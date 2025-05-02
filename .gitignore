@@ -1,13 +1,8 @@
-# Ignore build artifacts and temporary files
-.Module.symvers.cmd
-# .modules.order.cmd removed as .modules.order already covers it
-.modules.order.cmd
-.pinctrl-bcm2835-acpi.*.cmd
+
 Module.symvers
 modules.order
+*.cmd
 *.ko
-# Intentionally including Module.symvers despite ignoring .Module.symvers.cmd
-Module.symvers
+*.mod
+*.o
 *.mod.c
-pinctrl-bcm2835-acpi.mod.o
-pinctrl-bcm2835-acpi.o
