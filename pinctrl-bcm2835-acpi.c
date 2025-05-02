@@ -21,9 +21,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/of.h>
-#include <linux/of_irq.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pinctrl/machine.h>
 #include <linux/pinctrl/pinconf.h>
@@ -374,17 +371,6 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
 	return 0;
 }
 
-static int bcm2835_add_pin_ranges_fallback(struct gpio_chip *gc)
-{
-	struct device_node *np = dev_of_node(gc->parent);
-	struct pinctrl_dev *pctldev = of_pinctrl_get(np);
-
-	if (!pctldev)
-		return 0;
-
-	return gpiochip_add_pin_range(gc, pinctrl_dev_get_devname(pctldev), 0, 0,
-				      gc->ngpio);
-}
 
 static const struct gpio_chip bcm2835_gpio_chip = {
 	.label = MODULE_NAME,
@@ -400,7 +386,6 @@ static const struct gpio_chip bcm2835_gpio_chip = {
 	.base = -1,
 	.ngpio = BCM2835_NUM_GPIOS,
 	.can_sleep = false,
-	.add_pin_ranges = bcm2835_add_pin_ranges_fallback,
 };
 
 static const struct gpio_chip bcm2711_gpio_chip = {
@@ -417,7 +402,6 @@ static const struct gpio_chip bcm2711_gpio_chip = {
 	.base = -1,
 	.ngpio = BCM2711_NUM_GPIOS,
 	.can_sleep = false,
-	.add_pin_ranges = bcm2835_add_pin_ranges_fallback,
 };
 
 static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
@@ -1266,27 +1250,11 @@ static const struct bcm_plat_data bcm2711_plat_data = {
 	.gpio_range = &bcm2711_pinctrl_gpio_range,
 };
 
-static const struct of_device_id bcm2835_pinctrl_match[] = {
-	{
-		.compatible = "brcm,bcm2835-gpio",
-		.data = &bcm2835_plat_data,
-	},
-	{
-		.compatible = "brcm,bcm2711-gpio",
-		.data = &bcm2711_plat_data,
-	},
-	{
-		.compatible = "brcm,bcm7211-gpio",
-		.data = &bcm2711_plat_data,
-	},
-	{}
-};
-MODULE_DEVICE_TABLE(of, bcm2835_pinctrl_match);
+
 
 
 static const struct acpi_device_id bcm2835_acpi_ids[] = {
 	{ "BCM2845", (kernel_ulong_t)&bcm2835_plat_data },
-	{ "BCM2835", (kernel_ulong_t)&bcm2835_plat_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_acpi_ids);
@@ -1294,181 +1262,91 @@ MODULE_DEVICE_TABLE(acpi, bcm2835_acpi_ids);
 
 
 static int bcm2835_pinctrl_probe(struct platform_device *pdev)
-
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
-	const struct bcm_plat_data *pdata = NULL;
 	struct bcm2835_pinctrl *pc;
-	struct gpio_irq_chip *girq;
-	struct resource iomem;
-	int err, i;
-        struct resource *res;
-	const struct of_device_id *match;
-	int is_7211 = 0;
+	const struct acpi_device_id *id;
+	const struct bcm_plat_data *pdata;
+	struct resource *res;
+	int ret;
 
-	if (dev->of_node) {
-		match = of_match_node(bcm2835_pinctrl_match, dev->of_node);
-		if (!match)
-			return -EINVAL;
-		pdata = match->data;
-		is_7211 = of_device_is_compatible(dev->of_node, "brcm,bcm7211-gpio");
-	} else if (ACPI_HANDLE(dev)) {
-		const struct acpi_device_id *id;
-		id = acpi_match_device(bcm2835_acpi_ids, dev);
-		if (!id)
-			return -ENODEV;
-		pdata = (const struct bcm_plat_data *)id->driver_data;
+	dev_info(dev, "BCM2835 pinctrl: probing via ACPI\n");
+
+	/* Match ACPI device */
+	id = acpi_match_device(bcm2835_acpi_ids, dev);
+	if (!id) {
+		dev_err(dev, "No matching ACPI ID\n");
+		return -ENODEV;
 	}
-pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+
+	pdata = (const struct bcm_plat_data *)id->driver_data;
+
+	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
 	if (!pc)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, pc);
 	pc->dev = dev;
 
-        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-        if (!res) {
-	        dev_err(dev, "could not get IO memory\n");
-	        return -EINVAL;
-        }
+	/* I/O resource mapping */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(dev, "Missing memory resource\n");
+		return -ENODEV;
+	}
 
-        pc->base = devm_ioremap_resource(dev, res);
-        if (IS_ERR(pc->base))
-	        return PTR_ERR(pc->base);
+	pc->base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(pc->base)) {
+		dev_err(dev, "Failed to map registers\n");
+		return PTR_ERR(pc->base);
+	}
 
-	match = of_match_node(bcm2835_pinctrl_match, pdev->dev.of_node);
-	if (!match)
-		return -EINVAL;
+	dev_info(dev, "Mapped GPIO registers at %pa\n", &res->start);
 
-	pdata = match->data;
-	is_7211 = of_device_is_compatible(np, "brcm,bcm7211-gpio");
+	/* Init locks */
+	spin_lock_init(&pc->fsel_lock);
+	raw_spin_lock_init(&pc->irq_lock[0]);
+	raw_spin_lock_init(&pc->irq_lock[1]);
 
+	/* Copy platform data fields */
 	pc->gpio_chip = *pdata->gpio_chip;
 	pc->gpio_chip.parent = dev;
 
-	spin_lock_init(&pc->fsel_lock);
-	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
-		unsigned long events;
-		unsigned offset;
-
-		/* clear event detection flags */
-		bcm2835_gpio_wr(pc, GPREN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPFEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPHEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPLEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPAREN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPAFEN0 + i * 4, 0);
-
-		/* clear all the events */
-		events = bcm2835_gpio_rd(pc, GPEDS0 + i * 4);
-		for_each_set_bit(offset, &events, 32)
-			bcm2835_gpio_wr(pc, GPEDS0 + i * 4, BIT(offset));
-
-		raw_spin_lock_init(&pc->irq_lock[i]);
-	}
-
 	pc->pctl_desc = *pdata->pctl_desc;
+	pc->pctl_desc.owner = THIS_MODULE;
+
+	pc->gpio_range = *pdata->gpio_range;
+
+	/* Register pinctrl */
 	pc->pctl_dev = devm_pinctrl_register(dev, &pc->pctl_desc, pc);
 	if (IS_ERR(pc->pctl_dev)) {
-		gpiochip_remove(&pc->gpio_chip);
+		dev_err(dev, "Failed to register pinctrl device\n");
 		return PTR_ERR(pc->pctl_dev);
 	}
 
-	pc->gpio_range = *pdata->gpio_range;
-	pc->gpio_range.base = pc->gpio_chip.base;
-	pc->gpio_range.gc = &pc->gpio_chip;
-	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
-
-	girq = &pc->gpio_chip.irq;
-	gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
-	girq->parent_handler = bcm2835_gpio_irq_handler;
-	girq->num_parents = BCM2835_NUM_IRQS;
-	girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS,
-				     sizeof(*girq->parents),
-				     GFP_KERNEL);
-	if (!girq->parents) {
-		err = -ENOMEM;
-		goto out_remove;
+	/* Register GPIO chip */
+	ret = devm_gpiochip_add_data(dev, &pc->gpio_chip, pc);
+	if (ret) {
+		dev_err(dev, "Failed to register GPIO chip: %d\n", ret);
+		return ret;
 	}
 
-	if (is_7211) {
-		pc->wake_irq = devm_kcalloc(dev, BCM2835_NUM_IRQS,
-					    sizeof(*pc->wake_irq),
-					    GFP_KERNEL);
-		if (!pc->wake_irq) {
-			err = -ENOMEM;
-			goto out_remove;
-		}
+	/* Add GPIO range to pinctrl */
+	ret = pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
+	if (ret) {
+		dev_err(dev, "Failed to add GPIO range: %d\n", ret);
+		return ret;
 	}
 
-	/*
-	 * Use the same handler for all groups: this is necessary
-	 * since we use one gpiochip to cover all lines - the
-	 * irq handler then needs to figure out which group and
-	 * bank that was firing the IRQ and look up the per-group
-	 * and bank data.
-	 */
-	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-		int len;
-		char *name;
-
-		girq->parents[i] = irq_of_parse_and_map(np, i);
-		if (!is_7211) {
-			if (!girq->parents[i]) {
-				girq->num_parents = i;
-				break;
-			}
-			continue;
-		}
-		/* Skip over the all banks interrupts */
-		pc->wake_irq[i] = irq_of_parse_and_map(np, i +
-						       BCM2835_NUM_IRQS + 1);
-
-		len = strlen(dev_name(pc->dev)) + 16;
-		name = devm_kzalloc(pc->dev, len, GFP_KERNEL);
-		if (!name) {
-			err = -ENOMEM;
-			goto out_remove;
-		}
-
-		snprintf(name, len, "%s:bank%d", dev_name(pc->dev), i);
-
-		/* These are optional interrupts */
-		err = devm_request_irq(dev, pc->wake_irq[i],
-				       bcm2835_gpio_wake_irq_handler,
-				       IRQF_SHARED, name, pc);
-		if (err)
-			dev_warn(dev, "unable to request wake IRQ %d\n",
-				 pc->wake_irq[i]);
-	}
-
-	girq->default_type = IRQ_TYPE_NONE;
-	girq->handler = handle_level_irq;
-
-	err = gpiochip_add_data(&pc->gpio_chip, pc);
-	if (err) {
-		dev_err(dev, "could not add GPIO chip\n");
-		goto out_remove;
-	}
-
-	dev_info(dev, "GPIO_OUT persistence: %s\n",
-		 str_yes_no(persist_gpio_outputs));
-
+	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
+		 pc->gpio_chip.ngpio);
 	return 0;
-
-out_remove:
-	pinctrl_remove_gpio_range(pc->pctl_dev, &pc->gpio_range);
-	return err;
 }
 
 static struct platform_driver bcm2835_pinctrl_driver = {
 	.probe = bcm2835_pinctrl_probe,
 	.driver = {
-		.name = MODULE_NAME,
-		.of_match_table = bcm2835_pinctrl_match,
-		.acpi_match_table = bcm2835_acpi_ids,
-		.suppress_bind_attrs = true,
+		.name = "pinctrl-bcm2835-acpi",
+		.acpi_match_table = ACPI_PTR(bcm2835_acpi_match),
 	},
 };
 module_platform_driver(bcm2835_pinctrl_driver);
@@ -1476,5 +1354,5 @@ module_platform_driver(bcm2835_pinctrl_driver);
 MODULE_AUTHOR("Chris Boot");
 MODULE_AUTHOR("Simon Arlott");
 MODULE_AUTHOR("Stephen Warren");
-MODULE_DESCRIPTION("Broadcom BCM2835/2711 pinctrl and GPIO driver");
+MODULE_DESCRIPTION("Broadcom BCM2835/2711 pinctrl and GPIO driver modified for ACPI");
 MODULE_LICENSE("GPL");
