@@ -272,12 +272,17 @@ static inline int bcm2835_gpio_get_bit(struct bcm2835_pinctrl *pc, unsigned reg,
 	return (bcm2835_gpio_rd(pc, reg) >> GPIO_REG_SHIFT(bit)) & 1;
 }
 
-/* note NOT a read/modify/write cycle */
 static inline void bcm2835_gpio_set_bit(struct bcm2835_pinctrl *pc,
-		unsigned reg, unsigned bit)
+                unsigned reg, unsigned bit)
 {
-	reg += GPIO_REG_OFFSET(bit) * 4;
-	bcm2835_gpio_wr(pc, reg, BIT(GPIO_REG_SHIFT(bit)));
+        reg += GPIO_REG_OFFSET(bit) * 4;
+        u32 mask = BIT(GPIO_REG_SHIFT(bit));
+        void __iomem *addr = pc->base + reg;
+
+        dev_info(pc->dev, "GPIO set_bit: reg offset 0x%X, bit %u, write 0x%08X to %p\n",
+                 reg, bit, mask, addr);
+
+        bcm2835_gpio_wr(pc, reg, mask);
 }
 
 static inline enum bcm2835_fsel bcm2835_pinctrl_fsel_get(
@@ -365,6 +370,9 @@ static void bcm2835_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
 
+	dev_info(pc->dev, "GPIO %u set to %d\n", offset, value);
+
+
 	bcm2835_gpio_set_bit(pc, value ? GPSET0 : GPCLR0, offset);
 }
 
@@ -372,6 +380,9 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
 		unsigned offset, int value)
 {
 	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
+
+	dev_info(pc->dev, "GPIO %u direction_output(%d)\n", offset, value);
+
 
 	bcm2835_gpio_set_bit(pc, value ? GPSET0 : GPCLR0, offset);
 	bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_OUT);
