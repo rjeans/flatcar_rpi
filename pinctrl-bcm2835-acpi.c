@@ -1294,7 +1294,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pc);
 	pc->dev = dev;
 
-	/* Map I/O resources */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev, "Missing memory resource\n");
@@ -1314,24 +1313,29 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
 		unsigned long events;
 		unsigned offset;
+		void __iomem *base = pc->base;
+		void __iomem *reg;
 
-		bcm2835_gpio_wr(pc, GPREN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPFEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPHEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPLEN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPAREN0 + i * 4, 0);
-		bcm2835_gpio_wr(pc, GPAFEN0 + i * 4, 0);
+		// Clear event detection registers
+		writel(0, base + GPREN0  + i * 4);
+		writel(0, base + GPFEN0  + i * 4);
+		writel(0, base + GPHEN0  + i * 4);
+		writel(0, base + GPLEN0  + i * 4);
+		writel(0, base + GPAREN0 + i * 4);
+		writel(0, base + GPAFEN0 + i * 4);
 
-		events = bcm2835_gpio_rd(pc, GPEDS0 + i * 4);
+		// Clear events
+		reg = base + GPEDS0 + i * 4;
+		events = readl(reg);
 		for_each_set_bit(offset, &events, 32)
-			bcm2835_gpio_wr(pc, GPEDS0 + i * 4, BIT(offset));
+			writel(BIT(offset), reg);
 
 		raw_spin_lock_init(&pc->irq_lock[i]);
 	}
 
 	pc->gpio_chip = *pdata->gpio_chip;
 	pc->gpio_chip.parent = dev;
-	pc->gpio_chip.base = -1; // allow dynamic base allocation
+	pc->gpio_chip.base = -1;
 
 	girq = &pc->gpio_chip.irq;
 	gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
@@ -1353,7 +1357,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	girq->default_type = IRQ_TYPE_NONE;
 	girq->handler = handle_level_irq;
 
-	/* Optional wake IRQs */
 	pc->wake_irq = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*pc->wake_irq), GFP_KERNEL);
 	if (!pc->wake_irq)
 		return -ENOMEM;
@@ -1390,7 +1393,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	}
 
 	pc->gpio_range = *pdata->gpio_range;
-	pc->gpio_range.base = 0; // fallback default
+	pc->gpio_range.base = 0;
 	pc->gpio_range.gc = &pc->gpio_chip;
 
 	ret = devm_gpiochip_add_data(dev, &pc->gpio_chip, pc);
