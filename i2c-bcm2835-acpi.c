@@ -391,7 +391,7 @@ static u32 bcm2835_i2c_func(struct i2c_adapter *adap)
 }
 
 static const struct i2c_algorithm bcm2835_i2c_algo = {
-	.xfer = bcm2835_i2c_xfer,
+	.master_xfer = bcm2835_i2c_xfer, // Updated member name
 	.functionality = bcm2835_i2c_func,
 };
 
@@ -490,7 +490,7 @@ err_put_exclusive_rate:
 	return ret;
 }
 
-static void bcm2835_i2c_remove(struct platform_device *pdev)
+static int bcm2835_i2c_remove(struct platform_device *pdev) // Changed return type to int
 {
 	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
@@ -499,6 +499,8 @@ static void bcm2835_i2c_remove(struct platform_device *pdev)
 
 	free_irq(i2c_dev->irq, i2c_dev);
 	i2c_del_adapter(&i2c_dev->adapter);
+
+	return 0; // Added return statement
 }
 
 static const struct acpi_device_id bcm2835_i2c_acpi_match[] = {
