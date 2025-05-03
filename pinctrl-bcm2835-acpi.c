@@ -390,58 +390,7 @@ static const struct gpio_chip bcm2711_gpio_chip = {
 	.can_sleep = false,
 };
 
-static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
-					 unsigned int bank, u32 mask)
-{
-	unsigned long events;
-	unsigned offset;
-	unsigned gpio;
 
-	events = readl(pc->base + GPEDS0 + bank * 4);
-	events &= mask;
-	events &= pc->enabled_irq_map[bank];
-	for_each_set_bit(offset, &events, 32) {
-		gpio = (32 * bank) + offset;
-		generic_handle_domain_irq(pc->gpio_chip.irq.domain,
-					  gpio);
-	}
-}
-
-static void bcm2835_gpio_irq_handler(struct irq_desc *desc)
-{
-	struct gpio_chip *chip = irq_desc_get_handler_data(desc);
-	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
-	struct irq_chip *host_chip = irq_desc_get_chip(desc);
-	int irq = irq_desc_get_irq(desc);
-	int group = 0;
-	int i;
-
-	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-		if (chip->irq.parents[i] == irq) {
-			group = i;
-			break;
-		}
-	}
-	/* This should not happen, every IRQ has a bank */
-	BUG_ON(i == BCM2835_NUM_IRQS);
-
-	chained_irq_enter(host_chip, desc);
-
-	switch (group) {
-	case 0: /* IRQ0 covers GPIOs 0-27 */
-		bcm2835_gpio_irq_handle_bank(pc, 0, 0x0fffffff);
-		break;
-	case 1: /* IRQ1 covers GPIOs 28-45 */
-		bcm2835_gpio_irq_handle_bank(pc, 0, 0xf0000000);
-		bcm2835_gpio_irq_handle_bank(pc, 1, 0x00003fff);
-		break;
-	case 2: /* IRQ2 covers GPIOs 46-57 */
-		bcm2835_gpio_irq_handle_bank(pc, 1, 0x003fc000);
-		break;
-	}
-
-	chained_irq_exit(host_chip, desc);
-}
 
 static irqreturn_t bcm2835_gpio_wake_irq_handler(int irq, void *dev_id)
 {
