@@ -1346,8 +1346,8 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-		int irq;
-        irq = acpi_dev_get_irq(ACPI_COMPANION(dev), i, NULL);
+		acpi_handle handle = ACPI_HANDLE(dev);
+        int irq = acpi_irq_get_irq(handle, i);
         if (irq < 0)
 	      break;
         girq->parents[i] = irq;
