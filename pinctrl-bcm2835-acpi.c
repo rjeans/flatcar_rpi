@@ -1340,7 +1340,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
-
+     return 0;
 
 }
 
