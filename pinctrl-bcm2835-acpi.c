@@ -1343,8 +1343,9 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	girq->parent_handler = bcm2835_gpio_irq_handler;
 	girq->num_parents = BCM2835_NUM_IRQS;
 	girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
-	if (!girq->parents)
+	if (!girq->parents) {
 		return -ENOMEM;
+	}
 
 
 		for (i = 0; i < BCM2835_NUM_IRQS; i++) {
