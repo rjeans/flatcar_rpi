@@ -1340,16 +1340,8 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
-		 ret = bcm2835_gpio_direction_output(&pc->gpio_chip, 17, 0);
-		 if (ret) {
-			 dev_err(dev, "Failed to set GPIO 17 as output: %d\n", ret);
-			 return ret;
-		 }
-		 ret = gpio_request(17, "pinned-gpio17");
-		 if (ret)
-			 dev_warn(pc->dev, "Failed to request GPIO 17: %d\n", ret);
-		 else
-			 gpio_direction_output(17, 0);	return 0;
+
+
 }
 
 static struct platform_driver bcm2835_pinctrl_driver = {
