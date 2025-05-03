@@ -378,20 +378,12 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
 	return 0;
 }
 
-static int bcm2835_gpio_request(struct gpio_chip *chip, unsigned offset)
-{
-	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
 
-	dev_info(pc->dev, "GPIO %d requested\n", offset);
-
-
-	return 0;
-}
 
 static const struct gpio_chip bcm2835_gpio_chip = {
 	.label = MODULE_NAME,
 	.owner = THIS_MODULE,
-	.request = bcm2835_gpio_request,
+	.request = gpiochip_generic_request,
 	.free = gpiochip_generic_free,
 	.direction_input = bcm2835_gpio_direction_input,
 	.direction_output = bcm2835_gpio_direction_output,
