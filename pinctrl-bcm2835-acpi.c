@@ -935,6 +935,10 @@ static int bcm2835_pmx_free(struct pinctrl_dev *pctldev,
 	if (fsel == BCM2835_FSEL_GPIO_IN)
 		return 0;
 
+		dev_warn(pc->dev,
+			"pmx_free(): pin %u fsel=%u (%s), persist_gpio_outputs=%d\n",
+			offset, fsel, bcm2835_functions[fsel], persist_gpio_outputs);
+
 	if (persist_gpio_outputs && fsel == BCM2835_FSEL_GPIO_OUT)
 		return 0;
 
