@@ -384,7 +384,6 @@ static int bcm2835_gpio_request(struct gpio_chip *chip, unsigned offset)
 
 	dev_info(pc->dev, "GPIO %d requested\n", offset);
 
-	bcm2835_bind_gpio_function(pc, offset, BCM2835_FSEL_GPIO_OUT);
 
 	return 0;
 }
