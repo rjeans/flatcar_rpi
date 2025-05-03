@@ -1346,12 +1346,11 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-		girq->parents[i] = platform_get_irq(pdev, i);
-		if (girq->parents[i] < 0) {
-			dev_warn(dev, "Missing IRQ %d\n", i);
-			girq->num_parents = i;
+		int irq = platform_get_irq_optional(pdev, i);
+		if (irq < 0)
 			break;
-		}
+
+		girq->parents[i] = irq;
 	}
 
 	girq->default_type = IRQ_TYPE_NONE;
