@@ -1276,6 +1276,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	const struct bcm_plat_data *pdata;
 	struct resource *res;
 	struct gpio_irq_chip *girq;
+	struct resource irq_res;
 	int ret, i;
 
 	dev_info(dev, "BCM2835 pinctrl: probing via ACPI\n");
@@ -1345,7 +1346,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	if (!girq->parents)
 		return -ENOMEM;
 
-		struct resource irq_res;
+
 		for (i = 0; i < BCM2835_NUM_IRQS; i++) {
 			int ret = acpi_irq_get(ACPI_HANDLE(dev), i, &irq_res);
 			if (ret < 0)
