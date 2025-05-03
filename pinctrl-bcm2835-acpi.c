@@ -1345,13 +1345,13 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	if (!girq->parents)
 		return -ENOMEM;
 
-		struct resource res;
+		struct resource irq_res;
 		for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-			int ret = acpi_irq_get(ACPI_HANDLE(dev), i, &res);
+			int ret = acpi_irq_get(ACPI_HANDLE(dev), i, &irq_res);
 			if (ret < 0)
 				break;
 		
-			girq->parents[i] = res.start;
+			girq->parents[i] = irq_res.start;
 		}
 		girq->num_parents = i;
 
