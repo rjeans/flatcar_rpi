@@ -250,7 +250,6 @@ static const char * const irq_type_names[] = {
 	[IRQ_TYPE_LEVEL_LOW] = "level-low",
 };
 
-#define persist_gpio_outputs (true)
 
 
 
@@ -934,13 +933,15 @@ static int bcm2835_pmx_free(struct pinctrl_dev *pctldev,
 	if (fsel == BCM2835_FSEL_GPIO_IN)
 		return 0;
 
-		dev_warn(pc->dev,
-			"pmx_free(): pin %u fsel=%u (%s), persist_gpio_outputs=%d\n",
-			offset, fsel, bcm2835_functions[fsel], persist_gpio_outputs);
+	dev_warn(pc->dev,
+			"pmx_free(): pin %u fsel=%u (%s)",
+			offset, fsel, bcm2835_functions[fsel]);
 
-	if (persist_gpio_outputs && fsel == BCM2835_FSEL_GPIO_OUT)
+	if (fsel == BCM2835_FSEL_GPIO_OUT)
 		return 0;
-
+    dev_warn(pc->dev,
+			"pmx_free(): pin %u fsel=%u (%s) - setting to GPIO_IN\n",
+			offset, fsel, bcm2835_functions[fsel]);
 	/* disable by setting to GPIO_IN */
 	bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_IN);
 	return 0;
