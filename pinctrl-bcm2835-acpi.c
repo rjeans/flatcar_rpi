@@ -922,36 +922,6 @@ static const struct pinctrl_ops bcm2835_pctl_ops = {
 	.dt_free_map = bcm2835_pctl_dt_free_map,
 };
 
-static int bcm2835_pmx_free(struct pinctrl_dev *pctldev,
-		unsigned offset)
-{
-	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
-	enum bcm2835_fsel fsel = bcm2835_pinctrl_fsel_get(pc, offset);
-
-	dev_warn(pc->dev, "pmx_free() forcibly setting pin %u to input\n", offset);
-
-	if (fsel == BCM2835_FSEL_GPIO_IN)
-		return 0;
-
-	dev_warn(pc->dev,
-			"pmx_free(): pin %u fsel=%u (%s)",
-			offset, fsel, bcm2835_functions[fsel]);
-
-	if (fsel == BCM2835_FSEL_GPIO_OUT) {
-		dev_warn(pc->dev,
-			"pmx_free(): pin %u fsel=%u (%s) - Returning\n",
-			offset, fsel, bcm2835_functions[fsel]);
-		return 0;
-		}
-    
-	
-		dev_warn(pc->dev,
-			"pmx_free(): pin %u fsel=%u (%s) - setting to GPIO_IN\n",
-			offset, fsel, bcm2835_functions[fsel]);
-	/* disable by setting to GPIO_IN */
-	bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_IN);
-	return 0;
-}
 
 static int bcm2835_pmx_get_functions_count(struct pinctrl_dev *pctldev)
 {
@@ -993,12 +963,7 @@ static int bcm2835_pmx_set(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
-static void bcm2835_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
-		struct pinctrl_gpio_range *range,
-		unsigned offset)
-{
-	bcm2835_pmx_free(pctldev, offset);
-}
+
 
 static int bcm2835_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 		struct pinctrl_gpio_range *range,
@@ -1020,7 +985,6 @@ static const struct pinmux_ops bcm2835_pmx_ops = {
 	.get_function_name = bcm2835_pmx_get_function_name,
 	.get_function_groups = bcm2835_pmx_get_function_groups,
 	.set_mux = bcm2835_pmx_set,
-	.gpio_disable_free = bcm2835_pmx_gpio_disable_free,
 	.gpio_set_direction = bcm2835_pmx_gpio_set_direction,
 };
 
