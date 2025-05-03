@@ -402,7 +402,7 @@ static const struct gpio_chip bcm2711_gpio_chip = {
 	.label = "pinctrl-bcm2711",
 	.owner = THIS_MODULE,
 	.request = gpiochip_generic_request,
-	.free = gpiochip_generic_free,
+	.free = NULL,
 	.direction_input = bcm2835_gpio_direction_input,
 	.direction_output = bcm2835_gpio_direction_output,
 	.get_direction = bcm2835_gpio_get_direction,
@@ -1344,6 +1344,11 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		 if (ret) {
 			 dev_err(dev, "Failed to set GPIO 17 as output: %d\n", ret);
 			 return ret;
+		 }
+		 struct gpio_desc *desc = gpiochip_request_own_desc(&pc->gpio_chip, 17, "pinned-gpio17", GPIOD_OUT_LOW, 0);
+		 if (IS_ERR(desc)) {
+			 dev_err(dev, "Failed to request GPIO 17: %ld\n", PTR_ERR(desc));
+			 return PTR_ERR(desc);
 		 }
 	return 0;
 }
