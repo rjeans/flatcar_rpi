@@ -424,14 +424,17 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		return PTR_ERR(i2c_dev->regs);
 
 	mclk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(mclk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(mclk),
-				     "Could not get clock\n");
+	if (IS_ERR(mclk)) {
+		dev_warn(&pdev->dev, "Clock not found, using default rate\n");
+		mclk = NULL; // Fallback to no clock
+	}
 
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
-	if (IS_ERR(i2c_dev->bus_clk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(i2c_dev->bus_clk),
-				     "Could not register clock\n");
+	if (IS_ERR(i2c_dev->bus_clk)) {
+		ret = PTR_ERR(i2c_dev->bus_clk);
+		dev_err(&pdev->dev, "Could not register clock: %d\n", ret);
+		goto err_put_exclusive_rate;
+	}
 
 	// Use ACPI to retrieve clock frequency if available
 	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate))
