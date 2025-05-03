@@ -270,8 +270,8 @@ static inline void bcm2835_gpio_set_bit(struct bcm2835_pinctrl *pc,
 	u32 offset = reg + (GPIO_REG_OFFSET(bit) * 4);  // byte offset
 	void __iomem *addr = pc->base;
 
-	dev_info(pc->dev, "GPIO set_bit: reg offset 0x%X, bit %u, write 0x%08X\n",
-	         offset, bit, mask);
+	dev_info(pc->dev, "GPIO set_bit: addr %p, reg offset 0x%X, bit %u, write 0x%08X\n",
+			 addr + offset, offset, bit, mask);
 
 	writel(mask, addr + offset);
 }
