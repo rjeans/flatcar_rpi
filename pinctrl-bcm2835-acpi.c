@@ -267,13 +267,13 @@ static inline void bcm2835_gpio_set_bit(struct bcm2835_pinctrl *pc,
 	unsigned reg, unsigned bit)
 {
 	u32 mask = BIT(GPIO_REG_SHIFT(bit));
-	unsigned offset = reg + (GPIO_REG_OFFSET(bit) * 4);
-	void __iomem *addr = (char __iomem *)pc->base + offset;
+	u32 offset = reg + (GPIO_REG_OFFSET(bit) * 4);  // byte offset
+	void __iomem *addr = pc->base;
 
-	dev_info(pc->dev, "GPIO set_bit: reg offset 0x%X, bit %u, write 0x%08X to %p\n",
-	         offset, bit, mask, addr);
+	dev_info(pc->dev, "GPIO set_bit: reg offset 0x%X, bit %u, write 0x%08X\n",
+	         offset, bit, mask);
 
-	writel(mask, addr);
+	writel(mask, addr + offset);
 }
 
 static inline enum bcm2835_fsel bcm2835_pinctrl_fsel_get(
