@@ -12,9 +12,10 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/module.h>
-#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/acpi.h>
+#include <linux/property.h>
 
 #define BCM2835_I2C_C		0x0
 #define BCM2835_I2C_S		0x4
@@ -409,7 +410,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	int ret;
 	struct i2c_adapter *adap;
 	struct clk *mclk;
-	u32 bus_clk_rate;
+	u32 bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ; // Default clock frequency
 
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
 	if (!i2c_dev)
@@ -418,7 +419,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	i2c_dev->dev = &pdev->dev;
 	init_completion(&i2c_dev->completion);
 
-	i2c_dev->regs = devm_platform_get_and_ioremap_resource(pdev, 0, NULL);
+	i2c_dev->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
 
@@ -428,18 +429,13 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 				     "Could not get clock\n");
 
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
-
 	if (IS_ERR(i2c_dev->bus_clk))
 		return dev_err_probe(&pdev->dev, PTR_ERR(i2c_dev->bus_clk),
 				     "Could not register clock\n");
 
-	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-				   &bus_clk_rate);
-	if (ret < 0) {
-		dev_warn(&pdev->dev,
-			 "Could not read clock-frequency property\n");
-		bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ;
-	}
+	// Use ACPI to retrieve clock frequency if available
+	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate))
+		dev_warn(&pdev->dev, "Using default clock frequency\n");
 
 	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
 	if (ret < 0)
@@ -469,18 +465,12 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	i2c_set_adapdata(adap, i2c_dev);
 	adap->owner = THIS_MODULE;
 	adap->class = I2C_CLASS_DEPRECATED;
-	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)",
-		 of_node_full_name(pdev->dev.of_node));
+	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)", dev_name(&pdev->dev));
 	adap->algo = &bcm2835_i2c_algo;
 	adap->dev.parent = &pdev->dev;
-	adap->dev.of_node = pdev->dev.of_node;
-	adap->quirks = of_device_get_match_data(&pdev->dev);
+	adap->quirks = &bcm2835_i2c_quirks;
 
-	/*
-	 * Disable the hardware clock stretching timeout. SMBUS
-	 * specifies a limit for how long the device can stretch the
-	 * clock, but core I2C doesn't.
-	 */
+	// Disable hardware clock stretching timeout
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, 0);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
@@ -511,19 +501,19 @@ static void bcm2835_i2c_remove(struct platform_device *pdev)
 	i2c_del_adapter(&i2c_dev->adapter);
 }
 
-static const struct of_device_id bcm2835_i2c_of_match[] = {
-	{ .compatible = "brcm,bcm2711-i2c" },
-	{ .compatible = "brcm,bcm2835-i2c", .data = &bcm2835_i2c_quirks },
+static const struct acpi_device_id bcm2835_i2c_acpi_match[] = {
+	{ "BCM2835", 0 },
+	{ "BCM2711", 0 },
 	{},
 };
-MODULE_DEVICE_TABLE(of, bcm2835_i2c_of_match);
+MODULE_DEVICE_TABLE(acpi, bcm2835_i2c_acpi_match);
 
 static struct platform_driver bcm2835_i2c_driver = {
 	.probe		= bcm2835_i2c_probe,
 	.remove		= bcm2835_i2c_remove,
 	.driver		= {
 		.name	= "i2c-bcm2835",
-		.of_match_table = bcm2835_i2c_of_match,
+		.acpi_match_table = ACPI_PTR(bcm2835_i2c_acpi_match),
 	},
 };
 module_platform_driver(bcm2835_i2c_driver);
