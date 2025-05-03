@@ -937,7 +937,27 @@ static int bcm2835_pmx_set(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+// Add the persist_gpio_outputs parameter
+static bool persist_gpio_outputs;
+module_param(persist_gpio_outputs, bool, 0444);
+MODULE_PARM_DESC(persist_gpio_outputs, "Enable GPIO_OUT persistence when pin is freed");
 
+// Modify bcm2835_pmx_free to handle persist_gpio_outputs
+static int bcm2835_pmx_free(struct pinctrl_dev *pctldev, unsigned offset)
+{
+    struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+    enum bcm2835_fsel fsel = bcm2835_pinctrl_fsel_get(pc, offset);
+
+    if (fsel == BCM2835_FSEL_GPIO_IN)
+        return 0;
+
+    if (persist_gpio_outputs && fsel == BCM2835_FSEL_GPIO_OUT)
+        return 0;
+
+    /* Disable by setting to GPIO_IN */
+    bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_IN);
+    return 0;
+}
 
 static int bcm2835_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 		struct pinctrl_gpio_range *range,
@@ -953,12 +973,34 @@ static int bcm2835_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int bcm2835_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
+	struct pinctrl_gpio_range *range,
+	unsigned offset)
+{
+struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+
+/* Set the pin to GPIO mode */
+bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_IN);
+return 0;
+}
+
+static void bcm2835_pmx_gpio_disable_free(struct pinctrl_dev *pctldev,
+   struct pinctrl_gpio_range *range,
+   unsigned offset)
+{
+	bcm2835_pmx_free(pctldev, offset);
+}
+
 static const struct pinmux_ops bcm2835_pmx_ops = {
+	.free = bcm2835_pmx_free,
+
 	.get_functions_count = bcm2835_pmx_get_functions_count,
 	.get_function_name = bcm2835_pmx_get_function_name,
 	.get_function_groups = bcm2835_pmx_get_function_groups,
 	.set_mux = bcm2835_pmx_set,
 	.gpio_set_direction = bcm2835_pmx_gpio_set_direction,
+	.gpio_request_enable = bcm2835_pmx_gpio_request_enable, 
+    .gpio_disable_free = bcm2835_pmx_gpio_disable_free,     
 };
 
 static int bcm2835_pinconf_get(struct pinctrl_dev *pctldev,
@@ -1227,6 +1269,56 @@ static const struct acpi_device_id bcm2835_acpi_ids[] = {
 MODULE_DEVICE_TABLE(acpi, bcm2835_acpi_ids);
 
 
+static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
+	unsigned int bank, u32 mask)
+{
+unsigned long events;
+unsigned offset;
+unsigned gpio;
+
+events = readl(pc->base + GPEDS0 + bank * 4);
+events &= mask;
+events &= pc->enabled_irq_map[bank];
+for_each_set_bit(offset, &events, 32) {
+gpio = (32 * bank) + offset;
+generic_handle_domain_irq(pc->gpio_chip.irq.domain, gpio);
+}
+}
+
+static void bcm2835_gpio_irq_handler(struct irq_desc *desc)
+{
+    struct gpio_chip *chip = irq_desc_get_handler_data(desc);
+    struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
+    struct irq_chip *host_chip = irq_desc_get_chip(desc);
+    int irq = irq_desc_get_irq(desc);
+    int group = 0;
+    int i;
+
+    for (i = 0; i < BCM2835_NUM_IRQS; i++) {
+        if (chip->irq.parents[i] == irq) {
+            group = i;
+            break;
+        }
+    }
+    BUG_ON(i == BCM2835_NUM_IRQS);
+
+    chained_irq_enter(host_chip, desc);
+
+    switch (group) {
+    case 0: /* IRQ0 covers GPIOs 0-27 */
+        bcm2835_gpio_irq_handle_bank(pc, 0, 0x0fffffff);
+        break;
+    case 1: /* IRQ1 covers GPIOs 28-45 */
+        bcm2835_gpio_irq_handle_bank(pc, 0, 0xf0000000);
+        bcm2835_gpio_irq_handle_bank(pc, 1, 0x00003fff);
+        break;
+    case 2: /* IRQ2 covers GPIOs 46-57 */
+        bcm2835_gpio_irq_handle_bank(pc, 1, 0x003fc000);
+        break;
+    }
+
+    chained_irq_exit(host_chip, desc);
+}
 
 static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 {
@@ -1236,8 +1328,23 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	const struct bcm_plat_data *pdata;
 	struct resource *res;
 	int ret;
+	struct gpio_irq_chip *girq;
 
 	dev_info(dev, "BCM2835 pinctrl: probing via ACPI\n");
+
+    girq = &pc->gpio_chip.irq;
+    gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
+    girq->parent_handler = bcm2835_gpio_irq_handler;
+    girq->num_parents = BCM2835_NUM_IRQS;
+    girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
+    if (!girq->parents)
+        return -ENOMEM;
+
+    girq->default_type = IRQ_TYPE_NONE;
+    girq->handler = handle_level_irq;
+
+
+	
 
 	/* Match ACPI device */
 	id = acpi_match_device(bcm2835_acpi_ids, dev);
