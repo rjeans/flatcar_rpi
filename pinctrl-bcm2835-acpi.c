@@ -302,7 +302,7 @@ static inline void bcm2835_pinctrl_fsel_set(
 	val = readl(pc->base + FSEL_REG(pin));
 	cur = (val >> FSEL_SHIFT(pin)) & BCM2835_FSEL_MASK;
 
-	dev_dbg(pc->dev, "read %08x (%u => %s)\n", val, pin,
+	dev_info(pc->dev, "read %08x (%u => %s)\n", val, pin,
 		bcm2835_functions[cur]);
 
 	if (cur == fsel)
@@ -321,7 +321,7 @@ static inline void bcm2835_pinctrl_fsel_set(
 	val &= ~(BCM2835_FSEL_MASK << FSEL_SHIFT(pin));
 	val |= fsel << FSEL_SHIFT(pin);
 
-	dev_dbg(pc->dev, "write %08x (%u <= %s)\n", val, pin,
+	dev_info(pc->dev, "write %08x (%u <= %s)\n", val, pin,
 			bcm2835_functions[fsel]);
 	writel(val, pc->base + FSEL_REG(pin));
 
