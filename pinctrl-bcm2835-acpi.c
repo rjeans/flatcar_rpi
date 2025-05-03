@@ -1268,7 +1268,6 @@ static void bcm2835_gpio_irq_handler(struct irq_desc *desc)
 
     chained_irq_exit(host_chip, desc);
 }
-
 static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1276,53 +1275,26 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	const struct acpi_device_id *id;
 	const struct bcm_plat_data *pdata;
 	struct resource *res;
-	int ret;
 	struct gpio_irq_chip *girq;
+	int ret, i;
 
 	dev_info(dev, "BCM2835 pinctrl: probing via ACPI\n");
 
-
-	
-
-	/* Match ACPI device */
 	id = acpi_match_device(bcm2835_acpi_ids, dev);
 	if (!id) {
 		dev_err(dev, "No matching ACPI ID\n");
 		return -ENODEV;
 	}
-
 	pdata = (const struct bcm_plat_data *)id->driver_data;
 
 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
 	if (!pc)
 		return -ENOMEM;
 
+	platform_set_drvdata(pdev, pc);
 	pc->dev = dev;
 
-	girq = &pc->gpio_chip.irq;
-    gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
-    girq->parent_handler = bcm2835_gpio_irq_handler;
-    girq->num_parents = BCM2835_NUM_IRQS;
-    girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
-    if (!girq->parents)
-        return -ENOMEM;
-
-    girq->default_type = IRQ_TYPE_NONE;
-    girq->handler = handle_level_irq;
-
-	   // Register wake IRQ handler
-	   if (pc->wake_irq) {
-        int ret = devm_request_irq(dev, pc->wake_irq[0],
-                                   bcm2835_gpio_wake_irq_handler,
-                                   IRQF_SHARED, MODULE_NAME, pc);
-        if (ret) {
-            dev_err(dev, "Failed to request wake IRQ: %d\n", ret);
-            return ret;
-        }
-    }
-
-
-	/* I/O resource mapping */
+	/* Map I/O resources */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev, "Missing memory resource\n");
@@ -1337,53 +1309,116 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 
 	dev_info(dev, "Mapped GPIO registers at %pa\n", &res->start);
 
-	/* Init locks */
 	spin_lock_init(&pc->fsel_lock);
-	raw_spin_lock_init(&pc->irq_lock[0]);
-	raw_spin_lock_init(&pc->irq_lock[1]);
 
-	/* Copy platform data fields */
+	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
+		unsigned long events;
+		unsigned offset;
+
+		bcm2835_gpio_wr(pc, GPREN0 + i * 4, 0);
+		bcm2835_gpio_wr(pc, GPFEN0 + i * 4, 0);
+		bcm2835_gpio_wr(pc, GPHEN0 + i * 4, 0);
+		bcm2835_gpio_wr(pc, GPLEN0 + i * 4, 0);
+		bcm2835_gpio_wr(pc, GPAREN0 + i * 4, 0);
+		bcm2835_gpio_wr(pc, GPAFEN0 + i * 4, 0);
+
+		events = bcm2835_gpio_rd(pc, GPEDS0 + i * 4);
+		for_each_set_bit(offset, &events, 32)
+			bcm2835_gpio_wr(pc, GPEDS0 + i * 4, BIT(offset));
+
+		raw_spin_lock_init(&pc->irq_lock[i]);
+	}
+
 	pc->gpio_chip = *pdata->gpio_chip;
 	pc->gpio_chip.parent = dev;
+	pc->gpio_chip.base = -1; // allow dynamic base allocation
+
+	girq = &pc->gpio_chip.irq;
+	gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
+	girq->parent_handler = bcm2835_gpio_irq_handler;
+	girq->num_parents = BCM2835_NUM_IRQS;
+	girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
+	if (!girq->parents)
+		return -ENOMEM;
+
+	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
+		girq->parents[i] = platform_get_irq(pdev, i);
+		if (girq->parents[i] < 0) {
+			dev_warn(dev, "Missing IRQ %d\n", i);
+			girq->num_parents = i;
+			break;
+		}
+	}
+
+	girq->default_type = IRQ_TYPE_NONE;
+	girq->handler = handle_level_irq;
+
+	/* Optional wake IRQs */
+	pc->wake_irq = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*pc->wake_irq), GFP_KERNEL);
+	if (!pc->wake_irq)
+		return -ENOMEM;
+
+	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
+		char *name;
+		int irq, len;
+
+		irq = platform_get_irq(pdev, i + BCM2835_NUM_IRQS + 1);
+		pc->wake_irq[i] = irq;
+		if (irq < 0)
+			continue;
+
+		len = strlen(dev_name(dev)) + 16;
+		name = devm_kzalloc(dev, len, GFP_KERNEL);
+		if (!name)
+			return -ENOMEM;
+
+		snprintf(name, len, "%s:bank%d", dev_name(dev), i);
+		ret = devm_request_irq(dev, irq,
+				       bcm2835_gpio_wake_irq_handler,
+				       IRQF_SHARED, name, pc);
+		if (ret)
+			dev_warn(dev, "Failed to request wake IRQ %d\n", irq);
+	}
 
 	pc->pctl_desc = *pdata->pctl_desc;
 	pc->pctl_desc.owner = THIS_MODULE;
 
-	pc->gpio_range = *pdata->gpio_range;
-
-	/* Register pinctrl */
 	pc->pctl_dev = devm_pinctrl_register(dev, &pc->pctl_desc, pc);
 	if (IS_ERR(pc->pctl_dev)) {
 		dev_err(dev, "Failed to register pinctrl device\n");
 		return PTR_ERR(pc->pctl_dev);
 	}
 
-	/* Register GPIO chip */
+	pc->gpio_range = *pdata->gpio_range;
+	pc->gpio_range.base = 0; // fallback default
+	pc->gpio_range.gc = &pc->gpio_chip;
+
 	ret = devm_gpiochip_add_data(dev, &pc->gpio_chip, pc);
 	if (ret) {
 		dev_err(dev, "Failed to register GPIO chip: %d\n", ret);
-		return ret;
+		goto cleanup_gpio_range;
 	}
 
+	dev_info(dev, "Registering pin range for devname: %s\n", pinctrl_dev_get_devname(pc->pctl_dev));
 
-        dev_info(dev, "Registering pin range for devname: %s\n", pinctrl_dev_get_devname(pc->pctl_dev));
+	ret = gpiochip_add_pin_range(&pc->gpio_chip,
+				     pinctrl_dev_get_devname(pc->pctl_dev),
+				     0, 0, pc->gpio_chip.ngpio);
+	if (ret) {
+		dev_err(dev, "Failed to add GPIO pin range: %d\n", ret);
+		goto cleanup_gpio_range;
+	}
 
-        ret = gpiochip_add_pin_range(&pc->gpio_chip,
-			      pinctrl_dev_get_devname(pc->pctl_dev),
-			      0, 0, pc->gpio_chip.ngpio);
-        if (ret) {
-	        dev_err(dev, "Failed to add GPIO pin range: %d\n", ret);
-	        return ret;
-        }
-
-	/* Add GPIO range to pinctrl */
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
-     return 0;
+	return 0;
 
+cleanup_gpio_range:
+	pinctrl_remove_gpio_range(pc->pctl_dev, &pc->gpio_range);
+	return ret;
 }
 
 static struct platform_driver bcm2835_pinctrl_driver = {
