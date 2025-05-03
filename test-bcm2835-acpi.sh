@@ -7,7 +7,7 @@ echo "[1] Kernel messages:"
 dmesg | grep -i bcm || echo "No bcm2835-related dmesg output found"
 
 echo "[2] Checking for GPIO chip:"
-gpiochip=$(gpioinfo | grep -m1 'gpiochip' | awk '{print $1}')
+gpiochip="/dev/$(gpioinfo | grep -m1 'gpiochip' | awk '{print $1}')"
 if [ -z "$gpiochip" ]; then
     echo "No GPIO chip found! Is the driver loaded?"
     exit 1
@@ -16,13 +16,13 @@ else
 fi
 
 echo "[3] GPIO line info:"
-gpioinfo $gpiochip | head -n 10
+gpioinfo -c $gpiochip 
 
 echo "[4] GPIO read/write test on line 17 (CAUTION - ensure this is safe):"
-gpioset $gpiochip 17=1
+gpioset -c $gpiochip 17=1
 sleep 0.2
-gpioget $gpiochip 17
-gpioset $gpiochip 17=0
+gpioget -c $gpiochip 17
+gpioset -c $gpiochip 17=0
 
 echo "[5] IRQ mapping check:"
 grep -i bcm /proc/interrupts || echo "No BCM GPIO IRQs registered"

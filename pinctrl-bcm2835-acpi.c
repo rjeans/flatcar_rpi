@@ -74,6 +74,8 @@
 #define BCM2711_PULL_UP		0x1
 #define BCM2711_PULL_DOWN	0x2
 
+
+
 struct bcm2835_pinctrl {
 	struct device *dev;
 	void __iomem *base;
@@ -92,6 +94,8 @@ struct bcm2835_pinctrl {
 	/* Protect FSEL registers */
 	spinlock_t fsel_lock;
 };
+
+
 
 /* pins are just named GPIO0..GPIO53 */
 #define BCM2835_GPIO_PIN(a) PINCTRL_PIN(a, "gpio" #a)
@@ -222,6 +226,9 @@ enum bcm2835_fsel {
 	BCM2835_FSEL_COUNT = 8,
 	BCM2835_FSEL_MASK = 0x7,
 };
+
+void bcm2835_bind_gpio_function(struct bcm2835_pinctrl *pc, unsigned int pin, enum bcm2835_fsel func);
+
 
 static const char * const bcm2835_functions[BCM2835_FSEL_COUNT] = {
 	[BCM2835_FSEL_GPIO_IN] = "gpio_in",
@@ -371,11 +378,21 @@ static int bcm2835_gpio_direction_output(struct gpio_chip *chip,
 	return 0;
 }
 
+static int bcm2835_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
+
+	dev_info(pc->dev, "GPIO %d requested\n", offset);
+
+	bcm2835_bind_gpio_function(pc, offset, BCM2835_FSEL_GPIO_OUT);
+
+	return 0;
+}
 
 static const struct gpio_chip bcm2835_gpio_chip = {
 	.label = MODULE_NAME,
 	.owner = THIS_MODULE,
-	.request = gpiochip_generic_request,
+	.request = bcm2835_gpio_request,
 	.free = gpiochip_generic_free,
 	.direction_input = bcm2835_gpio_direction_input,
 	.direction_output = bcm2835_gpio_direction_output,
@@ -952,14 +969,20 @@ static int bcm2835_pmx_get_function_groups(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+void bcm2835_bind_gpio_function(struct bcm2835_pinctrl *pc, unsigned pin, enum bcm2835_fsel func)
+{
+	bcm2835_pinctrl_fsel_set(pc, pin, func);
+
+	dev_info(pc->dev, "Pin %d muxed to %s\n", pin, bcm2835_functions[func]);
+}
+
 static int bcm2835_pmx_set(struct pinctrl_dev *pctldev,
 		unsigned func_selector,
 		unsigned group_selector)
 {
 	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 
-	bcm2835_pinctrl_fsel_set(pc, group_selector, func_selector);
-
+	bcm2835_bind_gpio_function(pc, group_selector, func_selector);
 	return 0;
 }
 
@@ -1330,15 +1353,26 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+
+        dev_info(dev, "Registering pin range for devname: %s\n", pinctrl_dev_get_devname(pc->pctl_dev));
+
+        ret = gpiochip_add_pin_range(&pc->gpio_chip,
+			      pinctrl_dev_get_devname(pc->pctl_dev),
+			      0, 0, pc->gpio_chip.ngpio);
+        if (ret) {
+	        dev_err(dev, "Failed to add GPIO pin range: %d\n", ret);
+	        return ret;
+        }
+
 	/* Add GPIO range to pinctrl */
-	ret = pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
-	if (ret) {
-		dev_err(dev, "Failed to add GPIO range: %d\n", ret);
-		return ret;
-	}
+	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
+
+        bcm2835_pinctrl_fsel_set(pc, 17, BCM2835_FSEL_GPIO_OUT);
+        bcm2835_pmx_set(pc->pctl_dev, BCM2835_FSEL_GPIO_OUT, 17);
+
 	return 0;
 }
 
@@ -1346,7 +1380,7 @@ static struct platform_driver bcm2835_pinctrl_driver = {
 	.probe = bcm2835_pinctrl_probe,
 	.driver = {
 		.name = "pinctrl-bcm2835-acpi",
-		.acpi_match_table = ACPI_PTR(bcm2835_acpi_match),
+		.acpi_match_table = ACPI_PTR(bcm2835_acpi_ids),
 	},
 };
 module_platform_driver(bcm2835_pinctrl_driver);
