@@ -1281,17 +1281,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 
 	dev_info(dev, "BCM2835 pinctrl: probing via ACPI\n");
 
-    girq = &pc->gpio_chip.irq;
-    gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
-    girq->parent_handler = bcm2835_gpio_irq_handler;
-    girq->num_parents = BCM2835_NUM_IRQS;
-    girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
-    if (!girq->parents)
-        return -ENOMEM;
-
-    girq->default_type = IRQ_TYPE_NONE;
-    girq->handler = handle_level_irq;
-
 
 	
 
@@ -1309,6 +1298,29 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pc->dev = dev;
+
+	girq = &pc->gpio_chip.irq;
+    gpio_irq_chip_set_chip(girq, &bcm2835_gpio_irq_chip);
+    girq->parent_handler = bcm2835_gpio_irq_handler;
+    girq->num_parents = BCM2835_NUM_IRQS;
+    girq->parents = devm_kcalloc(dev, BCM2835_NUM_IRQS, sizeof(*girq->parents), GFP_KERNEL);
+    if (!girq->parents)
+        return -ENOMEM;
+
+    girq->default_type = IRQ_TYPE_NONE;
+    girq->handler = handle_level_irq;
+
+	   // Register wake IRQ handler
+	   if (pc->wake_irq) {
+        int ret = devm_request_irq(dev, pc->wake_irq[0],
+                                   bcm2835_gpio_wake_irq_handler,
+                                   IRQF_SHARED, MODULE_NAME, pc);
+        if (ret) {
+            dev_err(dev, "Failed to request wake IRQ: %d\n", ret);
+            return ret;
+        }
+    }
+
 
 	/* I/O resource mapping */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
