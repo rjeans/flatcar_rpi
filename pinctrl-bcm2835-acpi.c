@@ -254,22 +254,13 @@ static bool persist_gpio_outputs;
 module_param(persist_gpio_outputs, bool, 0444);
 MODULE_PARM_DESC(persist_gpio_outputs, "Enable GPIO_OUT persistence when pin is freed");
 
-static inline u32 bcm2835_gpio_rd(struct bcm2835_pinctrl *pc, unsigned reg)
-{
-	return readl(pc->base + reg);
-}
 
-static inline void bcm2835_gpio_wr(struct bcm2835_pinctrl *pc, unsigned reg,
-		u32 val)
-{
-	writel(val, pc->base + reg);
-}
 
 static inline int bcm2835_gpio_get_bit(struct bcm2835_pinctrl *pc, unsigned reg,
 		unsigned bit)
 {
 	reg += GPIO_REG_OFFSET(bit) * 4;
-	return (bcm2835_gpio_rd(pc, reg) >> GPIO_REG_SHIFT(bit)) & 1;
+	return (readl(pc->base + reg) >> GPIO_REG_SHIFT(bit)) & 1;
 }
 
 static inline void bcm2835_gpio_set_bit(struct bcm2835_pinctrl *pc,
@@ -282,13 +273,13 @@ static inline void bcm2835_gpio_set_bit(struct bcm2835_pinctrl *pc,
         dev_info(pc->dev, "GPIO set_bit: reg offset 0x%X, bit %u, write 0x%08X to %p\n",
                  reg, bit, mask, addr);
 
-        bcm2835_gpio_wr(pc, reg, mask);
+		writel(mask, addr);
 }
 
 static inline enum bcm2835_fsel bcm2835_pinctrl_fsel_get(
 		struct bcm2835_pinctrl *pc, unsigned pin)
 {
-	u32 val = bcm2835_gpio_rd(pc, FSEL_REG(pin));
+	u32 val = readl(pc->base + FSEL_REG(pin));
 	enum bcm2835_fsel status = (val >> FSEL_SHIFT(pin)) & BCM2835_FSEL_MASK;
 
 	dev_dbg(pc->dev, "get %08x (%u => %s)\n", val, pin,
@@ -306,7 +297,7 @@ static inline void bcm2835_pinctrl_fsel_set(
 	unsigned long flags;
 
 	spin_lock_irqsave(&pc->fsel_lock, flags);
-	val = bcm2835_gpio_rd(pc, FSEL_REG(pin));
+	val = readl(pc->base + FSEL_REG(pin));
 	cur = (val >> FSEL_SHIFT(pin)) & BCM2835_FSEL_MASK;
 
 	dev_dbg(pc->dev, "read %08x (%u => %s)\n", val, pin,
@@ -322,7 +313,7 @@ static inline void bcm2835_pinctrl_fsel_set(
 
 		dev_dbg(pc->dev, "trans %08x (%u <= %s)\n", val, pin,
 				bcm2835_functions[BCM2835_FSEL_GPIO_IN]);
-		bcm2835_gpio_wr(pc, FSEL_REG(pin), val);
+		writel(val, pc->base + FSEL_REG(pin));
 	}
 
 	val &= ~(BCM2835_FSEL_MASK << FSEL_SHIFT(pin));
@@ -330,7 +321,7 @@ static inline void bcm2835_pinctrl_fsel_set(
 
 	dev_dbg(pc->dev, "write %08x (%u <= %s)\n", val, pin,
 			bcm2835_functions[fsel]);
-	bcm2835_gpio_wr(pc, FSEL_REG(pin), val);
+	writel(val, pc->base + FSEL_REG(pin));
 
 unlock:
 	spin_unlock_irqrestore(&pc->fsel_lock, flags);
@@ -430,7 +421,7 @@ static void bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
 	unsigned offset;
 	unsigned gpio;
 
-	events = bcm2835_gpio_rd(pc, GPEDS0 + bank * 4);
+	events = readl(pc->base + GPEDS0 + bank * 4);
 	events &= mask;
 	events &= pc->enabled_irq_map[bank];
 	for_each_set_bit(offset, &events, 32) {
@@ -486,12 +477,12 @@ static inline void __bcm2835_gpio_irq_config(struct bcm2835_pinctrl *pc,
 {
 	u32 value;
 	reg += GPIO_REG_OFFSET(offset) * 4;
-	value = bcm2835_gpio_rd(pc, reg);
+	value = readl(pc->base + reg);
 	if (enable)
 		value |= BIT(GPIO_REG_SHIFT(offset));
 	else
 		value &= ~(BIT(GPIO_REG_SHIFT(offset)));
-	bcm2835_gpio_wr(pc, reg, value);
+	writel(value, pc->base + reg);
 }
 
 /* fast path for IRQ handler */
@@ -1053,7 +1044,7 @@ static void bcm2835_pull_config_set(struct bcm2835_pinctrl *pc,
 	off = GPIO_REG_OFFSET(pin);
 	bit = GPIO_REG_SHIFT(pin);
 
-	bcm2835_gpio_wr(pc, GPPUD, arg & 3);
+	writel(arg & 3, pc->base + GPPUD);
 	/*
 	 * BCM2835 datasheet say to wait 150 cycles, but not of what.
 	 * But the VideoCore firmware delay for this operation
@@ -1061,9 +1052,9 @@ static void bcm2835_pull_config_set(struct bcm2835_pinctrl *pc,
 	 * runs at 250 MHz.
 	 */
 	udelay(1);
-	bcm2835_gpio_wr(pc, GPPUDCLK0 + (off * 4), BIT(bit));
+	writel(BIT(bit), pc->base + GPPUDCLK0 + (off * 4));
 	udelay(1);
-	bcm2835_gpio_wr(pc, GPPUDCLK0 + (off * 4), 0);
+	writel(0, pc->base + GPPUDCLK0 + (off * 4));
 }
 
 static int bcm2835_pinconf_set(struct pinctrl_dev *pctldev,
@@ -1126,7 +1117,7 @@ static int bcm2711_pinconf_get(struct pinctrl_dev *pctldev, unsigned pin,
 
 	offset = PUD_2711_REG_OFFSET(pin);
 	shift = PUD_2711_REG_SHIFT(pin);
-	val = bcm2835_gpio_rd(pc, GP_GPIO_PUP_PDN_CNTRL_REG0 + (offset * 4));
+	val = readl(pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (offset * 4));
 
 	switch (param) {
 	case PIN_CONFIG_BIAS_DISABLE:
@@ -1166,10 +1157,10 @@ static void bcm2711_pull_config_set(struct bcm2835_pinctrl *pc,
 	off = PUD_2711_REG_OFFSET(pin);
 	shifter = PUD_2711_REG_SHIFT(pin);
 
-	value = bcm2835_gpio_rd(pc, GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4));
+	value = readl(pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4));
 	value &= ~(PUD_2711_MASK << shifter);
 	value |= (arg << shifter);
-	bcm2835_gpio_wr(pc, GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4), value);
+	writel(value, pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4));
 }
 
 static int bcm2711_pinconf_set(struct pinctrl_dev *pctldev,
