@@ -1370,9 +1370,11 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
-        bcm2835_pinctrl_fsel_set(pc, 17, BCM2835_FSEL_GPIO_OUT);
-        bcm2835_pmx_set(pc->pctl_dev, BCM2835_FSEL_GPIO_OUT, 17);
-
+		 ret = bcm2835_gpio_direction_output(&pc->gpio_chip, 17, 0);
+		 if (ret) {
+			 dev_err(dev, "Failed to set GPIO 17 as output: %d\n", ret);
+			 return ret;
+		 }
 	return 0;
 }
 
