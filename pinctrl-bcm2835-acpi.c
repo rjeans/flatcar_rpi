@@ -250,7 +250,7 @@ static const char * const irq_type_names[] = {
 	[IRQ_TYPE_LEVEL_LOW] = "level-low",
 };
 
-static bool persist_gpio_outputs;
+static bool persist_gpio_outputs=true;
 module_param(persist_gpio_outputs, bool, 0444);
 MODULE_PARM_DESC(persist_gpio_outputs, "Enable GPIO_OUT persistence when pin is freed");
 
@@ -929,6 +929,8 @@ static int bcm2835_pmx_free(struct pinctrl_dev *pctldev,
 {
 	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 	enum bcm2835_fsel fsel = bcm2835_pinctrl_fsel_get(pc, offset);
+
+	dev_warn(pc->dev, "pmx_free() forcibly setting pin %u to input\n", offset);
 
 	if (fsel == BCM2835_FSEL_GPIO_IN)
 		return 0;
