@@ -381,7 +381,7 @@ static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
 };
 
 static const struct acpi_device_id bcm2835_i2c_acpi_match[] = {
-    { "BCM2841", 0 }
+    { "BCM2841", 0 },
     {},
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_i2c_acpi_match);
