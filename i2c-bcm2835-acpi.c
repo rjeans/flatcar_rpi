@@ -449,6 +449,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	struct i2c_adapter *adap;
 	struct clk *mclk;
 	u32 bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ; // Default clock frequency
+	bool irq_pending;
 
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
 	if (!i2c_dev)
@@ -499,7 +500,9 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "IRQ %d registered for BCM2835 I2C\n", i2c_dev->irq);
 
 	// Check if the IRQ is pending at initialization
-	if (irq_get_irqchip_state(i2c_dev->irq, IRQCHIP_STATE_PENDING, &ret)) {
+	if (irq_get_irqchip_state(i2c_dev->irq, IRQCHIP_STATE_PENDING, &irq_pending)) {
+		dev_warn(&pdev->dev, "Failed to get IRQ state for IRQ %d\n", i2c_dev->irq);
+	} else if (irq_pending) {
 		dev_warn(&pdev->dev, "IRQ %d is pending at initialization\n", i2c_dev->irq);
 	}
 
