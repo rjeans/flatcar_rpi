@@ -286,6 +286,12 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 
 	// Read the interrupt status
 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
+	if (val == 0) {
+		// Spurious interrupt, return IRQ_NONE
+		dev_warn(i2c_dev->dev, "Spurious IRQ, status: 0x%x\n", val);
+		return IRQ_NONE;
+	}
+
 	dev_dbg(i2c_dev->dev, "ISR triggered, status: 0x%x\n", val);
 
 	// Check for errors
@@ -470,6 +476,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		ret = i2c_dev->irq;
 		goto err_disable_unprepare_clk;
 	}
+
+	dev_info(&pdev->dev, "IRQ %d registered for BCM2835 I2C\n", i2c_dev->irq);
 
 	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr, IRQF_SHARED,
 			  dev_name(&pdev->dev), i2c_dev);
