@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/acpi.h>
 #include <linux/property.h>
+#include <LinuxBoot/pm_runtime.h>
 
 #define BCM2835_I2C_C		0x0
 #define BCM2835_I2C_S		0x4
@@ -470,6 +471,16 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
 
+		pm_runtime_enable(&pdev->dev);
+
+		ret = pm_runtime_get_sync(&pdev->dev);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Failed to power up device: %d\n", ret);
+			pm_runtime_disable(&pdev->dev);
+			return ret;
+		}
+		
+
 	/* Try to get ACPI clock-frequency override */
 	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
 		bus_clk_rate = DEFAULT_I2C_FREQ;
@@ -593,15 +604,13 @@ err_free_irq:
 err_disable_unprepare_clk:
 	if (i2c_dev->bus_clk)
 		clk_disable_unprepare(i2c_dev->bus_clk);
-	else
-		dev_warn(&pdev->dev, "No clock to disable\n");
-	
 err_put_exclusive_rate:
 	if (i2c_dev->bus_clk)
 		clk_rate_exclusive_put(i2c_dev->bus_clk);
-	else
-		dev_warn(&pdev->dev, "No clock to put exclusive rate\n");
+	pm_runtime_put(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 	return ret;
+
 }
 
 static int bcm2835_i2c_remove(struct platform_device *pdev)
@@ -615,6 +624,10 @@ static int bcm2835_i2c_remove(struct platform_device *pdev)
 
 	free_irq(i2c_dev->irq, i2c_dev);
 	i2c_del_adapter(&i2c_dev->adapter);
+
+	pm_runtime_put(&pdev->dev);
+    pm_runtime_disable(&pdev->dev);
+
 
 	return 0;
 }
