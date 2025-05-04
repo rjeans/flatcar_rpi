@@ -437,7 +437,10 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		ret = i2c_dev->irq;
 		goto err_disable_unprepare_clk;
 	}
-
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S,
+		BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
+		
 	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr, IRQF_SHARED,
 			  dev_name(&pdev->dev), i2c_dev);
 	if (ret) {
