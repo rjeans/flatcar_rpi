@@ -503,9 +503,14 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DEL,
 						   (fedl << BCM2835_I2C_FEDL_SHIFT) |
 						   (redl << BCM2835_I2C_REDL_SHIFT));
-	
+		
+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_I2CEN);
+
 		dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
 				 divider, fedl, redl);
+		dev_info(&pdev->dev, "Final I2C_DIV: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DIV));
+		dev_info(&pdev->dev, "Final I2C_DEL: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DEL));
+				 
 	} else {
 	
 
