@@ -254,6 +254,12 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 
 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
 
+	// If no meaningful bits are set, return IRQ_NONE to avoid floods
+if (!(val & (BCM2835_I2C_S_DONE | BCM2835_I2C_S_ERR | BCM2835_I2C_S_CLKT))) {
+	dev_dbg(i2c_dev->dev, "Ignoring spurious IRQ (status=0x%08x)\n", val);
+	return IRQ_NONE;
+}
+
 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
 	if (err) {
 		i2c_dev->msg_err = err;
@@ -440,7 +446,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S,
 		BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
-		
+
 	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr, IRQF_SHARED,
 			  dev_name(&pdev->dev), i2c_dev);
 	if (ret) {
