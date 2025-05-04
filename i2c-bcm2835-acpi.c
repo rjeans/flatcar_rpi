@@ -450,6 +450,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	u32 bus_clk_rate = 100000; // Default: 100kHz
 	bool irq_pending;
 	int ret;
+	
+
 
 	/* Allocate and initialize private data */
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
@@ -470,6 +472,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(mclk)) {
 		dev_warn(&pdev->dev, "Parent clock not found, using fallback rate\n");
 		mclk = NULL;
+		
 	} else {
 		dev_info(&pdev->dev, "Parent clock rate: %lu Hz\n", clk_get_rate(mclk));
 	}
@@ -493,7 +496,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	
 		dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
 				 divider, fedl, redl);
-	}
+	} else {
 	
 
 	/* Register I2C bus clock divider */
@@ -525,7 +528,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "No clock provided, using hardcoded fallback rate: %u Hz\n", bus_clk_rate);
 	}
 	
-
+}
 	/* Acquire and register IRQ */
 	i2c_dev->irq = platform_get_irq(pdev, 0);
 	if (i2c_dev->irq < 0) {
@@ -575,9 +578,16 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 err_free_irq:
 	free_irq(i2c_dev->irq, i2c_dev);
 err_disable_unprepare_clk:
-	clk_disable_unprepare(i2c_dev->bus_clk);
+	if (i2c_dev->bus_clk)
+		clk_disable_unprepare(i2c_dev->bus_clk);
+	else
+		dev_warn(&pdev->dev, "No clock to disable\n");
+	
 err_put_exclusive_rate:
-	clk_rate_exclusive_put(i2c_dev->bus_clk);
+	if (i2c_dev->bus_clk)
+		clk_rate_exclusive_put(i2c_dev->bus_clk);
+	else
+		dev_warn(&pdev->dev, "No clock to put exclusive rate\n");
 	return ret;
 }
 
@@ -585,8 +595,11 @@ static int bcm2835_i2c_remove(struct platform_device *pdev)
 {
 	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
-	clk_disable_unprepare(i2c_dev->bus_clk);
-	clk_rate_exclusive_put(i2c_dev->bus_clk);
+	if (i2c_dev->bus_clk) {
+		clk_disable_unprepare(i2c_dev->bus_clk);
+		clk_rate_exclusive_put(i2c_dev->bus_clk);
+	}
+
 	free_irq(i2c_dev->irq, i2c_dev);
 	i2c_del_adapter(&i2c_dev->adapter);
 
