@@ -494,23 +494,26 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Invalid fallback divider for clock-frequency %u\n", bus_clk_rate);
 			return -EINVAL;
 		}
-	
-		/* Write clock divider and delays manually */
-		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
-	
-		u32 fedl = max(divider / 16, 1u);
-		u32 redl = max(divider / 4, 1u);
-		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DEL,
-						   (fedl << BCM2835_I2C_FEDL_SHIFT) |
-						   (redl << BCM2835_I2C_REDL_SHIFT));
-		
-		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_I2CEN);
+	/* 1. Disable controller */
+bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
-		dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
-				 divider, fedl, redl);
-		dev_info(&pdev->dev, "Final I2C_DIV: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DIV));
-		dev_info(&pdev->dev, "Final I2C_DEL: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DEL));
-				 
+/* 2. Write clock divider and delays */
+bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
+
+u32 fedl = max(divider / 16, 1u);
+u32 redl = max(divider / 4, 1u);
+bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DEL,
+				   (fedl << BCM2835_I2C_FEDL_SHIFT) |
+				   (redl << BCM2835_I2C_REDL_SHIFT));
+
+/* 3. Enable controller */
+bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_I2CEN);
+
+dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
+		 divider, fedl, redl);
+
+dev_info(&pdev->dev, "Final I2C_DIV: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DIV));
+dev_info(&pdev->dev, "Final I2C_DEL: 0x%08x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DEL));
 	} else {
 	
 
