@@ -506,7 +506,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 unsigned long fallback_core_clk = 150000000;
 int div = clk_bcm2835_i2c_calc_divider(bus_clk_rate, fallback_core_clk);
 u32 divider;
-u32 fedl, redl;
+
 
 if (div < 0 || div == 0) {
     dev_warn(&pdev->dev, "Divider calc failed, using hardcoded fallback\n");
