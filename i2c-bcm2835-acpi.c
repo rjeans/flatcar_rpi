@@ -159,35 +159,6 @@ static const struct clk_ops clk_bcm2835_i2c_ops = {
 	.recalc_rate = clk_bcm2835_i2c_recalc_rate,
 };
 
-static struct clk *bcm2835_i2c_register_div(struct device *dev,
-					struct clk *mclk,
-					struct bcm2835_i2c_dev *i2c_dev)
-{
-	struct clk_init_data init;
-	struct clk_bcm2835_i2c *priv;
-	char name[32];
-	const char *mclk_name;
-
-	snprintf(name, sizeof(name), "%s_div", dev_name(dev));
-
-	mclk_name = __clk_get_name(mclk);
-
-	init.ops = &clk_bcm2835_i2c_ops;
-	init.name = name;
-	init.parent_names = (const char* []) { mclk_name };
-	init.num_parents = 1;
-	init.flags = 0;
-
-	priv = devm_kzalloc(dev, sizeof(struct clk_bcm2835_i2c), GFP_KERNEL);
-	if (priv == NULL)
-		return ERR_PTR(-ENOMEM);
-
-	priv->hw.init = &init;
-	priv->i2c_dev = i2c_dev;
-
-	clk_hw_register_clkdev(&priv->hw, "div", dev_name(dev));
-	return devm_clk_register(dev, &priv->hw);
-}
 
 static void bcm2835_fill_txfifo(struct bcm2835_i2c_dev *i2c_dev)
 {
@@ -496,8 +467,7 @@ err_free_irq:
 	free_irq(i2c_dev->irq, i2c_dev);
 err_disable_unprepare_clk:
 	clk_disable_unprepare(i2c_dev->bus_clk);
-err_put_exclusive_rate:
-	clk_rate_exclusive_put(i2c_dev->bus_clk);
+
 
 	return ret;
 }
