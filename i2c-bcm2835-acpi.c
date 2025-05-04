@@ -283,14 +283,25 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 {
 	struct bcm2835_i2c_dev *i2c_dev = data;
 	u32 val, err;
+	static int spurious_count = 0;
 
 	// Read the interrupt status
 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
 	if (val == 0) {
-		// Spurious interrupt, return IRQ_NONE
-		dev_warn(i2c_dev->dev, "Spurious IRQ, status: 0x%x\n", val);
+		// Spurious interrupt, increment counter
+		spurious_count++;
+		dev_warn(i2c_dev->dev, "Spurious IRQ, status: 0x%x (count: %d)\n", val, spurious_count);
+
+		// Disable IRQ if spurious interrupts exceed threshold
+		if (spurious_count > 10) {
+			dev_err(i2c_dev->dev, "Disabling IRQ due to repeated spurious interrupts\n");
+			disable_irq_nosync(i2c_dev->irq);
+		}
 		return IRQ_NONE;
 	}
+
+	// Reset spurious interrupt counter
+	spurious_count = 0;
 
 	dev_dbg(i2c_dev->dev, "ISR triggered, status: 0x%x\n", val);
 
