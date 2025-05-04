@@ -470,15 +470,18 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	i2c_dev->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
+	
+	dev_info(&pdev->dev, "MMIO base mapped at %p\n", i2c_dev->regs);
 
-		pm_runtime_enable(&pdev->dev);
 
-		ret = pm_runtime_get_sync(&pdev->dev);
-		if (ret < 0) {
-			dev_err(&pdev->dev, "Failed to power up device: %d\n", ret);
-			pm_runtime_disable(&pdev->dev);
-			return ret;
-		}
+	pm_runtime_enable(&pdev->dev);
+
+    ret = pm_runtime_get_sync(&pdev->dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to power up device: %d\n", ret);
+		pm_runtime_disable(&pdev->dev);
+		return ret;
+	}
 		
 
 	/* Try to get ACPI clock-frequency override */
