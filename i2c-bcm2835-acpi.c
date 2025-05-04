@@ -506,7 +506,7 @@ err_put_exclusive_rate:
 	return ret;
 }
 
-static void bcm2835_i2c_remove(struct platform_device *pdev)
+static int bcm2835_i2c_remove(struct platform_device *pdev)
 {
 	struct bcm2835_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
@@ -515,8 +515,9 @@ static void bcm2835_i2c_remove(struct platform_device *pdev)
 
 	free_irq(i2c_dev->irq, i2c_dev);
 	i2c_del_adapter(&i2c_dev->adapter);
-}
 
+	return 0; // Return success
+}
 
 static struct platform_driver bcm2835_i2c_driver = {
 	.probe = bcm2835_i2c_probe,
