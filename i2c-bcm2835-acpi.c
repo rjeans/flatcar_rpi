@@ -172,7 +172,8 @@ static struct clk *bcm2835_i2c_register_div(struct device *dev,
 
 	snprintf(name, sizeof(name), "%s_div", dev_name(dev));
 
-	mclk_name = __clk_get_name(mclk);
+	// Use a default parent clock name if mclk is NULL
+	mclk_name = mclk ? __clk_get_name(mclk) : "default_parent_clk";
 
 	init.ops = &clk_bcm2835_i2c_ops;
 	init.name = name;
