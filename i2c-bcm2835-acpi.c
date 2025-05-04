@@ -405,6 +405,12 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		
 	unsigned long core_clk_hz = 250000000; // fallback core clock, 250 MHz
 	u32 divider, fedl, redl;
+
+	if (!bus_clk_rate) {
+		dev_warn(&pdev->dev,
+			"clock-frequency is zero or missing; defaulting to 100000 Hz\n");
+		bus_clk_rate = 100000;
+	}
 	
 	divider = DIV_ROUND_UP(core_clk_hz, bus_clk_rate);
 	if (divider & 1)
