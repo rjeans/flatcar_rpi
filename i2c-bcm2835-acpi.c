@@ -256,8 +256,11 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 
 	// If no meaningful bits are set, return IRQ_NONE to avoid floods
 if (!(val & (BCM2835_I2C_S_DONE | BCM2835_I2C_S_ERR | BCM2835_I2C_S_CLKT))) {
-	dev_dbg(i2c_dev->dev, "Ignoring spurious IRQ (status=0x%08x)\n", val);
-	return IRQ_NONE;
+//	dev_dbg(i2c_dev->dev, "Ignoring spurious IRQ (status=0x%08x)\n", val);
+//	return IRQ_NONE;
+dev_warn(i2c_dev->dev, "IRQ fired: status=0x%08x\n", val);
+return IRQ_HANDLED;
+
 }
 
 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
