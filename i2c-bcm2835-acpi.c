@@ -474,6 +474,28 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "Parent clock rate: %lu Hz\n", clk_get_rate(mclk));
 	}
 
+	if (!mclk) {
+		u32 divider = clk_bcm2835_i2c_calc_divider(bus_clk_rate, 100000); 
+	
+		if (divider == -EINVAL) {
+			dev_err(&pdev->dev, "Invalid fallback divider for clock-frequency %u\n", bus_clk_rate);
+			return -EINVAL;
+		}
+	
+		/* Write clock divider and delays manually */
+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
+	
+		u32 fedl = max(divider / 16, 1u);
+		u32 redl = max(divider / 4, 1u);
+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DEL,
+						   (fedl << BCM2835_I2C_FEDL_SHIFT) |
+						   (redl << BCM2835_I2C_REDL_SHIFT));
+	
+		dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
+				 divider, fedl, redl);
+	}
+	
+
 	/* Register I2C bus clock divider */
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
 	if (IS_ERR(i2c_dev->bus_clk)) {
