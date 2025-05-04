@@ -467,6 +467,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(mclk)) {
 		dev_warn(&pdev->dev, "Clock not found, using default rate\n");
 		mclk = NULL; // Fallback to no clock
+	} else {
+		dev_info(&pdev->dev, "Parent clock rate: %lu Hz\n", clk_get_rate(mclk));
 	}
 
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
@@ -487,9 +489,11 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	ret = clk_prepare_enable(i2c_dev->bus_clk);
 	if (ret) {
-		dev_err(&pdev->dev, "Couldn't prepare clock");
+		dev_err(&pdev->dev, "Couldn't prepare clock\n");
 		goto err_put_exclusive_rate;
 	}
+
+	dev_info(&pdev->dev, "Clock rate: %lu Hz\n", clk_get_rate(i2c_dev->bus_clk));
 
 	i2c_dev->irq = platform_get_irq(pdev, 0);
 	if (i2c_dev->irq < 0) {
