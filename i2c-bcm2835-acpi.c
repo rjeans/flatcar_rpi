@@ -389,7 +389,7 @@ static u32 bcm2835_i2c_func(struct i2c_adapter *adap)
 }
 
 static const struct i2c_algorithm bcm2835_i2c_algo = {
-	.xfer = bcm2835_i2c_xfer,
+	.master_xfer = bcm2835_i2c_xfer, // Corrected member name
 	.functionality = bcm2835_i2c_func,
 };
 
@@ -517,7 +517,6 @@ static void bcm2835_i2c_remove(struct platform_device *pdev)
 	i2c_del_adapter(&i2c_dev->adapter);
 }
 
-MODULE_DEVICE_TABLE(of, bcm2835_i2c_of_match);
 
 static struct platform_driver bcm2835_i2c_driver = {
 	.driver = {
