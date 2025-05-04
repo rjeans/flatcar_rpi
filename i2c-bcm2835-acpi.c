@@ -448,7 +448,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	int ret;
 	struct i2c_adapter *adap;
 	struct clk *mclk;
-	u32 bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ; // Default clock frequency
+	u32 bus_clk_rate = 100000; // Default clock frequency
 	bool irq_pending;
 
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
