@@ -519,13 +519,11 @@ static void bcm2835_i2c_remove(struct platform_device *pdev)
 
 
 static struct platform_driver bcm2835_i2c_driver = {
+	.probe = bcm2835_i2c_probe,
+	.remove = bcm2835_i2c_remove,
 	.driver = {
+		.name = "i2c-bcm2835",
 		.acpi_match_table = bcm2835_i2c_acpi_match,
-	.probe		= bcm2835_i2c_probe,
-	.remove		= bcm2835_i2c_remove,
-	.driver		= {
-		.name	= "i2c-bcm2835",
-		
 	},
 };
 module_platform_driver(bcm2835_i2c_driver);
