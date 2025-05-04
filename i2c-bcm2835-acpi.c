@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/acpi.h>
 #include <linux/property.h>
-#include <LinuxBoot/pm_runtime.h>
+#include <linux/pm_runtime.h>
 
 #define BCM2835_I2C_C		0x0
 #define BCM2835_I2C_S		0x4
