@@ -484,21 +484,25 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	/* Try to get ACPI clock-frequency override */
 	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
+		bus_clk_rate = 100000;
 		dev_warn(&pdev->dev, "clock-frequency not specified, defaulting to %u Hz\n", bus_clk_rate);
 	}
 
 	/* Set and enable the clock */
-	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
-	if (ret < 0)
-		return dev_err_probe(&pdev->dev, ret, "Failed to set bus clock rate\n");
-
-	ret = clk_prepare_enable(i2c_dev->bus_clk);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to enable bus clock\n");
-		goto err_put_exclusive_rate;
+	if (i2c_dev->bus_clk) {
+		ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
+		if (ret < 0)
+			dev_warn(&pdev->dev, "Could not set clock rate: %d (continuing)\n", ret);
+	
+		ret = clk_prepare_enable(i2c_dev->bus_clk);
+		if (ret)
+			dev_warn(&pdev->dev, "Could not enable clock: %d (continuing)\n", ret);
+	
+		dev_info(&pdev->dev, "Using bus clock rate: %lu Hz\n", clk_get_rate(i2c_dev->bus_clk));
+	} else {
+		dev_info(&pdev->dev, "No clock provided, using hardcoded fallback rate: %u Hz\n", bus_clk_rate);
 	}
-
-	dev_info(&pdev->dev, "Bus clock rate: %lu Hz\n", clk_get_rate(i2c_dev->bus_clk));
+	
 
 	/* Acquire and register IRQ */
 	i2c_dev->irq = platform_get_irq(pdev, 0);
