@@ -429,35 +429,31 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
 
-	mclk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(mclk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(mclk),
-				     "Could not get clock\n");
-
-	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
-
-	if (IS_ERR(i2c_dev->bus_clk))
-		return dev_err_probe(&pdev->dev, PTR_ERR(i2c_dev->bus_clk),
-				     "Could not register clock\n");
-
-	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-				   &bus_clk_rate);
-	if (ret < 0) {
-		dev_warn(&pdev->dev,
-			 "Could not read clock-frequency property\n");
-		bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ;
+	mclk = NULL;
+	dev_info(&pdev->dev, "No ACPI clock provided; using fallback core clock rate\n");
+		
+	unsigned long core_clk_hz = 250000000; // fallback core clock, 250 MHz
+	u32 divider, fedl, redl;
+	
+	divider = DIV_ROUND_UP(core_clk_hz, bus_clk_rate);
+	if (divider & 1)
+		divider++; // ensure even value
+	
+	if (divider < BCM2835_I2C_CDIV_MIN || divider > BCM2835_I2C_CDIV_MAX) {
+		dev_err(&pdev->dev, "Invalid clock divider: %u\n", divider);
+		return -EINVAL;
 	}
-
-	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
-	if (ret < 0)
-		return dev_err_probe(&pdev->dev, ret,
-				     "Could not set clock frequency\n");
-
-	ret = clk_prepare_enable(i2c_dev->bus_clk);
-	if (ret) {
-		dev_err(&pdev->dev, "Couldn't prepare clock");
-		goto err_put_exclusive_rate;
-	}
+	
+	fedl = max(divider / 16, 1u);
+	redl = max(divider / 4, 1u);
+	
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DEL,
+		(fedl << BCM2835_I2C_FEDL_SHIFT) | (redl << BCM2835_I2C_REDL_SHIFT));
+	
+	dev_info(&pdev->dev, "Fallback clock set directly: divider=%u, fedl=%u, redl=%u\n",
+		divider, fedl, redl);
+	
 
 	i2c_dev->irq = platform_get_irq(pdev, 0);
 	if (i2c_dev->irq < 0) {
