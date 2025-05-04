@@ -284,17 +284,23 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 	struct bcm2835_i2c_dev *i2c_dev = data;
 	u32 val, err;
 
+	// Read the interrupt status
 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
+	dev_dbg(i2c_dev->dev, "ISR triggered, status: 0x%x\n", val);
 
+	// Check for errors
 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
 	if (err) {
+		dev_err(i2c_dev->dev, "ISR error: 0x%x\n", err);
 		i2c_dev->msg_err = err;
 		goto complete;
 	}
 
+	// Check for transfer complete
 	if (val & BCM2835_I2C_S_DONE) {
+		dev_dbg(i2c_dev->dev, "ISR transfer complete\n");
 		if (!i2c_dev->curr_msg) {
-			dev_err(i2c_dev->dev, "Got unexpected interrupt (from firmware?)\n");
+			dev_err(i2c_dev->dev, "Unexpected interrupt (no current message)\n");
 		} else if (i2c_dev->curr_msg->flags & I2C_M_RD) {
 			bcm2835_drain_rxfifo(i2c_dev);
 			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
@@ -307,7 +313,9 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 		goto complete;
 	}
 
+	// Handle TX FIFO empty
 	if (val & BCM2835_I2C_S_TXW) {
+		dev_dbg(i2c_dev->dev, "ISR TX FIFO empty\n");
 		if (!i2c_dev->msg_buf_remaining) {
 			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
 			goto complete;
@@ -323,7 +331,9 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 		return IRQ_HANDLED;
 	}
 
+	// Handle RX FIFO full
 	if (val & BCM2835_I2C_S_RXR) {
+		dev_dbg(i2c_dev->dev, "ISR RX FIFO full\n");
 		if (!i2c_dev->msg_buf_remaining) {
 			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
 			goto complete;
@@ -333,9 +343,12 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 		return IRQ_HANDLED;
 	}
 
+	// If no conditions are met, return IRQ_NONE
+	dev_warn(i2c_dev->dev, "Unhandled IRQ, status: 0x%x\n", val);
 	return IRQ_NONE;
 
 complete:
+	// Clear the interrupt and signal completion
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
 			   BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
