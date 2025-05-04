@@ -502,8 +502,18 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	}
 
 	if (!mclk) {
-		u32 divider = clk_bcm2835_i2c_calc_divider(bus_clk_rate, DEFAULT_I2C_FREQ); 
-	
+/* Assume 150 MHz core clock as safe fallback */
+unsigned long fallback_core_clk = 150000000;
+int div = clk_bcm2835_i2c_calc_divider(bus_clk_rate, fallback_core_clk);
+u32 divider;
+u32 fedl, redl;
+
+if (div < 0 || div == 0) {
+    dev_warn(&pdev->dev, "Divider calc failed, using hardcoded fallback\n");
+    divider = 2500; // 150MHz / 2500 = 60kHz
+} else {
+    divider = (u32)div;
+}	
 		if (divider == -EINVAL) {
 			dev_err(&pdev->dev, "Invalid fallback divider for clock-frequency %u\n", bus_clk_rate);
 			return -EINVAL;
