@@ -460,6 +460,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
     BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE |
     BCM2835_I2C_S_TXW | BCM2835_I2C_S_RXR);
 
+	dev_info(i2c_dev->dev, "Cleared pending IRQ conditions: status=0x%08x\n",
+		bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S));
 
 	adap = &i2c_dev->adapter;
 	i2c_set_adapdata(adap, i2c_dev);
