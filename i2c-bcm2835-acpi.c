@@ -445,58 +445,62 @@ static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
 static int bcm2835_i2c_probe(struct platform_device *pdev)
 {
 	struct bcm2835_i2c_dev *i2c_dev;
-	int ret;
 	struct i2c_adapter *adap;
 	struct clk *mclk;
-	u32 bus_clk_rate = 100000; // Default clock frequency
+	u32 bus_clk_rate = 100000; // Default: 100kHz
 	bool irq_pending;
+	int ret;
 
+	/* Allocate and initialize private data */
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
 	if (!i2c_dev)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, i2c_dev);
 	i2c_dev->dev = &pdev->dev;
 	init_completion(&i2c_dev->completion);
+	platform_set_drvdata(pdev, i2c_dev);
 
+	/* Map I/O memory */
 	i2c_dev->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
 
+	/* Get parent clock */
 	mclk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(mclk)) {
-		dev_warn(&pdev->dev, "Clock not found, using default rate\n");
-		mclk = NULL; // Fallback to no clock
+		dev_warn(&pdev->dev, "Parent clock not found, using fallback rate\n");
+		mclk = NULL;
 	} else {
 		dev_info(&pdev->dev, "Parent clock rate: %lu Hz\n", clk_get_rate(mclk));
 	}
 
+	/* Register I2C bus clock divider */
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
 	if (IS_ERR(i2c_dev->bus_clk)) {
 		ret = PTR_ERR(i2c_dev->bus_clk);
-		dev_err(&pdev->dev, "Could not register clock: %d\n", ret);
+		dev_err(&pdev->dev, "Failed to register bus clock: %d\n", ret);
 		goto err_put_exclusive_rate;
 	}
 
-	// Use ACPI to retrieve clock frequency if available
+	/* Try to get ACPI clock-frequency override */
 	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
-		bus_clk_rate = 100000;
-		dev_warn(&pdev->dev, "clock-frequency not found, falling back to %u Hz\n", bus_clk_rate);
+		dev_warn(&pdev->dev, "clock-frequency not specified, defaulting to %u Hz\n", bus_clk_rate);
 	}
 
+	/* Set and enable the clock */
 	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
 	if (ret < 0)
-		return dev_err_probe(&pdev->dev, ret,
-				     "Could not set clock frequency\n");
+		return dev_err_probe(&pdev->dev, ret, "Failed to set bus clock rate\n");
 
 	ret = clk_prepare_enable(i2c_dev->bus_clk);
 	if (ret) {
-		dev_err(&pdev->dev, "Couldn't prepare clock\n");
+		dev_err(&pdev->dev, "Failed to enable bus clock\n");
 		goto err_put_exclusive_rate;
 	}
 
-	dev_info(&pdev->dev, "Clock rate: %lu Hz\n", clk_get_rate(i2c_dev->bus_clk));
+	dev_info(&pdev->dev, "Bus clock rate: %lu Hz\n", clk_get_rate(i2c_dev->bus_clk));
 
+	/* Acquire and register IRQ */
 	i2c_dev->irq = platform_get_irq(pdev, 0);
 	if (i2c_dev->irq < 0) {
 		ret = i2c_dev->irq;
@@ -505,36 +509,40 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "IRQ %d registered for BCM2835 I2C\n", i2c_dev->irq);
 
-	// Check if the IRQ is pending at initialization
+	/* Check if IRQ is pending at startup */
 	if (irq_get_irqchip_state(i2c_dev->irq, IRQCHIP_STATE_PENDING, &irq_pending)) {
-		dev_warn(&pdev->dev, "Failed to get IRQ state for IRQ %d\n", i2c_dev->irq);
+		dev_warn(&pdev->dev, "Failed to query IRQ %d state\n", i2c_dev->irq);
 	} else if (irq_pending) {
-		dev_warn(&pdev->dev, "IRQ %d is pending at initialization\n", i2c_dev->irq);
+		dev_warn(&pdev->dev, "IRQ %d is pending at probe\n", i2c_dev->irq);
 	}
 
-	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr, IRQF_SHARED | IRQF_NO_SUSPEND,
-			  dev_name(&pdev->dev), i2c_dev);
+	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr,
+	                  IRQF_SHARED | IRQF_NO_SUSPEND,
+	                  dev_name(&pdev->dev), i2c_dev);
 	if (ret) {
-		dev_err(&pdev->dev, "Could not request IRQ\n");
+		dev_err(&pdev->dev, "Failed to request IRQ\n");
 		goto err_disable_unprepare_clk;
 	}
 
+	/* Set up the I2C adapter */
 	adap = &i2c_dev->adapter;
 	i2c_set_adapdata(adap, i2c_dev);
 	adap->owner = THIS_MODULE;
 	adap->class = I2C_CLASS_DEPRECATED;
-	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)", dev_name(&pdev->dev));
 	adap->algo = &bcm2835_i2c_algo;
 	adap->dev.parent = &pdev->dev;
 	adap->quirks = &bcm2835_i2c_quirks;
+	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)", dev_name(&pdev->dev));
 
-	// Disable hardware clock stretching timeout
+	/* Disable clock stretching timeout */
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, 0);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
 	ret = i2c_add_adapter(adap);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
 		goto err_free_irq;
+	}
 
 	return 0;
 
