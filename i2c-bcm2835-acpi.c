@@ -479,8 +479,10 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	}
 
 	// Use ACPI to retrieve clock frequency if available
-	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate))
-		dev_warn(&pdev->dev, "Using default clock frequency\n");
+	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
+		bus_clk_rate = 100000;
+		dev_warn(&pdev->dev, "clock-frequency not found, falling back to %u Hz\n", bus_clk_rate);
+	}
 
 	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
 	if (ret < 0)
