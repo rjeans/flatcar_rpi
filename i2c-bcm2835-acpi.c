@@ -57,6 +57,9 @@
 #define BCM2835_I2C_CDIV_MIN	0x0002
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
+#define DEFAULT_I2C_FREQ 100000
+
+
 struct bcm2835_i2c_dev {
 	struct device *dev;
 	void __iomem *regs;
@@ -447,7 +450,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	struct bcm2835_i2c_dev *i2c_dev;
 	struct i2c_adapter *adap;
 	struct clk *mclk;
-	u32 bus_clk_rate = 100000; // Default: 100kHz
+	u32 bus_clk_rate = DEFAULT_I2C_FREQ; // Default: 100kHz
 	bool irq_pending;
 	int ret;
 	
@@ -467,6 +470,13 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(i2c_dev->regs))
 		return PTR_ERR(i2c_dev->regs);
 
+	/* Try to get ACPI clock-frequency override */
+	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
+		bus_clk_rate = DEFAULT_I2C_FREQ;
+		dev_warn(&pdev->dev, "clock-frequency not specified, defaulting to %u Hz\n", bus_clk_rate);
+	}
+	
+
 	/* Get parent clock */
 	mclk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(mclk)) {
@@ -478,7 +488,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	}
 
 	if (!mclk) {
-		u32 divider = clk_bcm2835_i2c_calc_divider(bus_clk_rate, 100000); 
+		u32 divider = clk_bcm2835_i2c_calc_divider(bus_clk_rate, DEFAULT_I2C_FREQ); 
 	
 		if (divider == -EINVAL) {
 			dev_err(&pdev->dev, "Invalid fallback divider for clock-frequency %u\n", bus_clk_rate);
@@ -507,11 +517,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		goto err_put_exclusive_rate;
 	}
 
-	/* Try to get ACPI clock-frequency override */
-	if (device_property_read_u32(&pdev->dev, "clock-frequency", &bus_clk_rate)) {
-		bus_clk_rate = 100000;
-		dev_warn(&pdev->dev, "clock-frequency not specified, defaulting to %u Hz\n", bus_clk_rate);
-	}
 
 	/* Set and enable the clock */
 	if (i2c_dev->bus_clk) {
