@@ -279,6 +279,19 @@ static void bcm2835_i2c_finish_transfer(struct bcm2835_i2c_dev *i2c_dev)
  * we start the engine.
  */
 
+static void bcm2835_i2c_dump_regs(struct bcm2835_i2c_dev *i2c_dev)
+{
+	dev_err(i2c_dev->dev, "Register dump:\n");
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_C:    0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_C));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_S:    0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_DLEN: 0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DLEN));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_A:    0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_A));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_FIFO: 0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_FIFO));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_DIV:  0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DIV));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_DEL:  0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_DEL));
+	dev_err(i2c_dev->dev, "  BCM2835_I2C_CLKT: 0x%x\n", bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_CLKT));
+}
+
 static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 {
 	struct bcm2835_i2c_dev *i2c_dev = data;
@@ -291,6 +304,9 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
 		// Spurious interrupt, increment counter
 		spurious_count++;
 		dev_warn(i2c_dev->dev, "Spurious IRQ, status: 0x%x (count: %d)\n", val, spurious_count);
+
+		 // Dump registers for debugging
+		bcm2835_i2c_dump_regs(i2c_dev);
 
 		// Disable IRQ if spurious interrupts exceed threshold
 		if (spurious_count > 10) {
@@ -481,6 +497,11 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	}
 
 	dev_info(&pdev->dev, "IRQ %d registered for BCM2835 I2C\n", i2c_dev->irq);
+
+	// Check if the IRQ is pending at initialization
+	if (irq_get_irqchip_state(i2c_dev->irq, IRQCHIP_STATE_PENDING, &ret)) {
+		dev_warn(&pdev->dev, "IRQ %d is pending at initialization\n", i2c_dev->irq);
+	}
 
 	ret = request_irq(i2c_dev->irq, bcm2835_i2c_isr, IRQF_SHARED | IRQF_NO_SUSPEND,
 			  dev_name(&pdev->dev), i2c_dev);
