@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/acpi.h>
 
 #define BCM2835_I2C_C		0x0
 #define BCM2835_I2C_S		0x4
@@ -381,11 +382,10 @@ static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
 };
 
 static const struct acpi_device_id bcm2835_i2c_acpi_match[] = {
-    { "BCM2841", .driver_data = 1 },
+    { "BCM2841", 0},
     {},
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_i2c_acpi_match);
-
 
 static int bcm2835_i2c_probe(struct platform_device *pdev)
 {
@@ -394,6 +394,20 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	struct i2c_adapter *adap;
 	struct clk *mclk;
 	u32 bus_clk_rate;
+	unsigned long uid;
+
+	// Check for ACPI _UID
+	if (ACPI_HANDLE(&pdev->dev)) {
+		ret = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev), "_UID", NULL, &uid);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to evaluate _UID\n");
+			return -EINVAL;
+		}
+		if (uid != 0x1) {
+			dev_info(&pdev->dev, "Skipping device with _UID 0x%lx\n", uid);
+			return -ENODEV;
+		}
+	}
 
 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
 	if (!i2c_dev)
