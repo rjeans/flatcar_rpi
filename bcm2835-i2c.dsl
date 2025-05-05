@@ -1,4 +1,4 @@
-DefinitionBlock ("SSDT-I2C1.aml", "SSDT", 2, "RPIFND", "I2C1    ", 0x00000001)
+DefinitionBlock ("bcm2835-i2c.aml", "SSDT", 2, "RPIFND", "I2C1    ", 0x00000001)
 {
     External (\_SB_, DeviceObj)
     Scope (\_SB)
