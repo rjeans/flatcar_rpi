@@ -745,7 +745,7 @@ static int bcm2835_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 	int i, err;
 	u32 pin, func, pull;
 
-	dev_dbg(pc->dev, "Processing pinctrl bindings for node: %pOF\n", np);
+	dev_info(pc->dev, "Processing pinctrl bindings for node: %pOF\n", np);
 
 	/* Check for generic binding in this node */
 	err = pinconf_generic_dt_node_to_map_all(pctldev, np, map, num_maps);
@@ -808,14 +808,14 @@ static int bcm2835_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 			goto out;
 		}
 
-		dev_dbg(pc->dev, "Configuring pin %d\n", pin);
+		dev_info(pc->dev, "Configuring pin %d\n", pin);
 
 		if (num_funcs) {
 			err = of_property_read_u32_index(np, "brcm,function",
 					(num_funcs > 1) ? i : 0, &func);
 			if (err)
 				goto out;
-			dev_dbg(pc->dev, "Setting function %d for pin %d\n", func, pin);
+			dev_info(pc->dev, "Setting function %d for pin %d\n", func, pin);
 			err = bcm2835_pctl_dt_node_to_map_func(pc, np, pin,
 							func, &cur_map);
 			if (err)
@@ -826,7 +826,7 @@ static int bcm2835_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 					(num_pulls > 1) ? i : 0, &pull);
 			if (err)
 				goto out;
-			dev_dbg(pc->dev, "Setting pull %d for pin %d\n", pull, pin);
+			dev_info(pc->dev, "Setting pull %d for pin %d\n", pull, pin);
 			err = bcm2835_pctl_dt_node_to_map_pull(pc, np, pin,
 							pull, &cur_map);
 			if (err)
