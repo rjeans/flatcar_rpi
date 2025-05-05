@@ -394,7 +394,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	struct i2c_adapter *adap;
 	struct clk *mclk;
 	u32 bus_clk_rate;
-	unsigned long uid;
+	acpi_evaluate_integer uid;
 
 	// Check for ACPI _UID
 	if (ACPI_HANDLE(&pdev->dev)) {
