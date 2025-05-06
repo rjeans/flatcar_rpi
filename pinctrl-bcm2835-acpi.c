@@ -1426,6 +1426,14 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
+		 ret = pinctrl_register_mappings();
+		 if (ret)
+			 dev_warn(dev, "Failed to register pinctrl mappings: %d\n", ret);
+	 
+		 ret = acpi_pinctrl_register(dev, pc->pctl_dev);
+		 if (ret)
+			 dev_warn(dev, "Failed to register ACPI pinctrl: %d\n", ret);
+
 	return 0;
 
 cleanup_gpio_range:
