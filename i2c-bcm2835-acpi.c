@@ -59,7 +59,7 @@
 #define BCM2835_I2C_CDIV_MIN	0x0002
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
-static const struct pinctrl_map bcm2835_i2c1_pinctrl_map[] = {
+static struct pinctrl_map bcm2835_i2c1_pinctrl_map[] = {
 	{
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
