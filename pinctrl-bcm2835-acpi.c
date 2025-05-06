@@ -1425,7 +1425,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to add GPIO pin range: %d\n", ret);
 		goto cleanup_gpio_range;
 	}
-
+    pc->gpio_range.pin_base=0;
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
 
 	struct pinctrl_gpio_range i2c_range = {
