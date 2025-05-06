@@ -38,27 +38,6 @@
 #include <linux/pinctrl/machine.h>
 
 
-static const struct pinctrl_map bcm2835_i2c1_map[] = {
-	{
-		.dev_name = "BCM2841:00",
-		.name = "default",
-		.type = PIN_MAP_TYPE_MUX_GROUP,
-		.data.mux = {
-			.group = "gpio2",
-			.function = "alt0",
-		},
-	},
-	{
-		.dev_name = "BCM2841:00",
-		.name = "default",
-		.type = PIN_MAP_TYPE_MUX_GROUP,
-		.data.mux = {
-			.group = "gpio3",
-			.function = "alt0",
-		},
-	},
-};
-
 
 #define MODULE_NAME "pinctrl-bcm2835-acpi"
 #define BCM2835_NUM_GPIOS 54
@@ -1448,12 +1427,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	}
 
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
-
-	ret = pinctrl_register_mappings(bcm2835_i2c1_map,
-		ARRAY_SIZE(bcm2835_i2c1_map));
-    if (ret)
-       dev_warn(dev, "Failed to register I2C1 pin mappings: %d\n", ret);
-
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);

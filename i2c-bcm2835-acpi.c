@@ -60,6 +60,27 @@
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
 
+static const struct pinctrl_map bcm2835_i2c1_map[] = {
+	{
+		.dev_name = "BCM2841:00",
+		.name = "default",
+		.type = PIN_MAP_TYPE_MUX_GROUP,
+		.data.mux = {
+			.group = "gpio2",
+			.function = "alt0",
+		},
+	},
+	{
+		.dev_name = "BCM2841:00",
+		.name = "default",
+		.type = PIN_MAP_TYPE_MUX_GROUP,
+		.data.mux = {
+			.group = "gpio3",
+			.function = "alt0",
+		},
+	},
+};
+
 
 struct bcm2835_i2c_dev {
 	struct device *dev;
@@ -514,6 +535,14 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	ret = i2c_add_adapter(adap);
 	if (ret)
 		goto err_free_irq;
+
+	
+		ret = pinctrl_register_mappings(bcm2835_i2c1_map,
+			ARRAY_SIZE(bcm2835_i2c1_map));
+		if (ret)
+		   dev_warn(dev, "Failed to register I2C1 pin mappings: %d\n", ret);
+	
+	
 
 	dev_info(&pdev->dev, "I2C driver registered: %s\n", dev_name(&pdev->dev));
 
