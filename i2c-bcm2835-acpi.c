@@ -540,7 +540,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		ret = pinctrl_register_mappings(bcm2835_i2c1_map,
 			ARRAY_SIZE(bcm2835_i2c1_map));
 		if (ret)
-		   dev_warn(dev, "Failed to register I2C1 pin mappings: %d\n", ret);
+		   dev_warn(&pdev->dev, "Failed to register I2C1 pin mappings: %d\n", ret);
 	
 	
 
