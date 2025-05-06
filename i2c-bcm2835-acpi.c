@@ -442,7 +442,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	bcm2835_i2c1_pinctrl_map[0].dev_name = dev_name(&pdev->dev);
 	bcm2835_i2c1_pinctrl_map[1].dev_name = dev_name(&pdev->dev);
 
-	ret = pinctrl_register_map(bcm2835_i2c1_pinctrl_map,
+	ret = pinctrl_register_mappings(bcm2835_i2c1_pinctrl_map,
 		ARRAY_SIZE(bcm2835_i2c1_pinctrl_map),
 		NULL);
 	if (ret)
