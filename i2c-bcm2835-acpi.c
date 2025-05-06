@@ -537,6 +537,10 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		goto err_free_irq;
 
 	pdev->dev.fwnode = dev_fwnode(&pdev->dev);
+
+	dev_info(&pdev->dev, "dev_name: %s", dev_name(&pdev->dev));
+    dev_info(&pdev->dev, "dev->fwnode: %p\n", pdev->dev.fwnode);
+
 	
 	ret = pinctrl_register_mappings(bcm2835_i2c1_map,
 		ARRAY_SIZE(bcm2835_i2c1_map));

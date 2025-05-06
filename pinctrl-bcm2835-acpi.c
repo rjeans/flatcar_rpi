@@ -1444,7 +1444,9 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	
 	dev_info(dev, "Added pinctrl range for I2C device BCM2841:00 (gpio2-3)\n");
 
-
+	dev_info(dev, "pinctrl dev: %s", dev_name(dev));
+	dev_info(dev, "pinctrl dev->fwnode: %p\n", dev->fwnode);
+	
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
