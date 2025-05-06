@@ -1428,6 +1428,20 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
 
+	struct pinctrl_gpio_range i2c_range = {
+		.name = "bcm2835-i2c",
+		.id = 0,
+		.base = 2,
+		.pin_base = 2,
+		.npins = 2,
+		.gc = &pc->gpio_chip,
+		.dev_name = "BCM2841:00", // CRITICAL: This must match the dev_name in the mapping
+	};
+	
+	pinctrl_add_gpio_range(pc->pctl_dev, &i2c_range);
+	
+
+
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
