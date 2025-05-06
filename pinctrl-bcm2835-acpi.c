@@ -294,13 +294,15 @@ static inline void bcm2835_pinctrl_fsel_set(
 	unsigned long flags;
 
 
-    dev_info(pc->dev, "bcm2835_pinctrl_fsel_set: pin=%u, fsel=%d (%s), current_val=0x%x\n",
-             pin, fsel, bcm2835_functions[fsel], val);
-
 
 	spin_lock_irqsave(&pc->fsel_lock, flags);
 	val = readl(pc->base + FSEL_REG(pin));
 	cur = (val >> FSEL_SHIFT(pin)) & BCM2835_FSEL_MASK;
+
+
+    dev_info(pc->dev, "bcm2835_pinctrl_fsel_set: pin=%u, fsel=%d (%s), current_val=0x%x\n",
+             pin, fsel, bcm2835_functions[fsel], val);
+
 
 	if (cur == fsel)
 		goto unlock;
