@@ -77,26 +77,7 @@
 #define BCM2711_PULL_UP		0x1
 #define BCM2711_PULL_DOWN	0x2
 
-static const struct pinctrl_map bcm2835_i2c1_map[] = {
-    {
-        .dev_name = "BCM2841:00",
-        .name = "default",
-        .type = PIN_MAP_TYPE_MUX_GROUP,
-        .data.mux = {
-            .group = "gpio2",
-            .function = "alt0",
-        },
-    },
-    {
-        .dev_name = "BCM2841:00",
-        .name = "default",
-        .type = PIN_MAP_TYPE_MUX_GROUP,
-        .data.mux = {
-            .group = "gpio3",
-            .function = "alt0",
-        },
-    },
-};
+
 
 
 
@@ -1458,9 +1439,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "pinctrl dev: %s", dev_name(dev));
 	dev_info(dev, "pinctrl dev->fwnode: %p\n", dev->fwnode);
 
-	ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
-    if (ret)
-       dev_warn(dev, "Failed to register I2C1 pinctrl mappings: %d\n", ret);
+	
 	
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",

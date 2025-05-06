@@ -522,6 +522,10 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
 
+	ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
+	if (ret)
+		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
+
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 	if (IS_ERR(pinctrl)) {
 		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
@@ -543,9 +547,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "pinctrl map dev_name: %s\n", bcm2835_i2c1_map[0].dev_name);
     dev_info(&pdev->dev, "actual dev_name: %s\n", dev_name(&pdev->dev));
 
-	ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
-	if (ret)
-		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
 	
 
 	return 0;
