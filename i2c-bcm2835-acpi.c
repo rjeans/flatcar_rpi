@@ -57,6 +57,26 @@
 #define BCM2835_I2C_CDIV_MIN	0x0002
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
+static const struct pinctrl_map bcm2835_i2c1_pinctrl_map[] = {
+	{
+		.name = "default",
+		.type = PIN_MAP_TYPE_MUX_GROUP,
+		.data.mux = {
+			.group = "gpio2",
+			.function = "alt0",
+		},
+	},
+	{
+		.name = "default",
+		.type = PIN_MAP_TYPE_MUX_GROUP,
+		.data.mux = {
+			.group = "gpio3",
+			.function = "alt0",
+		},
+	},
+};
+
+
 struct bcm2835_i2c_dev {
 	struct device *dev;
 	void __iomem *regs;
@@ -417,7 +437,15 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, i2c_dev);
 	i2c_dev->dev = &pdev->dev;
 
-	
+	bcm2835_i2c1_pinctrl_map[0].dev_name = dev_name(&pdev->dev);
+	bcm2835_i2c1_pinctrl_map[1].dev_name = dev_name(&pdev->dev);
+
+	ret = pinctrl_register_map(bcm2835_i2c1_pinctrl_map,
+		ARRAY_SIZE(bcm2835_i2c1_pinctrl_map),
+		NULL);
+	if (ret)
+		dev_warn(dev, "Failed to register static pinctrl map: %d\n", ret);
+
 
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 	if (IS_ERR(pinctrl)) {

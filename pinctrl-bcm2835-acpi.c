@@ -35,7 +35,8 @@
 #include <linux/types.h>
 #include <dt-bindings/pinctrl/bcm2835.h>
 #include <linux/acpi.h>
-#include <linux/pinctrl/pinctrl-acpi.h>
+#include <linux/pinctrl/machine.h>
+
 
 
 
@@ -76,7 +77,6 @@
 #define BCM2711_PULL_NONE	0x0
 #define BCM2711_PULL_UP		0x1
 #define BCM2711_PULL_DOWN	0x2
-
 
 
 struct bcm2835_pinctrl {
