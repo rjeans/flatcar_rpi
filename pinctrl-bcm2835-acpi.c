@@ -40,7 +40,7 @@
 
 static const struct pinctrl_map bcm2835_i2c1_map[] = {
 	{
-		.dev_name = "BCM2841:00",
+		.dev_name = "BCM2845:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
@@ -49,7 +49,7 @@ static const struct pinctrl_map bcm2835_i2c1_map[] = {
 		},
 	},
 	{
-		.dev_name = "BCM2841:00",
+		.dev_name = "BCM2845:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
