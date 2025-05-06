@@ -515,6 +515,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_free_irq;
 
+	dev_info(&pdev->dev, "I2C driver registered: %s\n", dev_name(&pdev->dev));
 
 	return 0;
 
