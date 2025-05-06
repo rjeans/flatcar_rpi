@@ -96,30 +96,7 @@ struct bcm2835_pinctrl {
 	/* Protect FSEL registers */
 	spinlock_t fsel_lock;
 
-//	struct pinctrl_gpio_range i2c_range;
 };
-
-static struct pinctrl_map bcm2835_i2c1_map[] = {
-    {
-        .dev_name = "BCM2841:00",
-        .name = "default",
-        .type = PIN_MAP_TYPE_MUX_GROUP,
-        .data.mux = {
-            .group = "gpio2",
-            .function = "alt0",
-        },
-    },
-    {
-        .dev_name = "BCM2841:00",
-        .name = "default",
-        .type = PIN_MAP_TYPE_MUX_GROUP,
-        .data.mux = {
-            .group = "gpio3",
-            .function = "alt0",
-        },
-    },
-};
-
 
 
 /* pins are just named GPIO0..GPIO53 */
@@ -1453,23 +1430,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	}
     pc->gpio_range.pin_base=0;
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
-/*
-	pc->i2c_range = (struct pinctrl_gpio_range) {
-		.gc = &pc->gpio_chip,
-		.name = "BCM2841:00",
-		.base = 2,
-		.pin_base = 2,
-		.npins = 2,
-		.id = 0,
-	};
-	
-	pinctrl_add_gpio_range(pc->pctl_dev, &pc->i2c_range);
-	
-	dev_info(dev, "Added pinctrl range for I2C device BCM2841:00 (gpio2-3)\n");
 
-*/
-
-    pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
 
 
 	dev_info(dev, "pinctrl dev: %s", dev_name(dev));
