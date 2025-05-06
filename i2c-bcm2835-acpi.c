@@ -444,7 +444,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		ARRAY_SIZE(bcm2835_i2c1_pinctrl_map),
 		NULL);
 	if (ret)
-		dev_warn(dev, "Failed to register static pinctrl map: %d\n", ret);
+		dev_warn(&pdev->dev, "Failed to register static pinctrl map: %d\n", ret);
 
 
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
