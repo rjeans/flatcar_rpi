@@ -1430,11 +1430,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		 pc->gpio_chip.ngpio);
 
 
-		ret = acpi_pinctrl_add_device(dev);
-		if (ret) {
-			dev_err(dev, "Failed to add ACPI pinctrl device: %d\n", ret);
-			return ret;
-		}
 
 
 	return 0;
