@@ -531,7 +531,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 
-	dev_info(&pdev->dev, "After pinctrl_get_select_default: pinctrl=%p, ERR=%ld\n",
+	dev_info(&pdev->dev, "After pinctrl_get_select_default: pinctrl=%p, ERR=%d\n",
 		pinctrl, PTR_ERR_OR_ZERO(pinctrl));
 
 
