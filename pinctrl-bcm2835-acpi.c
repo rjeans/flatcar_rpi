@@ -95,6 +95,15 @@ struct bcm2835_pinctrl {
 	raw_spinlock_t irq_lock[BCM2835_NUM_BANKS];
 	/* Protect FSEL registers */
 	spinlock_t fsel_lock;
+
+	struct pinctrl_gpio_range i2c_range = {
+		.id = 0,
+		.base = 2,
+		.pin_base = 2,
+		.npins = 2,
+		.gc = &pc->gpio_chip,
+		.name = "BCM2841:00", // CRITICAL: This must match the dev_name in the mapping
+	};
 };
 
 
@@ -1428,16 +1437,9 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
     pc->gpio_range.pin_base=0;
 	pinctrl_add_gpio_range(pc->pctl_dev, &pc->gpio_range);
 
-	struct pinctrl_gpio_range i2c_range = {
-		.id = 0,
-		.base = 2,
-		.pin_base = 2,
-		.npins = 2,
-		.gc = &pc->gpio_chip,
-		.name = "BCM2841:00", // CRITICAL: This must match the dev_name in the mapping
-	};
+
 	
-	pinctrl_add_gpio_range(pc->pctl_dev, &i2c_range);
+	pinctrl_add_gpio_range(pc->pctl_dev, &pc->i2c_range);
 	
 	dev_info(dev, "Added pinctrl range for I2C device BCM2841:00 (gpio2-3)\n");
 
