@@ -294,8 +294,8 @@ static inline void bcm2835_pinctrl_fsel_set(
 	unsigned long flags;
 
 
-    dev_info(pc->dev, "bcm2835_pinctrl_fsel_set: pin=%u, fsel=%d (%s), shift=%u, mask=0x%x, value=0x%x, current_val=0x%x\n",
-             pin, fsel, bcm2835_functions[fsel], shift, mask, value, val);
+    dev_info(pc->dev, "bcm2835_pinctrl_fsel_set: pin=%u, fsel=%d (%s), current_val=0x%x\n",
+             pin, fsel, bcm2835_functions[fsel], val);
 
 
 	spin_lock_irqsave(&pc->fsel_lock, flags);
