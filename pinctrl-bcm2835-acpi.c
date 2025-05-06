@@ -1236,6 +1236,7 @@ static const struct bcm_plat_data bcm2711_plat_data = {
 
 static const struct acpi_device_id bcm2835_acpi_ids[] = {
 	{ "BCM2845", (kernel_ulong_t)&bcm2835_plat_data },
+	{ "BCM2841", (kernel_ulong_t)&bcm2835_plat_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_acpi_ids);
