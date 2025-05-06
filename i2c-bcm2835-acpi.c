@@ -59,24 +59,25 @@
 #define BCM2835_I2C_CDIV_MIN	0x0002
 #define BCM2835_I2C_CDIV_MAX	0xFFFE
 
-
 static const struct pinctrl_map bcm2835_i2c1_map[] = {
-	{
-		.name = "default",
-		.type = PIN_MAP_TYPE_MUX_GROUP,
-		.data.mux = {
-			.group = "gpio2",
-			.function = "alt0",
-		},
-	},
-	{
-		.name = "default",
-		.type = PIN_MAP_TYPE_MUX_GROUP,
-		.data.mux = {
-			.group = "gpio3",
-			.function = "alt0",
-		},
-	},
+    {
+        .dev_name = "BCM2841:00",
+        .name = "default",
+        .type = PIN_MAP_TYPE_MUX_GROUP,
+        .data.mux = {
+            .group = "gpio2",
+            .function = "alt0",
+        },
+    },
+    {
+        .dev_name = "BCM2841:00",
+        .name = "default",
+        .type = PIN_MAP_TYPE_MUX_GROUP,
+        .data.mux = {
+            .group = "gpio3",
+            .function = "alt0",
+        },
+    },
 };
 
 
@@ -540,11 +541,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
     dev_info(&pdev->dev, "dev->fwnode: %p\n", pdev->dev.fwnode);
 	dev_info(&pdev->dev, "fwnode: %p\n", dev_fwnode(&pdev->dev));
 
-
-	for (int i = 0; i < ARRAY_SIZE(bcm2835_i2c1_map); i++) {
-		bcm2835_i2c1_map[i].fwnode = dev_fwnode(&pdev->dev);
-	}
-	
 	
 	ret = pinctrl_register_mappings(bcm2835_i2c1_map,
 		ARRAY_SIZE(bcm2835_i2c1_map));

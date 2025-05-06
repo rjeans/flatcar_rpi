@@ -1401,6 +1401,8 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 
 	pc->pctl_desc = *pdata->pctl_desc;
 	pc->pctl_desc.owner = THIS_MODULE;
+	dev_set_name(dev, "BCM2841:00");
+
 
 	pc->pctl_dev = devm_pinctrl_register(dev, &pc->pctl_desc, pc);
 	if (IS_ERR(pc->pctl_dev)) {
