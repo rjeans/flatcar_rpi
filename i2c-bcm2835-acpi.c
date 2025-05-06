@@ -536,8 +536,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_free_irq;
 
-	pdev->dev.fwnode = pdev->fwnode; // inherit fwnode from parent if not already set
-
+	pdev->dev.fwnode = dev_fwnode(&pdev->dev);
 	
 	ret = pinctrl_register_mappings(bcm2835_i2c1_map,
 		ARRAY_SIZE(bcm2835_i2c1_map));
