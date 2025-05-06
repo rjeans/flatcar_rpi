@@ -526,7 +526,15 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
 
+	dev_info(&pdev->dev, "Before pinctrl_get_select_default\n");
+
+
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+
+	dev_info(&pdev->dev, "After pinctrl_get_select_default: pinctrl=%p, ERR=%ld\n",
+		pinctrl, PTR_ERR_OR_ZERO(pinctrl));
+
+
 	if (IS_ERR(pinctrl)) {
 		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
 	} else {

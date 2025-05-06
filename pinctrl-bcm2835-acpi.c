@@ -293,6 +293,11 @@ static inline void bcm2835_pinctrl_fsel_set(
 	enum bcm2835_fsel cur;
 	unsigned long flags;
 
+
+    dev_info(pc->dev, "bcm2835_pinctrl_fsel_set: pin=%u, fsel=%d (%s), reg=0x%x, shift=%u, mask=0x%x, value=0x%x, current_val=0x%x\n",
+             pin, fsel, bcm2835_functions[fsel], reg, shift, mask, value, val);
+
+
 	spin_lock_irqsave(&pc->fsel_lock, flags);
 	val = readl(pc->base + FSEL_REG(pin));
 	cur = (val >> FSEL_SHIFT(pin)) & BCM2835_FSEL_MASK;
@@ -892,6 +897,8 @@ static int bcm2835_pmx_set(struct pinctrl_dev *pctldev,
 		unsigned group_selector)
 {
 	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+
+	
 	dev_info(pc->dev, "Set mux: group=%s function=%s\n",
 		bcm2835_gpio_groups[group_selector],
 		bcm2835_functions[func_selector]);
