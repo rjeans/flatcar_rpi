@@ -62,7 +62,6 @@
 
 static const struct pinctrl_map bcm2835_i2c1_map[] = {
 	{
-		.dev_name = "BCM2841:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
@@ -71,7 +70,6 @@ static const struct pinctrl_map bcm2835_i2c1_map[] = {
 		},
 	},
 	{
-		.dev_name = "BCM2841:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
@@ -540,7 +538,13 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "dev_name: %s", dev_name(&pdev->dev));
     dev_info(&pdev->dev, "dev->fwnode: %p\n", pdev->dev.fwnode);
+	dev_info(&pdev->dev, "fwnode: %p\n", dev_fwnode(&pdev->dev));
 
+
+	for (int i = 0; i < ARRAY_SIZE(bcm2835_i2c1_map); i++) {
+		bcm2835_i2c1_map[i].fwnode = dev_fwnode(&pdev->dev);
+	}
+	
 	
 	ret = pinctrl_register_mappings(bcm2835_i2c1_map,
 		ARRAY_SIZE(bcm2835_i2c1_map));
