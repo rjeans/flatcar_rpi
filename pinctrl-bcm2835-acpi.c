@@ -35,7 +35,8 @@
 #include <linux/types.h>
 #include <dt-bindings/pinctrl/bcm2835.h>
 #include <linux/acpi.h>
-#include <linux/acpi_pinctrl.h> // Add this header for acpi_pinctrl_add_device
+#include <linux/pinctrl/pinctrl-acpi.h>
+
 
 
 #define MODULE_NAME "pinctrl-bcm2835-acpi"
