@@ -35,6 +35,8 @@
 #include <linux/types.h>
 #include <dt-bindings/pinctrl/bcm2835.h>
 #include <linux/acpi.h>
+#include <linux/acpi_pinctrl.h> // Add this header for acpi_pinctrl_add_device
+
 
 #define MODULE_NAME "pinctrl-bcm2835-acpi"
 #define BCM2835_NUM_GPIOS 54
@@ -1426,13 +1428,13 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
 
-		 ret = pinctrl_register_mappings();
-		 if (ret)
-			 dev_warn(dev, "Failed to register pinctrl mappings: %d\n", ret);
-	 
-		 ret = acpi_pinctrl_register(dev, pc->pctl_dev);
-		 if (ret)
-			 dev_warn(dev, "Failed to register ACPI pinctrl: %d\n", ret);
+
+		ret = acpi_pinctrl_add_device(dev);
+		if (ret) {
+			dev_err(dev, "Failed to add ACPI pinctrl device: %d\n", ret);
+			return ret;
+		}
+
 
 	return 0;
 
