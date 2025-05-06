@@ -40,7 +40,7 @@
 
 static const struct pinctrl_map bcm2835_i2c1_map[] = {
 	{
-		.dev_name = "BCM2845:00",
+		.dev_name = "BCM2841:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
@@ -49,7 +49,7 @@ static const struct pinctrl_map bcm2835_i2c1_map[] = {
 		},
 	},
 	{
-		.dev_name = "BCM2845:00",
+		.dev_name = "BCM2841:00",
 		.name = "default",
 		.type = PIN_MAP_TYPE_MUX_GROUP,
 		.data.mux = {
@@ -910,9 +910,12 @@ static int bcm2835_pmx_set(struct pinctrl_dev *pctldev,
 		unsigned group_selector)
 {
 	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+	dev_info(pc->dev, "Set mux: group=%s function=%s\n",
+		bcm2835_gpio_groups[group_selector],
+		bcm2835_functions[func_selector]);
 
-	bcm2835_bind_gpio_function(pc, group_selector, func_selector);
-	return 0;
+   bcm2835_bind_gpio_function(pc, group_selector, func_selector);
+   return 0;
 }
 
 // Add the persist_gpio_outputs parameter
