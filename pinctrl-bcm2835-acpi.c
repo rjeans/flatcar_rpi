@@ -1437,11 +1437,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		.name = "BCM2841:00", // CRITICAL: This must match the dev_name in the mapping
 	};
 	
-	ret=pinctrl_add_gpio_range(pc->pctl_dev, &i2c_range);
-	if (ret) {
-		dev_err(dev, "Failed to add GPIO pin range for I2C device: %d\n", ret);
-		goto cleanup_gpio_range;
-	}
+	pinctrl_add_gpio_range(pc->pctl_dev, &i2c_range);
 	
 	dev_info(dev, "Added pinctrl range for I2C device BCM2841:00 (gpio2-3)\n");
 
