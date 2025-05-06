@@ -15,7 +15,9 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
-#include <linux/pinctrl/consumer.h> // Include missing header for pinctrl functions
+#include <linux/pinctrl/consumer.h> 
+#include <linux/pinctrl/machine.h>
+
 
 #define BCM2835_I2C_C		0x0
 #define BCM2835_I2C_S		0x4
