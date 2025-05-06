@@ -1419,6 +1419,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register GPIO chip: %d\n", ret);
 		goto cleanup_gpio_range;
 	}
+	
 
 	dev_info(dev, "Registering pin range for devname: %s\n", pinctrl_dev_get_devname(pc->pctl_dev));
 
@@ -1451,6 +1452,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 
 	dev_info(dev, "BCM GPIO controller registered successfully (ngpio=%d)\n",
 		 pc->gpio_chip.ngpio);
+	dev_info(dev, "Pinctrl probed successfully for controller: %s\n", dev_name(dev));
 
 
 
