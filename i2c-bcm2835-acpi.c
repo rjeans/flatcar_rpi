@@ -439,25 +439,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, i2c_dev);
 	i2c_dev->dev = &pdev->dev;
 
-	bcm2835_i2c1_pinctrl_map[0].dev_name = dev_name(&pdev->dev);
-	bcm2835_i2c1_pinctrl_map[1].dev_name = dev_name(&pdev->dev);
-
-	ret = pinctrl_register_mappings(bcm2835_i2c1_pinctrl_map,
-		ARRAY_SIZE(bcm2835_i2c1_pinctrl_map));
-	if (ret)
-		dev_warn(&pdev->dev, "Failed to register static pinctrl map: %d\n", ret);
-
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl)) {
-		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
-	} else {
-		dev_info(&pdev->dev, "Applied default pinctrl state\n");
-	}
-	
-
-
-
 	init_completion(&i2c_dev->completion);
 
 	i2c_dev->regs = devm_platform_get_and_ioremap_resource(pdev, 0, NULL);
@@ -538,9 +519,29 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, 0);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
+
+	bcm2835_i2c1_pinctrl_map[0].dev_name = dev_name(&pdev->dev);
+	bcm2835_i2c1_pinctrl_map[1].dev_name = dev_name(&pdev->dev);
+
+	ret = pinctrl_register_mappings(bcm2835_i2c1_pinctrl_map,
+		ARRAY_SIZE(bcm2835_i2c1_pinctrl_map));
+	if (ret)
+		dev_warn(&pdev->dev, "Failed to register static pinctrl map: %d\n", ret);
+
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl)) {
+		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
+	} else {
+		dev_info(&pdev->dev, "Applied default pinctrl state\n");
+	}
+	
+
+
 	ret = i2c_add_adapter(adap);
 	if (ret)
 		goto err_free_irq;
+
 
 	return 0;
 
