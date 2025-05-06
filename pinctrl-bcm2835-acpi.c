@@ -1408,10 +1408,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		return PTR_ERR(pc->pctl_dev);
 	}
 
-	struct acpi_device *adev = ACPI_COMPANION(dev);
-    if (adev)
-	   acpi_device_set_pinctrl_dev(adev, pc->pctl_dev);
-
 
 	pc->gpio_range = *pdata->gpio_range;
 	pc->gpio_range.base = 0;
