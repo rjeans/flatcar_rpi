@@ -395,6 +395,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	struct clk *mclk;
 	u32 bus_clk_rate;
 	unsigned long long uid;
+	struct pinctrl *pinctrl;
 
 	// Check for ACPI _UID
 	if (ACPI_HANDLE(&pdev->dev)) {
@@ -414,6 +415,19 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, i2c_dev);
 	i2c_dev->dev = &pdev->dev;
+
+	
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl)) {
+		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
+	} else {
+		dev_info(&pdev->dev, "Applied default pinctrl state\n");
+	}
+	
+
+
+
 	init_completion(&i2c_dev->completion);
 
 	i2c_dev->regs = devm_platform_get_and_ioremap_resource(pdev, 0, NULL);
