@@ -1458,7 +1458,7 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 	dev_info(dev, "pinctrl dev: %s", dev_name(dev));
 	dev_info(dev, "pinctrl dev->fwnode: %p\n", dev->fwnode);
 
-	ret = pinctrl_register_mappings(i2c1_pinctrl_map, ARRAY_SIZE(i2c1_pinctrl_map));
+	ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
     if (ret)
        dev_warn(dev, "Failed to register I2C1 pinctrl mappings: %d\n", ret);
 	
