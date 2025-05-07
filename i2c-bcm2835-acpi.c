@@ -569,15 +569,21 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "Applied default pinctrl state\n");
 	}
 	
-    struct fwnode_handle *child;
-fwnode_for_each_child_node(dev_fwnode(&pdev->dev), child) {
-	u64 adr = 0;
-	if (!fwnode_property_read_u64(child, "reg", &adr)) {
-		dev_info(&pdev->dev, "Found ACPI child with reg=0x%llx\n", adr);
-	} else {
-		dev_warn(&pdev->dev, "Found ACPI child with NO reg property\n");
+	fwnode_for_each_child_node(dev_fwnode(&pdev->dev), child) {
+		if (!is_acpi_node(child)) {
+			dev_warn(&pdev->dev, "Skipping non-ACPI child fwnode\n");
+			continue;
+		}
+	
+		u64 adr;
+		if (fwnode_property_read_u64(child, "reg", &adr)) {
+			dev_warn(&pdev->dev, "Child has no reg property\n");
+			continue;
+		}
+	
+		dev_info(&pdev->dev, "ACPI child with reg=0x%llx\n", adr);
 	}
-}
+	
 
 	ret = i2c_add_adapter(adap);
 	if (ret)
