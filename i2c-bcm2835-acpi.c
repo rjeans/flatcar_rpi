@@ -504,18 +504,37 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	dev_info(i2c_dev->dev, "Cleared pending IRQ conditions: status=0x%08x\n",
 		bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S));
+		
+		adap = &i2c_dev->adapter;
 
-	adap = &i2c_dev->adapter;
-	i2c_set_adapdata(adap, i2c_dev);
-	adap->owner = THIS_MODULE;
-	adap->class = I2C_CLASS_DEPRECATED;
-	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)",
-         dev_name(&pdev->dev));
-
-	adap->algo = &bcm2835_i2c_algo;
-	adap->dev.parent = &pdev->dev;
-	adap->dev.fwnode = dev_fwnode(&pdev->dev);  // ← ADD THIS
+		/* Link driver data */
+		i2c_set_adapdata(adap, i2c_dev);
+		adap->owner = THIS_MODULE;
+		adap->class = I2C_CLASS_DEPRECATED;
+	
+		/* Adapter name — safe for both DT and ACPI */
+		snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)",
+				 dev_name(&pdev->dev) ? dev_name(&pdev->dev) : "unknown");
+	
+		adap->algo = &bcm2835_i2c_algo;
+	
+		/* Parent device is the platform device */
+		adap->dev.parent = &pdev->dev;
+	
+		/* Only assign .fwnode if it's valid (safe for ACPI) */
+		{
+			struct fwnode_handle *fwnode = dev_fwnode(&pdev->dev);
+			if (fwnode) {
+				adap->dev.fwnode = fwnode;
+				dev_info(&pdev->dev, "Linked firmware node: %pfw\n", fwnode);
+			} else {
+				dev_warn(&pdev->dev, "No firmware node found; adapter will have no fwnode\n");
+			}
+		}
+	
+		/* Set I2C controller quirks */
 		adap->quirks = &bcm2835_i2c_quirks;
+	
 
 	/*
 	 * Disable the hardware clock stretching timeout. SMBUS
