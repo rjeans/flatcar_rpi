@@ -684,6 +684,9 @@ static int bcm2835_pmx_get_function_groups(struct pinctrl_dev *pctldev,
 		const char * const **groups,
 		unsigned * const num_groups)
 {
+	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+	dev_info(pc->dev, "get_function_groups: selector=%u, name=%s\n",
+		selector, bcm2835_functions[selector]);	
 	/* every pin can do every function */
 	*groups = bcm2835_gpio_groups;
 	*num_groups = BCM2835_NUM_GPIOS;
