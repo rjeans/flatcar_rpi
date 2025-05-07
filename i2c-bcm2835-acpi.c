@@ -568,7 +568,8 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	} else {
 		dev_info(&pdev->dev, "Applied default pinctrl state\n");
 	}
-	
+	struct fwnode_handle *child;
+
 	fwnode_for_each_child_node(dev_fwnode(&pdev->dev), child) {
 		if (!is_acpi_node(child)) {
 			dev_warn(&pdev->dev, "Skipping non-ACPI child fwnode\n");
