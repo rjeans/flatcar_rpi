@@ -672,8 +672,10 @@ static int bcm2835_pmx_get_functions_count(struct pinctrl_dev *pctldev)
 static const char *bcm2835_pmx_get_function_name(struct pinctrl_dev *pctldev,
 		unsigned selector)
 {
-	dev_info(pctldev, "get_function_name: selector=%u, name=%s\n",
-		selector, bcm2835_functions[selector].name);
+	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
+
+	dev_info(pc->dev, "get_function_name: selector=%u, name=%s\n",
+		selector, bcm2835_functions[selector]);
 	return bcm2835_functions[selector];
 }
 
