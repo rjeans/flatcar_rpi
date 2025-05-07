@@ -510,9 +510,11 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	adap->owner = THIS_MODULE;
 	adap->class = I2C_CLASS_DEPRECATED;
 	snprintf(adap->name, sizeof(adap->name), "bcm2835 (%s)",
-		 of_node_full_name(pdev->dev.of_node));
+         dev_name(&pdev->dev));
+
 	adap->algo = &bcm2835_i2c_algo;
 	adap->dev.parent = &pdev->dev;
+	adap->dev.fwnode = dev_fwnode(&pdev->dev);  // ← ADD THIS
 		adap->quirks = &bcm2835_i2c_quirks;
 
 	/*
