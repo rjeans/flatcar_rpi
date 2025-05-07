@@ -41,7 +41,6 @@
 
 #define MODULE_NAME "pinctrl-bcm2835-acpi"
 #define BCM2835_NUM_GPIOS 54
-#define BCM2711_NUM_GPIOS 58
 #define BCM2835_NUM_BANKS 2
 #define BCM2835_NUM_IRQS  3
 
@@ -73,10 +72,6 @@
 /* argument: bcm2835_pinconf_pull */
 #define BCM2835_PINCONF_PARAM_PULL	(PIN_CONFIG_END + 1)
 
-#define BCM2711_PULL_NONE	0x0
-#define BCM2711_PULL_UP		0x1
-#define BCM2711_PULL_DOWN	0x2
-
 
 
 
@@ -88,7 +83,6 @@ struct bcm2835_pinctrl {
 
 	/* note: locking assumes each bank will have its own unsigned long */
 	unsigned long enabled_irq_map[BCM2835_NUM_BANKS];
-	unsigned int irq_type[BCM2711_NUM_GPIOS];
 
 	struct pinctrl_dev *pctl_dev;
 	struct gpio_chip gpio_chip;
@@ -383,22 +377,6 @@ static const struct gpio_chip bcm2835_gpio_chip = {
 	.set_config = gpiochip_generic_config,
 	.base = -1,
 	.ngpio = BCM2835_NUM_GPIOS,
-	.can_sleep = false,
-};
-
-static const struct gpio_chip bcm2711_gpio_chip = {
-	.label = "pinctrl-bcm2711",
-	.owner = THIS_MODULE,
-	.request = gpiochip_generic_request,
-	.free = NULL,
-	.direction_input = bcm2835_gpio_direction_input,
-	.direction_output = bcm2835_gpio_direction_output,
-	.get_direction = bcm2835_gpio_get_direction,
-	.get = bcm2835_gpio_get,
-	.set = bcm2835_gpio_set,
-	.set_config = gpiochip_generic_config,
-	.base = -1,
-	.ngpio = BCM2711_NUM_GPIOS,
 	.can_sleep = false,
 };
 
@@ -892,115 +870,7 @@ static const struct pinconf_ops bcm2835_pinconf_ops = {
 	.pin_config_set = bcm2835_pinconf_set,
 };
 
-static int bcm2711_pinconf_get(struct pinctrl_dev *pctldev, unsigned pin,
-			       unsigned long *config)
-{
-	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
-	enum pin_config_param param = pinconf_to_config_param(*config);
-	u32 offset, shift, val;
 
-	offset = PUD_2711_REG_OFFSET(pin);
-	shift = PUD_2711_REG_SHIFT(pin);
-	val = readl(pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (offset * 4));
-
-	switch (param) {
-	case PIN_CONFIG_BIAS_DISABLE:
-		if (((val >> shift) & PUD_2711_MASK) != BCM2711_PULL_NONE)
-			return -EINVAL;
-
-		break;
-
-	case PIN_CONFIG_BIAS_PULL_UP:
-		if (((val >> shift) & PUD_2711_MASK) != BCM2711_PULL_UP)
-			return -EINVAL;
-
-		*config = pinconf_to_config_packed(param, 50000);
-		break;
-
-	case PIN_CONFIG_BIAS_PULL_DOWN:
-		if (((val >> shift) & PUD_2711_MASK) != BCM2711_PULL_DOWN)
-			return -EINVAL;
-
-		*config = pinconf_to_config_packed(param, 50000);
-		break;
-
-	default:
-		return bcm2835_pinconf_get(pctldev, pin, config);
-	}
-
-	return 0;
-}
-
-static void bcm2711_pull_config_set(struct bcm2835_pinctrl *pc,
-				    unsigned int pin, unsigned int arg)
-{
-	u32 shifter;
-	u32 value;
-	u32 off;
-
-	off = PUD_2711_REG_OFFSET(pin);
-	shifter = PUD_2711_REG_SHIFT(pin);
-
-	value = readl(pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4));
-	value &= ~(PUD_2711_MASK << shifter);
-	value |= (arg << shifter);
-	writel(value, pc->base + GP_GPIO_PUP_PDN_CNTRL_REG0 + (off * 4));
-}
-
-static int bcm2711_pinconf_set(struct pinctrl_dev *pctldev,
-			       unsigned int pin, unsigned long *configs,
-			       unsigned int num_configs)
-{
-	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
-	u32 param, arg;
-	int i;
-
-	for (i = 0; i < num_configs; i++) {
-		param = pinconf_to_config_param(configs[i]);
-		arg = pinconf_to_config_argument(configs[i]);
-
-		switch (param) {
-		/* convert legacy brcm,pull */
-		case BCM2835_PINCONF_PARAM_PULL:
-			if (arg == BCM2835_PUD_UP)
-				arg = BCM2711_PULL_UP;
-			else if (arg == BCM2835_PUD_DOWN)
-				arg = BCM2711_PULL_DOWN;
-			else
-				arg = BCM2711_PULL_NONE;
-
-			bcm2711_pull_config_set(pc, pin, arg);
-			break;
-
-		/* Set pull generic bindings */
-		case PIN_CONFIG_BIAS_DISABLE:
-			bcm2711_pull_config_set(pc, pin, BCM2711_PULL_NONE);
-			break;
-		case PIN_CONFIG_BIAS_PULL_DOWN:
-			bcm2711_pull_config_set(pc, pin, BCM2711_PULL_DOWN);
-			break;
-		case PIN_CONFIG_BIAS_PULL_UP:
-			bcm2711_pull_config_set(pc, pin, BCM2711_PULL_UP);
-			break;
-
-		/* Set output-high or output-low */
-		case PIN_CONFIG_OUTPUT:
-			bcm2835_gpio_set_bit(pc, arg ? GPSET0 : GPCLR0, pin);
-			break;
-
-		default:
-			return -ENOTSUPP;
-		}
-	} /* for each config */
-
-	return 0;
-}
-
-static const struct pinconf_ops bcm2711_pinconf_ops = {
-	.is_generic = true,
-	.pin_config_get = bcm2711_pinconf_get,
-	.pin_config_set = bcm2711_pinconf_set,
-};
 
 static const struct pinctrl_desc bcm2835_pinctrl_desc = {
 	.name = MODULE_NAME,
@@ -1012,25 +882,14 @@ static const struct pinctrl_desc bcm2835_pinctrl_desc = {
 	.owner = THIS_MODULE,
 };
 
-static const struct pinctrl_desc bcm2711_pinctrl_desc = {
-	.name = "pinctrl-bcm2711",
-	.pins = bcm2835_gpio_pins,
-	.npins = BCM2711_NUM_GPIOS,
-	.pctlops = &bcm2835_pctl_ops,
-	.pmxops = &bcm2835_pmx_ops,
-	.confops = &bcm2711_pinconf_ops,
-	.owner = THIS_MODULE,
-};
+
 
 static const struct pinctrl_gpio_range bcm2835_pinctrl_gpio_range = {
 	.name = MODULE_NAME,
 	.npins = BCM2835_NUM_GPIOS,
 };
 
-static const struct pinctrl_gpio_range bcm2711_pinctrl_gpio_range = {
-	.name = "pinctrl-bcm2711",
-	.npins = BCM2711_NUM_GPIOS,
-};
+
 
 struct bcm_plat_data {
 	const struct gpio_chip *gpio_chip;
@@ -1044,18 +903,12 @@ static const struct bcm_plat_data bcm2835_plat_data = {
 	.gpio_range = &bcm2835_pinctrl_gpio_range,
 };
 
-static const struct bcm_plat_data bcm2711_plat_data = {
-	.gpio_chip = &bcm2711_gpio_chip,
-	.pctl_desc = &bcm2711_pinctrl_desc,
-	.gpio_range = &bcm2711_pinctrl_gpio_range,
-};
 
 
 
 
 static const struct acpi_device_id bcm2835_acpi_ids[] = {
 	{ "BCM2845", (kernel_ulong_t)&bcm2835_plat_data },
-	{ "BCM2841", (kernel_ulong_t)&bcm2835_plat_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_acpi_ids);
@@ -1129,6 +982,8 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "No matching ACPI ID\n");
 		return -ENODEV;
 	}
+
+	// Assign platform data based on the matched ID
 	pdata = (const struct bcm_plat_data *)id->driver_data;
 
 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
