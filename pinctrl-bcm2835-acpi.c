@@ -861,8 +861,8 @@ static const struct pinctrl_ops bcm2835_pctl_ops = {
 	.get_group_name = bcm2835_pctl_get_group_name,
 	.get_group_pins = bcm2835_pctl_get_group_pins,
 	.pin_dbg_show = bcm2835_pctl_pin_dbg_show,
-	.dt_node_to_map = bcm2835_pctl_dt_node_to_map,
-	.dt_free_map = bcm2835_pctl_dt_free_map,
+	.dt_node_to_map = pinctrl_acpi_to_map,
+	.dt_free_map = pinctrl_utils_free_map,
 };
 
 
