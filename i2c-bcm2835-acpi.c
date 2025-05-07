@@ -504,7 +504,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 
 	dev_info(i2c_dev->dev, "Cleared pending IRQ conditions: status=0x%08x\n",
 		bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S));
-		
+
 		adap = &i2c_dev->adapter;
 
 		/* Link driver data */
@@ -569,7 +569,15 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "Applied default pinctrl state\n");
 	}
 	
-
+    struct fwnode_handle *child;
+fwnode_for_each_child_node(dev_fwnode(&pdev->dev), child) {
+	u64 adr = 0;
+	if (!fwnode_property_read_u64(child, "reg", &adr)) {
+		dev_info(&pdev->dev, "Found ACPI child with reg=0x%llx\n", adr);
+	} else {
+		dev_warn(&pdev->dev, "Found ACPI child with NO reg property\n");
+	}
+}
 
 	ret = i2c_add_adapter(adap);
 	if (ret)
