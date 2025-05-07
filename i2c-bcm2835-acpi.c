@@ -415,7 +415,7 @@ MODULE_DEVICE_TABLE(acpi, bcm2835_i2c_acpi_match);
 static int bcm2835_i2c_probe(struct platform_device *pdev)
 {
 	struct bcm2835_i2c_dev *i2c_dev;
-	int ret;
+	int i,ret;
 	struct i2c_adapter *adap;
 	struct clk *mclk;
 	u32 bus_clk_rate;
@@ -521,6 +521,11 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, 0);
 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
+    for (i=0; i<ARRAY_SIZE(bcm2835_i2c1_map); i++) {
+		dev_info(&pdev->dev, "bcm2835_i2c1_map[%d].dev_name: %s\n", i, bcm2835_i2c1_map[i].dev_name);
+		dev_info(&pdev->dev, "bcm2835_i2c1_map[%d].name: %s\n", i, bcm2835_i2c1_map[i].name);
+		dev_info(&pdev->dev, "bcm2835_i2c1_map[%d].type: %d\n", i, bcm2835_i2c1_map[i].type);
+	}
 
 	ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
 	if (ret)
