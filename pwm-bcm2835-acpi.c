@@ -132,41 +132,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 
-static struct clk *register_fallback_clk(struct device *dev, struct bcm2835_pwm *pc)
-{
-	struct clk_fixed_rate *fixed;
-	struct clk_init_data *init;
-	struct clk *clk;
 
-	fixed = devm_kzalloc(dev, sizeof(*fixed), GFP_KERNEL);
-	if (!fixed)
-		return ERR_PTR(-ENOMEM);
-
-	init = devm_kzalloc(dev, sizeof(*init), GFP_KERNEL);
-	if (!init) {
-		devm_kfree(dev, fixed); // Free allocated memory for `fixed`
-		return ERR_PTR(-ENOMEM);
-	}
-
-	init->name = "bcm2835-pwm-fallback-clk";
-	init->ops = &clk_fixed_rate_ops;
-
-	fixed->fixed_rate = 1000000;
-	fixed->hw.init = init;
-
-	clk = clk_register(dev, &fixed->hw);
-	if (IS_ERR(clk)) {
-		dev_warn(dev, "Fallback clock registration failed, error: %ld\n", PTR_ERR(clk));
-		devm_kfree(dev, init);  // Free allocated memory for `init`
-		devm_kfree(dev, fixed); // Free allocated memory for `fixed`
-		
-	} else {
-		dev_info(dev, "Fallback clock registered successfully\n");
-//		pc->clk_hw = &fixed->hw;
-	}
-
-	return clk;
-}
 
 static const struct pwm_ops bcm2835_pwm_ops = {
 	.request = bcm2835_pwm_request,
@@ -190,14 +156,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
                 return PTR_ERR(pc->base);
 
         pc->clk = devm_clk_get(&pdev->dev, NULL);
-        if (IS_ERR(pc->clk)) {
-			dev_warn(&pdev->dev, "No clock found, using fallback\n");
-			pc->clk = register_fallback_clk(&pdev->dev, pc);
-			if (IS_ERR(pc->clk)) {
-				dev_err(&pdev->dev, "Failed to register fallback clock\n");
+        if (IS_ERR(pc->clk)) {;
                 return dev_err_probe(&pdev->dev, PTR_ERR(pc->clk),
                                      "clock not found\n");
-			}
+			
 		}
 
         ret = clk_prepare_enable(pc->clk);
@@ -238,7 +200,7 @@ static int bcm2835_pwm_resume(struct device *dev)
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
-	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
+//	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
 	dev_info(&pdev->dev, "Removing BCM2835 PWM driver\n");
 
