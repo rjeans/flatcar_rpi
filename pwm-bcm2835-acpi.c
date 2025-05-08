@@ -185,12 +185,11 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Clock enabled successfully\n");
 
 	pc->chip.dev = &pdev->dev;
-pc->chip.fwnode = dev_fwnode(&pdev->dev);  // <-- ADD THIS
 	pc->chip.ops = &bcm2835_pwm_ops;
 	pc->chip.npwm = 2;
 	pc->chip.base = -1;
 	pc->chip.of_xlate = NULL;
-	pc->chip.of_pwm_n_cells = -1;
+	pc->chip.of_pwm_n_cells = 0;
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
