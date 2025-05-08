@@ -132,54 +132,6 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 
-int my_pwmchip_add(struct pwm_chip *chip)
-{
-	struct pwm_device *pwm;
-	unsigned int i;
-	int ret;
-
-	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
-		return -EINVAL;
-
-	if (!pwm_ops_check(chip))
-		return -EINVAL;
-
-	chip->pwms = kcalloc(chip->npwm, sizeof(*pwm), GFP_KERNEL);
-	if (!chip->pwms)
-		return -ENOMEM;
-
-	mutex_lock(&pwm_lock);
-
-	ret = alloc_pwms(chip->npwm);
-	if (ret < 0) {
-		mutex_unlock(&pwm_lock);
-		kfree(chip->pwms);
-		return ret;
-	}
-
-	chip->base = ret;
-
-	for (i = 0; i < chip->npwm; i++) {
-		pwm = &chip->pwms[i];
-
-		pwm->chip = chip;
-		pwm->pwm = chip->base + i;
-		pwm->hwpwm = i;
-	}
-
-	list_add(&chip->list, &pwm_chips);
-
-	mutex_unlock(&pwm_lock);
-
-	if (IS_ENABLED(CONFIG_OF))
-		of_pwmchip_add(chip);
-
-	pwmchip_sysfs_export(chip);
-
-	return 0;
-}
-
-
 
 
 
@@ -247,7 +199,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
 
 
-	ret = my_pwmchip_add(&pc->chip);
+	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
 		dev_err(&pdev->dev, "Debug info: base=%p, clk=%p\n", pc->base, pc->clk);
