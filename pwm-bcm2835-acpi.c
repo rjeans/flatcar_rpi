@@ -234,7 +234,7 @@ static int bcm2835_pwm_resume(struct device *dev)
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
-/	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
+	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
 pwmchip_remove(&pc->chip);
 clk_disable_unprepare(pc->clk);
