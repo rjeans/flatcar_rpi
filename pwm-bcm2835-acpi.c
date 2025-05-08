@@ -128,11 +128,27 @@ static struct clk_fixed_rate fallback_pwm_clk = {
 	},
 };
 
-static struct clk *register_fallback_clk(struct device *dev)
+sstatic struct clk *register_fallback_clk(struct device *dev)
 {
+	struct clk_fixed_rate *fixed;
+	struct clk_init_data *init;
 	struct clk *clk;
 
-	clk = clk_register(dev, &fallback_pwm_clk.hw);
+	fixed = devm_kzalloc(dev, sizeof(*fixed), GFP_KERNEL);
+	if (!fixed)
+		return ERR_PTR(-ENOMEM);
+
+	init = devm_kzalloc(dev, sizeof(*init), GFP_KERNEL);
+	if (!init)
+		return ERR_PTR(-ENOMEM);
+
+	init->name = "bcm2835-pwm-fallback-clk";
+	init->ops = &clk_fixed_rate_ops;
+
+	fixed->fixed_rate = 1000000;
+	fixed->hw.init = init;
+
+	clk = clk_register(dev, &fixed->hw);
 	if (IS_ERR(clk))
 		dev_warn(dev, "Fallback clock registration failed\n");
 	else
