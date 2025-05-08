@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright 2014 Bart Tanghe <bart.tanghe@thomasmore.be>
+ * Copyright 2014 Richard Jeans <rich@jeansy.org>
  */
 
 #include <linux/clk.h>
@@ -196,6 +196,6 @@ static struct platform_driver bcm2835_pwm_driver = {
 };
 module_platform_driver(bcm2835_pwm_driver);
 
-MODULE_AUTHOR("Bart Tanghe <bart.tanghe@thomasmore.be>");
-MODULE_DESCRIPTION("Broadcom BCM2835 PWM driver");
+MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
+MODULE_DESCRIPTION("Broadcom BCM2835 PWM driver with acpi support");
 MODULE_LICENSE("GPL v2");
