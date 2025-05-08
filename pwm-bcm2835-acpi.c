@@ -34,7 +34,7 @@ struct bcm2835_pwm {
 
 static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
 {
-        return pwmchip_get_drvdata(chip);
+        (bcm2835_pwm *)return pwmchip_get_drvdata(chip);
 }
 
 
