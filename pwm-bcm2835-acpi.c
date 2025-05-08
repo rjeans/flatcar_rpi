@@ -236,8 +236,8 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Removing BCM2835 PWM driver\n");
 
-	if (pc->clk_hw)
-		clk_hw_unregister(pc->clk_hw);
+//	if (pc->clk_hw)
+//		clk_hw_unregister(pc->clk_hw);
 
 	return 0;
 }
