@@ -183,16 +183,17 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	dev_info(dev, "I/O memory mapped successfully\n");
 
-	pc->clk = register_fallback_clk(dev,pc);
+	pc->clk = register_fallback_clk(dev, pc);
 	if (IS_ERR(pc->clk)) {
 		dev_err(dev, "Clock not registered\n");
 		return -ENODEV;
-	} 
+	}
 
 	pc->rate = clk_get_rate(pc->clk);
 	if (pc->rate == 0) {
 		dev_err(dev, "Failed to get clock rate\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unregister_clk;
 	}
 	dev_info(dev, "Clock rate: %lu\n", pc->rate);
 
@@ -210,12 +211,16 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to add PWM chip, error: %d\n", ret);
 		dev_err(dev, "Debug info: base=%p, clk=%p, rate=%lu\n",
 			pc->base, pc->clk, pc->rate);
-		return ret;
+		goto err_unregister_clk;
 	}
 
 	dev_info(dev, "BCM2835 PWM driver probed successfully\n");
-
 	return 0;
+
+err_unregister_clk:
+	if (pc->clk_hw)
+		clk_hw_unregister(pc->clk_hw);
+	return ret;
 }
 
 static int bcm2835_pwm_suspend(struct device *dev)
@@ -238,8 +243,10 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
 	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
+	dev_info(&pdev->dev, "Removing BCM2835 PWM driver\n");
+
 	if (pc->clk_hw)
-		 clk_hw_unregister(pc->clk_hw);
+		clk_hw_unregister(pc->clk_hw);
 
 	return 0;
 }
