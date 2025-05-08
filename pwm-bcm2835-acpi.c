@@ -162,7 +162,7 @@ static struct clk *register_fallback_clk(struct device *dev, struct bcm2835_pwm 
 		
 	} else {
 		dev_info(dev, "Fallback clock registered successfully\n");
-		pc->clk_hw = &fixed->hw;
+//		pc->clk_hw = &fixed->hw;
 	}
 
 	return clk;
