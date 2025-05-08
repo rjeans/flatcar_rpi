@@ -150,11 +150,11 @@ static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *
 	fixed->hw.init = init;
 
 	clk = clk_register(dev, &fixed->hw);
-	if (IS_ERR(clk))
-		dev_warn(dev, "Fallback clock registration failed\n");
-	else
+	if (IS_ERR(clk)) {
+		dev_warn(dev, "Fallback clock registration failed, error: %ld\n", PTR_ERR(clk));
+	} else {
 		dev_info(dev, "Fallback clock registered successfully\n");
-
+	}
 	pc->clk_hw = &fixed->hw;
 	return clk;
 }
