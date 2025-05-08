@@ -194,16 +194,28 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
 
-	dev_info(&pdev->dev, "Adding PWM chip: npwm=%d, base=%d\n",
-		pc->chip.npwm, pc->chip.base);
-    dev_info(&pdev->dev, "pwm_ops: apply=%p, request=%p, free=%p\n",
-		pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
-
+	// Dump chip configuration before registering
+	dev_info(&pdev->dev, "About to add PWM chip...");
+	dev_info(&pdev->dev, "chip.dev = %p", pc->chip.dev);
+	dev_info(&pdev->dev, "chip.npwm = %d", pc->chip.npwm);
+	dev_info(&pdev->dev, "chip.base = %d", pc->chip.base);
+	dev_info(&pdev->dev, "chip.ops = %p", pc->chip.ops);
+	dev_info(&pdev->dev, "chip.of_xlate = %p", pc->chip.of_xlate);
+	dev_info(&pdev->dev, "chip.of_pwm_n_cells = %d", pc->chip.of_pwm_n_cells);
 
 	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
 		dev_err(&pdev->dev, "Debug info: base=%p, clk=%p\n", pc->base, pc->clk);
+
+		// Print out pwm_ops function pointers
+		if (pc->chip.ops) {
+			dev_err(&pdev->dev, "pwm_ops: apply=%p, request=%p, free=%p\n",
+				pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
+		} else {
+			dev_err(&pdev->dev, "pwm_ops is NULL\n");
+		}
+
 		goto add_fail;
 	}
 	dev_info(&pdev->dev, "PWM chip added successfully\n");
