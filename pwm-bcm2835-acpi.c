@@ -155,12 +155,23 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
         if (IS_ERR(pc->base))
                 return PTR_ERR(pc->base);
 
-        pc->clk = devm_clk_get(&pdev->dev, NULL);
-        if (IS_ERR(pc->clk)) {;
-                return dev_err_probe(&pdev->dev, PTR_ERR(pc->clk),
-                                     "clock not found\n");
-			
-		}
+				const char *names[] = { NULL, "pwm", "apb_pclk", "pwm_clk", "osc", "clk" };
+				int i;
+				
+				for (i = 0; i < ARRAY_SIZE(names); i++) {
+					pc->clk = devm_clk_get(&pdev->dev, names[i]);
+					if (!IS_ERR(pc->clk)) {
+						dev_info(&pdev->dev, "Got clock named '%s'\n", names[i] ? names[i] : "default");
+						break;
+					} else {
+						dev_info(&pdev->dev, "Failed to get clock '%s': %ld\n",
+								 names[i] ? names[i] : "default", PTR_ERR(pc->clk));
+					}
+				}
+				
+				if (IS_ERR(pc->clk))
+					return dev_err_probe(&pdev->dev, PTR_ERR(pc->clk), "no usable clock found\n");
+				
 
         ret = clk_prepare_enable(pc->clk);
         if (ret)
