@@ -129,7 +129,7 @@ static struct clk_fixed_rate fallback_pwm_clk = {
 	},
 };
 
-sstatic struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *pc)
+static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *pc)
 {
 	struct clk_fixed_rate *fixed;
 	struct clk_init_data *init;
@@ -245,7 +245,7 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
 	if (pc->clk_hw)
-		clk_unregister(pc->clk_hw);
+		 clk_hw_unregister(pc->clk_hw);
 
 	return 0;
 }
