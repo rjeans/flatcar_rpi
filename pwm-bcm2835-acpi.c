@@ -123,7 +123,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 
-static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *pc)
+static struct clk *register_fallback_clk(struct device *dev, struct bcm2835_pwm *pc)
 {
 	struct clk_fixed_rate *fixed;
 	struct clk_init_data *init;
@@ -134,8 +134,10 @@ static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *
 		return ERR_PTR(-ENOMEM);
 
 	init = devm_kzalloc(dev, sizeof(*init), GFP_KERNEL);
-	if (!init)
+	if (!init) {
+		devm_kfree(dev, fixed); // Free allocated memory for `fixed`
 		return ERR_PTR(-ENOMEM);
+	}
 
 	init->name = "bcm2835-pwm-fallback-clk";
 	init->ops = &clk_fixed_rate_ops;
@@ -146,10 +148,14 @@ static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *
 	clk = clk_register(dev, &fixed->hw);
 	if (IS_ERR(clk)) {
 		dev_warn(dev, "Fallback clock registration failed, error: %ld\n", PTR_ERR(clk));
+		devm_kfree(dev, init);  // Free allocated memory for `init`
+		devm_kfree(dev, fixed); // Free allocated memory for `fixed`
+		
 	} else {
 		dev_info(dev, "Fallback clock registered successfully\n");
+		pc->clk_hw = &fixed->hw;
 	}
-	pc->clk_hw = &fixed->hw;
+
 	return clk;
 }
 
@@ -183,11 +189,17 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	dev_info(dev, "I/O memory mapped successfully\n");
 
-	pc->clk = register_fallback_clk(dev, pc);
-	if (IS_ERR(pc->clk)) {
-		dev_err(dev, "Clock not registered\n");
-		return -ENODEV;
-	}
+	pc->clk = devm_clk_get(dev, NULL);
+    if (IS_ERR(pc->clk)) {
+        dev_warn(dev, "No clock found via ACPI, falling back\n");
+        pc->clk = register_fallback_clk(dev, pc);
+		if (IS_ERR(pc->clk)) {
+			dev_err(dev, "Clock not registered\n");
+			return -ENODEV;
+		}
+    }
+	
+	
 
 	pc->rate = clk_get_rate(pc->clk);
 	if (pc->rate == 0) {
