@@ -121,13 +121,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
-static struct clk_fixed_rate fallback_pwm_clk = {
-	.fixed_rate = 1000000,  // 1 MHz for example
-	.hw.init = &(struct clk_init_data){
-		.name = "bcm2835-pwm-fallback-clk",
-		.ops = &clk_fixed_rate_ops,
-	},
-};
+
 
 static struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *pc)
 {
