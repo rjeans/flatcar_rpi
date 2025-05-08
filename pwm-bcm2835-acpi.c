@@ -27,11 +27,12 @@ struct bcm2835_pwm {
 	void __iomem *base;
 	struct clk *clk;
 	unsigned long rate;
+	struct pwm_chip chip;
 };
 
 static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
 {
-	return pwmchip_get_drvdata(chip);
+	return container_of(chip, struct bcm2835_pwm, chip);
 }
 
 static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
@@ -126,14 +127,12 @@ static const struct pwm_ops bcm2835_pwm_ops = {
 static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct pwm_chip *chip;
 	struct bcm2835_pwm *pc;
 	int ret;
 
-	chip = devm_pwmchip_alloc(dev, 2, sizeof(*pc));
-	if (IS_ERR(chip))
-		return PTR_ERR(chip);
-	pc = to_bcm2835_pwm(chip);
+	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+	if (!pc)
+		return -ENOMEM;
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base))
@@ -144,22 +143,18 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(pc->clk),
 				     "clock not found\n");
 
-	ret = devm_clk_rate_exclusive_get(dev, pc->clk);
-	if (ret)
-		return dev_err_probe(dev, ret,
-				     "fail to get exclusive rate\n");
-
 	pc->rate = clk_get_rate(pc->clk);
 	if (!pc->rate)
 		return dev_err_probe(dev, -EINVAL,
 				     "failed to get clock rate\n");
 
-	chip->ops = &bcm2835_pwm_ops;
-	chip->atomic = true;
+	pc->chip.dev = dev;
+	pc->chip.ops = &bcm2835_pwm_ops;
+	pc->chip.npwm = 2;
 
 	platform_set_drvdata(pdev, pc);
 
-	ret = devm_pwmchip_add(dev, chip);
+	ret = devm_pwmchip_add(dev, &pc->chip);
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "failed to add pwmchip\n");
 
