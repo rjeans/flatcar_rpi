@@ -190,9 +190,15 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
                 return PTR_ERR(pc->base);
 
         pc->clk = devm_clk_get(&pdev->dev, NULL);
-        if (IS_ERR(pc->clk))
+        if (IS_ERR(pc->clk)) {
+			dev_warn(&pdev->dev, "No clock found, using fallback\n");
+			pc->clk = register_fallback_clk(&pdev->dev, pc);
+			if (IS_ERR(pc->clk)) {
+				dev_err(&pdev->dev, "Failed to register fallback clock\n");
                 return dev_err_probe(&pdev->dev, PTR_ERR(pc->clk),
                                      "clock not found\n");
+			}
+		}
 
         ret = clk_prepare_enable(pc->clk);
         if (ret)
