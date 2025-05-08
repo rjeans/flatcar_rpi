@@ -130,24 +130,34 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	struct bcm2835_pwm *pc;
 	int ret;
 
+	dev_info(dev, "Probing BCM2835 PWM driver\n");
+
 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
 	if (!pc)
 		return -ENOMEM;
 
+	dev_info(dev, "Allocating memory for PWM driver\n");
+
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(pc->base))
+	if (IS_ERR(pc->base)) {
+		dev_err(dev, "Failed to map I/O memory\n");
 		return PTR_ERR(pc->base);
+	}
+
+	dev_info(dev, "I/O memory mapped successfully\n");
 
 	pc->clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(pc->clk)) {
-		dev_warn(dev, "clock not found, skipping clock configuration\n");
+		dev_warn(dev, "Clock not found, skipping clock configuration\n");
 		pc->clk = NULL; // Mark clock as optional
 		pc->rate = 0;   // Set rate to 0 if no clock is available
 	} else {
 		pc->rate = clk_get_rate(pc->clk);
-		if (!pc->rate)
-			return dev_err_probe(dev, -EINVAL,
-					     "failed to get clock rate\n");
+		if (!pc->rate) {
+			dev_err(dev, "Failed to get clock rate\n");
+			return -EINVAL;
+		}
+		dev_info(dev, "Clock enabled with rate: %lu\n", pc->rate);
 	}
 
 	pc->chip.dev = dev;
@@ -156,9 +166,15 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pc);
 
+	dev_info(dev, "Registering PWM chip\n");
+
 	ret = devm_pwmchip_add(dev, &pc->chip);
-	if (ret < 0)
-		return dev_err_probe(dev, ret, "failed to add pwmchip\n");
+	if (ret < 0) {
+		dev_err(dev, "Failed to add PWM chip\n");
+		return ret;
+	}
+
+	dev_info(dev, "BCM2835 PWM driver probed successfully\n");
 
 	return 0;
 }
