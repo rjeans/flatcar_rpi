@@ -142,57 +142,78 @@ static const struct pwm_ops bcm2835_pwm_ops = {
 
 static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
-        struct bcm2835_pwm *pc;
-        int ret;
+	struct bcm2835_pwm *pc;
+	int ret;
 
-        pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
-        if (!pc)
-                return -ENOMEM;
+	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
 
-        pc->dev = &pdev->dev;
+	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
+	if (!pc) {
+		dev_err(&pdev->dev, "Failed to allocate memory for PWM driver\n");
+		return -ENOMEM;
+	}
+	dev_info(&pdev->dev, "Memory allocated for PWM driver\n");
 
-        pc->base = devm_platform_ioremap_resource(pdev, 0);
-        if (IS_ERR(pc->base))
-                return PTR_ERR(pc->base);
+	pc->dev = &pdev->dev;
 
-				const char *names[] = { NULL, "pwm", "apb_pclk", "pwm_clk", "osc", "clk" };
-				int i;
-				
-				for (i = 0; i < ARRAY_SIZE(names); i++) {
-					pc->clk = devm_clk_get(&pdev->dev, names[i]);
-					if (!IS_ERR(pc->clk)) {
-						dev_info(&pdev->dev, "Got clock named '%s'\n", names[i] ? names[i] : "default");
-						break;
-					} else {
-						dev_info(&pdev->dev, "Failed to get clock '%s': %ld\n",
-								 names[i] ? names[i] : "default", PTR_ERR(pc->clk));
-					}
-				}
-				
-				if (IS_ERR(pc->clk))
-					return dev_err_probe(&pdev->dev, PTR_ERR(pc->clk), "no usable clock found\n");
-				
+	pc->base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(pc->base)) {
+		dev_err(&pdev->dev, "Failed to map I/O memory\n");
+		return PTR_ERR(pc->base);
+	}
+	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
 
-        ret = clk_prepare_enable(pc->clk);
-        if (ret)
-                return ret;
+	const char *names[] = { NULL, "pwm", "apb_pclk", "pwm_clk", "osc", "clk" };
+	int i;
 
-        pc->chip.dev = &pdev->dev;
-        pc->chip.ops = &bcm2835_pwm_ops;
-        pc->chip.npwm = 2;
+	dev_info(&pdev->dev, "Attempting to get clock\n");
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		pc->clk = devm_clk_get(&pdev->dev, names[i]);
+		if (!IS_ERR(pc->clk)) {
+			dev_info(&pdev->dev, "Got clock named '%s'\n", names[i] ? names[i] : "default");
+			break;
+		} else {
+			dev_info(&pdev->dev, "Failed to get clock '%s': %ld\n",
+			         names[i] ? names[i] : "default", PTR_ERR(pc->clk));
+		}
+	}
 
-        platform_set_drvdata(pdev, pc);
+	if (IS_ERR(pc->clk)) {
+		dev_err_probe(&pdev->dev, PTR_ERR(pc->clk), "No usable clock found\n");
+		return PTR_ERR(pc->clk);
+	}
+	dev_info(&pdev->dev, "Clock obtained successfully\n");
 
-        ret = pwmchip_add(&pc->chip);
-        if (ret < 0)
-                goto add_fail;
+	ret = clk_prepare_enable(pc->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to enable clock, error: %d\n", ret);
+		return ret;
+	}
+	dev_info(&pdev->dev, "Clock enabled successfully\n");
 
-        return 0;
+	pc->chip.dev = &pdev->dev;
+	pc->chip.ops = &bcm2835_pwm_ops;
+	pc->chip.npwm = 2;
+
+	platform_set_drvdata(pdev, pc);
+	dev_info(&pdev->dev, "PWM chip initialized\n");
+
+	ret = pwmchip_add(&pc->chip);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
+		dev_err(&pdev->dev, "Debug info: base=%p, clk=%p\n", pc->base, pc->clk);
+		goto add_fail;
+	}
+	dev_info(&pdev->dev, "PWM chip added successfully\n");
+
+	return 0;
 
 add_fail:
-        clk_disable_unprepare(pc->clk);
-        return ret;
+	clk_disable_unprepare(pc->clk);
+	dev_err(&pdev->dev, "PWM probe failed, cleaning up\n");
+	return ret;
 }
+
 static int bcm2835_pwm_suspend(struct device *dev)
 {
 	struct bcm2835_pwm *pc = dev_get_drvdata(dev);
