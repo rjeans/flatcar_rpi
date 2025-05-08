@@ -184,9 +184,18 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->chip.dev = &pdev->dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
 	pc->chip.npwm = 1;
+	pc->chip.base = -1;
+	pc->chip.of_xlate = NULL;
+	pc->chip.of_pwm_n_cells = 0;
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
+
+	dev_info(&pdev->dev, "Adding PWM chip: npwm=%d, base=%d\n",
+		pc->chip.npwm, pc->chip.base);
+    dev_info(&pdev->dev, "pwm_ops: apply=%p, request=%p, free=%p\n",
+		pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
+
 
 	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
