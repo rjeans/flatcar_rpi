@@ -186,7 +186,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->chip.dev = &pdev->dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
-	pc->chip.npwm = 1;
+	pc->chip.npwm = 2;
 	pc->chip.base = -1;
 	pc->chip.of_xlate = NULL;
 	pc->chip.of_pwm_n_cells = 0;
@@ -234,13 +234,14 @@ static int bcm2835_pwm_resume(struct device *dev)
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
-//	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
+/	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
-	dev_info(&pdev->dev, "Removing BCM2835 PWM driver\n");
+pwmchip_remove(&pc->chip);
+clk_disable_unprepare(pc->clk);
 
+dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
+return 0;
 
-
-	return 0;
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(bcm2835_pwm_pm_ops, bcm2835_pwm_suspend,
