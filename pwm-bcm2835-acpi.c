@@ -174,7 +174,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->clk = register_fallback_clk(dev);
 	if (IS_ERR(pc->clk)) {
 		dev_err(dev, "Clock not registered\n");
-		return -ENOCLK;
+		return -ENODEV;
 	} 
 
 	pc->rate = clk_get_rate(pc->clk);
