@@ -139,14 +139,16 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		return PTR_ERR(pc->base);
 
 	pc->clk = devm_clk_get_enabled(dev, NULL);
-	if (IS_ERR(pc->clk))
-		return dev_err_probe(dev, PTR_ERR(pc->clk),
-				     "clock not found\n");
-
-	pc->rate = clk_get_rate(pc->clk);
-	if (!pc->rate)
-		return dev_err_probe(dev, -EINVAL,
-				     "failed to get clock rate\n");
+	if (IS_ERR(pc->clk)) {
+		dev_warn(dev, "clock not found, skipping clock configuration\n");
+		pc->clk = NULL; // Mark clock as optional
+		pc->rate = 0;   // Set rate to 0 if no clock is available
+	} else {
+		pc->rate = clk_get_rate(pc->clk);
+		if (!pc->rate)
+			return dev_err_probe(dev, -EINVAL,
+					     "failed to get clock rate\n");
+	}
 
 	pc->chip.dev = dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
