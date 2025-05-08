@@ -29,8 +29,8 @@ struct bcm2835_pwm {
 	void __iomem *base;
 	struct clk *clk;
 	unsigned long rate;
-	struct pwm_chip chip;
 	struct clk_hw *clk_hw;
+	struct pwm_chip chip;
 };
 
 static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
@@ -213,6 +213,12 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		goto err_unregister_clk;
 	}
 	dev_info(dev, "Clock rate: %lu\n", pc->rate);
+
+	pc->chip = devm_pwmchip_alloc(dev, sizeof(*pc));
+    if (!pc->chip)
+        return -ENOMEM;
+
+    pc = pwmchip_priv(pc->chip); // Reinterpret as bcm2835_pwm
 
 	pc->chip.dev = dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
