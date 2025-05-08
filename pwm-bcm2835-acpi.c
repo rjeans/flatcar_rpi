@@ -190,7 +190,7 @@ pc->chip.fwnode = dev_fwnode(&pdev->dev);  // <-- ADD THIS
 	pc->chip.npwm = 2;
 	pc->chip.base = -1;
 	pc->chip.of_xlate = NULL;
-	pc->chip.of_pwm_n_cells = 0;
+	pc->chip.of_pwm_n_cells = -1;
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
