@@ -133,8 +133,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(dev, "Probing BCM2835 PWM driver\n");
 
 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
-	if (!pc)
+	if (!pc) {
+		dev_err(dev, "Failed to allocate memory for PWM driver\n");
 		return -ENOMEM;
+	}
 
 	dev_info(dev, "Allocating memory for PWM driver\n");
 
@@ -170,7 +172,9 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	ret = devm_pwmchip_add(dev, &pc->chip);
 	if (ret < 0) {
-		dev_err(dev, "Failed to add PWM chip\n");
+		dev_err(dev, "Failed to add PWM chip, error: %d\n", ret);
+		dev_err(dev, "Debug info: base=%p, clk=%p, rate=%lu\n",
+			pc->base, pc->clk, pc->rate);
 		return ret;
 	}
 
