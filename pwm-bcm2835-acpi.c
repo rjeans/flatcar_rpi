@@ -10,6 +10,8 @@
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/acpi.h>
+#include <linux/clk-provider.h>
+
 
 #define PWM_CONTROL		0x000
 #define PWM_CONTROL_SHIFT(x)	((x) * 8)
@@ -118,6 +120,27 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
+static struct clk_fixed_rate fallback_pwm_clk = {
+	.fixed_rate = 1000000,  // 1 MHz for example
+	.hw.init = &(struct clk_init_data){
+		.name = "bcm2835-pwm-fallback-clk",
+		.ops = &clk_fixed_rate_ops,
+	},
+};
+
+static struct clk *register_fallback_clk(struct device *dev)
+{
+	struct clk *clk;
+
+	clk = clk_register(dev, &fallback_pwm_clk.hw);
+	if (IS_ERR(clk))
+		dev_warn(dev, "Fallback clock registration failed\n");
+	else
+		dev_info(dev, "Fallback clock registered successfully\n");
+
+	return clk;
+}
+
 static const struct pwm_ops bcm2835_pwm_ops = {
 	.request = bcm2835_pwm_request,
 	.free = bcm2835_pwm_free,
@@ -148,23 +171,23 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	dev_info(dev, "I/O memory mapped successfully\n");
 
-	pc->clk = devm_clk_get_enabled(dev, NULL);
+	pc->clk = register_fallback_clk(dev);
 	if (IS_ERR(pc->clk)) {
-		dev_warn(dev, "Clock not found, skipping clock configuration\n");
-		pc->clk = NULL; // Mark clock as optional
-		pc->rate = 0;   // Set rate to 0 if no clock is available
-	} else {
-		pc->rate = clk_get_rate(pc->clk);
-		if (!pc->rate) {
-			dev_err(dev, "Failed to get clock rate\n");
-			return -EINVAL;
-		}
-		dev_info(dev, "Clock enabled with rate: %lu\n", pc->rate);
+		dev_err(dev, "Clock not registered\n");
+		return -ENOCLK;
+	} 
+
+	pc->rate = clk_get_rate(pc->clk);
+	if (pc->rate == 0) {
+		dev_err(dev, "Failed to get clock rate\n");
+		return -EINVAL;
 	}
+	dev_info(dev, "Clock rate: %lu\n", pc->rate);
 
 	pc->chip.dev = dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
 	pc->chip.npwm = 2;
+	pc->chip.base = -1; // Use the default base value
 
 	platform_set_drvdata(pdev, pc);
 
