@@ -164,6 +164,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
 
 	const char *names[] = { NULL, "pwm", "apb_pclk", "pwm_clk", "osc", "clk" };
+	
 	int i;
 
 	dev_info(&pdev->dev, "Attempting to get clock\n");
