@@ -163,21 +163,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	}
 	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
 
-	const char *names[] = { NULL, "pwm", "apb_pclk", "pwm_clk", "osc", "clk" };
-	
-	int i;
 
 	dev_info(&pdev->dev, "Attempting to get clock\n");
-	for (i = 0; i < ARRAY_SIZE(names); i++) {
-		pc->clk = devm_clk_get(&pdev->dev, names[i]);
-		if (!IS_ERR(pc->clk)) {
-			dev_info(&pdev->dev, "Got clock named '%s'\n", names[i] ? names[i] : "default");
-			break;
-		} else {
-			dev_info(&pdev->dev, "Failed to get clock '%s': %ld\n",
-			         names[i] ? names[i] : "default", PTR_ERR(pc->clk));
-		}
-	}
+	pc->clk = devm_clk_get(&pdev->dev, "apb_pclk");
+
 
 	if (IS_ERR(pc->clk)) {
 		dev_err_probe(&pdev->dev, PTR_ERR(pc->clk), "No usable clock found\n");
@@ -194,7 +183,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->chip.dev = &pdev->dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
-	pc->chip.npwm = 2;
+	pc->chip.npwm = 1;
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
