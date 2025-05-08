@@ -30,6 +30,7 @@ struct bcm2835_pwm {
 	struct clk *clk;
 	unsigned long rate;
 	struct pwm_chip chip;
+	struct clk_hw *clk_hw;
 };
 
 static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
@@ -128,7 +129,7 @@ static struct clk_fixed_rate fallback_pwm_clk = {
 	},
 };
 
-sstatic struct clk *register_fallback_clk(struct device *dev)
+sstatic struct clk *register_fallback_clk(struct device *dev,struct bcm2835_pwm *pc)
 {
 	struct clk_fixed_rate *fixed;
 	struct clk_init_data *init;
@@ -154,6 +155,7 @@ sstatic struct clk *register_fallback_clk(struct device *dev)
 	else
 		dev_info(dev, "Fallback clock registered successfully\n");
 
+	pc->clk_hw = &fixed->hw;
 	return clk;
 }
 
@@ -187,7 +189,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	dev_info(dev, "I/O memory mapped successfully\n");
 
-	pc->clk = register_fallback_clk(dev);
+	pc->clk = register_fallback_clk(dev,pc);
 	if (IS_ERR(pc->clk)) {
 		dev_err(dev, "Clock not registered\n");
 		return -ENODEV;
@@ -238,6 +240,16 @@ static int bcm2835_pwm_resume(struct device *dev)
 	return clk_prepare_enable(pc->clk);
 }
 
+static int bcm2835_pwm_remove(struct platform_device *pdev)
+{
+	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
+
+	if (pc->clk_hw)
+		clk_unregister(pc->clk_hw);
+
+	return 0;
+}
+
 static DEFINE_SIMPLE_DEV_PM_OPS(bcm2835_pwm_pm_ops, bcm2835_pwm_suspend,
 				bcm2835_pwm_resume);
 
@@ -254,6 +266,7 @@ static struct platform_driver bcm2835_pwm_driver = {
 		.pm = pm_ptr(&bcm2835_pwm_pm_ops),
 	},
 	.probe = bcm2835_pwm_probe,
+	.remove = bcm2835_pwm_remove,
 };
 module_platform_driver(bcm2835_pwm_driver);
 
