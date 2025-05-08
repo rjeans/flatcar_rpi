@@ -1,4 +1,4 @@
-obj-m += pinctrl-bcm2835-acpi.o i2c-bcm2835-acpi.o i2c-dev.o 
+obj-m += pinctrl-bcm2835-acpi.o pwm-bcm2835-acpi.o
 
 KBUILD_MODPOST_WARN=1
 

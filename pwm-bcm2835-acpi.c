@@ -7,9 +7,9 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/module.h>
-#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
+#include <linux/acpi.h>
 
 #define PWM_CONTROL		0x000
 #define PWM_CONTROL_SHIFT(x)	((x) * 8)
@@ -77,8 +77,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	 *     round(period * rate / NSEC_PER_SEC) <= U32_MAX
 	 * <=> period * rate / NSEC_PER_SEC < U32_MAX + 0.5
 	 * <=> period * rate < (U32_MAX + 0.5) * NSEC_PER_SEC
-	 * <=> period < ((U32_MAX + 0.5) * NSEC_PER_SEC) / rate
-	 * <=> period < ((U32_MAX * NSEC_PER_SEC + NSEC_PER_SEC/2) / rate
+	 * <=> period < ((U32_MAX + NSEC_PER_SEC/2) / rate
 	 * <=> period <= ceil((U32_MAX * NSEC_PER_SEC + NSEC_PER_SEC/2) / rate) - 1
 	 */
 	max_period = DIV_ROUND_UP_ULL((u64)U32_MAX * NSEC_PER_SEC + NSEC_PER_SEC / 2, pc->rate) - 1;
@@ -186,16 +185,16 @@ static int bcm2835_pwm_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(bcm2835_pwm_pm_ops, bcm2835_pwm_suspend,
 				bcm2835_pwm_resume);
 
-static const struct of_device_id bcm2835_pwm_of_match[] = {
-	{ .compatible = "brcm,bcm2835-pwm", },
+static const struct acpi_device_id bcm2835_pwm_acpi_match[] = {
+	{ "BCM2844", 0 },
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, bcm2835_pwm_of_match);
+MODULE_DEVICE_TABLE(acpi, bcm2835_pwm_acpi_match);
 
 static struct platform_driver bcm2835_pwm_driver = {
 	.driver = {
 		.name = "bcm2835-pwm",
-		.of_match_table = bcm2835_pwm_of_match,
+		.acpi_match_table = ACPI_PTR(bcm2835_pwm_acpi_match),
 		.pm = pm_ptr(&bcm2835_pwm_pm_ops),
 	},
 	.probe = bcm2835_pwm_probe,
