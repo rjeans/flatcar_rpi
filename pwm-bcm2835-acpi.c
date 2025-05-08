@@ -32,10 +32,7 @@ struct bcm2835_pwm {
 	struct clk_hw *clk_hw;
 };
 
-static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
-{
-	return container_of(chip, struct bcm2835_pwm, chip);
-}
+
 
 static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
