@@ -199,6 +199,11 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		}
     }
 	
+	ret = clk_prepare_enable(pc->clk);
+    if (ret) {
+        dev_err(dev, "Failed to enable clock\n");
+       goto err_unregister_clk;
+    }
 	
 
 	pc->rate = clk_get_rate(pc->clk);
