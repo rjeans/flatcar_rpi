@@ -30,7 +30,6 @@ struct bcm2835_pwm {
 	struct clk *clk;
 	unsigned long rate;
 	struct clk_hw *clk_hw;
-	struct pwm_chip chip;
 };
 
 static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
@@ -169,15 +168,19 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct bcm2835_pwm *pc;
+	struct pwm_chip *chip;
 	int ret;
 
 	dev_info(dev, "Probing BCM2835 PWM driver\n");
 
-	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
-	if (!pc) {
-		dev_err(dev, "Failed to allocate memory for PWM driver\n");
+	chip = devm_pwmchip_alloc(dev, 2, sizeof(*pc));
+	if (!chip) {
+		dev_err(dev, "Failed to allocate memory for PWM chip\n");
 		return -ENOMEM;
 	}
+
+	pc = pwmchip_priv(chip); // Retrieve private data
+	
 
 	dev_info(dev, "Allocating memory for PWM driver\n");
 
@@ -189,22 +192,21 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	dev_info(dev, "I/O memory mapped successfully\n");
 
-	pc->clk = devm_clk_get(dev, NULL);
-    if (IS_ERR(pc->clk)) {
-        dev_warn(dev, "No clock found via ACPI, falling back\n");
-        pc->clk = register_fallback_clk(dev, pc);
+	pc->clk = devm_clk_get_enabled(dev, NULL);
+	if (IS_ERR(pc->clk)) {
+		dev_warn(dev, "No clock found via ACPI, falling back\n");
+		pc->clk = register_fallback_clk(dev, pc);
 		if (IS_ERR(pc->clk)) {
 			dev_err(dev, "Clock not registered\n");
 			return -ENODEV;
-		}
-    }
-	
+			}
+	}
+
 	ret = clk_prepare_enable(pc->clk);
-    if (ret) {
-        dev_err(dev, "Failed to enable clock\n");
-       goto err_unregister_clk;
-    }
-	
+	if (ret) {
+		dev_err(dev, "Failed to enable clock\n");
+		goto err_unregister_clk;
+	}
 
 	pc->rate = clk_get_rate(pc->clk);
 	if (pc->rate == 0) {
@@ -214,22 +216,15 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	}
 	dev_info(dev, "Clock rate: %lu\n", pc->rate);
 
-	pc->chip = devm_pwmchip_alloc(dev, sizeof(*pc));
-    if (!pc->chip)
-        return -ENOMEM;
+	chip->ops = &bcm2835_pwm_ops;
+	chip->atomic = true;
 
-    pc = pwmchip_priv(pc->chip); // Reinterpret as bcm2835_pwm
-
-	pc->chip.dev = dev;
-	pc->chip.ops = &bcm2835_pwm_ops;
-	pc->chip.npwm = 1;
-	pc->chip.base = -1; // Use the default base value
 
 	platform_set_drvdata(pdev, pc);
 
 	dev_info(dev, "Registering PWM chip\n");
 
-	ret = devm_pwmchip_add(dev, &pc->chip);
+	ret = devm_pwmchip_add(dev, chip);
 	if (ret < 0) {
 		dev_err(dev, "Failed to add PWM chip, error: %d\n", ret);
 		dev_err(dev, "Debug info: base=%p, clk=%p, rate=%lu\n",
