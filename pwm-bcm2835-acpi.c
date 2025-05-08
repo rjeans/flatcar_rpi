@@ -185,6 +185,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Clock enabled successfully\n");
 
 	pc->chip.dev = &pdev->dev;
+pc->chip.fwnode = dev_fwnode(&pdev->dev);  // <-- ADD THIS
 	pc->chip.ops = &bcm2835_pwm_ops;
 	pc->chip.npwm = 2;
 	pc->chip.base = -1;
