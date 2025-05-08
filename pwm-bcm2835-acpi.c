@@ -186,7 +186,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->chip.dev = dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
-	pc->chip.npwm = 2;
+	pc->chip.npwm = 1;
 	pc->chip.base = -1; // Use the default base value
 
 	platform_set_drvdata(pdev, pc);
