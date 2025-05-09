@@ -190,7 +190,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->chip.base = -1;
 	pc->chip.of_xlate = NULL;
 	pc->chip.of_pwm_n_cells = 0;
-	chip->dev->of_node = NULL;
+	pc->chip->dev->of_node = NULL;
 
 
 	platform_set_drvdata(pdev, pc);
