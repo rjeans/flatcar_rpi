@@ -58,13 +58,7 @@ static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
         return container_of(chip, struct bcm2835_pwm, chip);
 }
 
-static struct clk_fixed_rate fallback_pwm_clk = {
-    .fixed_rate = FALLBACK_PWM_CLK_HZ,
-    .hw.init = &(struct clk_init_data){
-        .name = "pwm-fallback",
-        .ops = &clk_fixed_rate_ops,
-    },
-};
+
 
 static const struct pinctrl_map bcm2835_pwm_map[] = {
     {
