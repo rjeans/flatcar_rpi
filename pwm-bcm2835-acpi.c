@@ -106,100 +106,70 @@ static void bcm2835_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 }
 
 static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-			     const struct pwm_state *state)
+                             const struct pwm_state *state)
 {
+    struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+    unsigned long rate = pc->clk_rate;
+    u64 period_cycles, duty_cycles;
+    u32 ctrl_val;
+    int retries = 5;
 
-	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-	unsigned long rate = pc->clk_rate;
-	unsigned long long period_cycles;
-	u64 max_period;
+    dev_info(pc->dev, "Clock rate: %lu Hz", rate);
+    if (!rate)
+        return -EINVAL;
 
-	u32 duty_val,ctrl_val;
+    // Convert period/duty from ns to cycles
+    period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
+    duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
-	dev_info(pc->dev, "Clock rate: %lu\n", rate);
-	if (!rate) {
-		dev_err(pc->dev, "failed to get clock rate\n");
-		return -EINVAL;
+    // Warn about small period
+    if (period_cycles < PERIOD_MIN) {
+        dev_warn(pc->dev, "Period too small (%llu cycles), skipping hardware write\n", period_cycles);
+        return 0;
+    }
 
+    // Retry loop for PERIOD
+    while (retries--) {
+        writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
+        udelay(100);
+        if (readl(pc->base + PERIOD(pwm->hwpwm)) == period_cycles)
+            break;
+        dev_warn(pc->dev, "PERIOD write verify failed (retry %d)", 5 - retries);
+    }
+    if (retries <= 0) {
+        dev_err(pc->dev, "PERIOD register stuck — wrote %llu, read back %u",
+                period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
+    }
 
-   }
+    writel(duty_cycles, pc->base + DUTY(pwm->hwpwm));
+    udelay(100);
+    if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles) {
+        dev_warn(pc->dev, "DUTY write verify failed: wrote %llu, read back %u",
+                 duty_cycles, readl(pc->base + DUTY(pwm->hwpwm)));
+    }
 
+    // Compose control value
+    ctrl_val = readl(pc->base + PWM_CONTROL);
+    ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
+    ctrl_val &= ~(PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
+    if (state->enabled)
+        ctrl_val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+    if (state->polarity == PWM_POLARITY_INVERSED)
+        ctrl_val |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
-	/*
-	 * period_cycles must be a 32 bit value, so period * rate / NSEC_PER_SEC
-	 * must be <= U32_MAX. As U32_MAX * NSEC_PER_SEC < U64_MAX the
-	 * multiplication period * rate doesn't overflow.
-	 * To calculate the maximal possible period that guarantees the
-	 * above inequality:
-	 *
-	 *     round(period * rate / NSEC_PER_SEC) <= U32_MAX
-	 * <=> period * rate / NSEC_PER_SEC < U32_MAX + 0.5
-	 * <=> period * rate < (U32_MAX + 0.5) * NSEC_PER_SEC
-	 * <=> period < ((U32_MAX + NSEC_PER_SEC/2) / rate
-	 * <=> period <= ceil((U32_MAX * NSEC_PER_SEC + NSEC_PER_SEC/2) / rate) - 1
-	 */
-	max_period = DIV_ROUND_UP_ULL((u64)U32_MAX * NSEC_PER_SEC + NSEC_PER_SEC / 2, rate) - 1;
+    writel(ctrl_val, pc->base + PWM_CONTROL);
+    udelay(100);
 
-	if (state->period > max_period)
-		return -EINVAL;
+    dev_info(pc->dev, "APPLY: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
+             pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
+             state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
-	/* set period */
-	period_cycles = DIV_ROUND_CLOSEST_ULL(state->period * rate, NSEC_PER_SEC);
-
-	/* don't accept a period that is too small */
-	if (period_cycles < PERIOD_MIN) {
-	dev_warn(pc->dev, "period_cycles < PERIOD_MIN (%llu), skipping write\n", period_cycles);
-	return 0; // Accept without programming hardware
-   }
-
-writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
-
-udelay(10);  // give time to latch
-
-u32 readback = readl(pc->base + PERIOD(pwm->hwpwm));
-if (readback != period_cycles) {
-	dev_warn(pc->dev, "PERIOD write verification failed: wrote %llu, read back %u",
-	         period_cycles, readback);
+    return 0;
 }
 
-	/* set duty cycle */
-    duty_val = DIV_ROUND_CLOSEST_ULL(state->duty_cycle * rate, NSEC_PER_SEC);
-    writel(duty_val, pc->base + DUTY(pwm->hwpwm));
-
-	/* set polarity */
-	ctrl_val = readl(pc->base + PWM_CONTROL);
-
-	if (state->polarity == PWM_POLARITY_NORMAL)
-		ctrl_val &= ~(PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm));
-	else
-		ctrl_val |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
-
-	/* enable/disable */
-	if (state->enabled)
-		ctrl_val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
-	else
-		ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
-
-    dev_info(pc->dev, "APPLY: pwm->hwpwm = %u", pwm->hwpwm);
-	dev_info(pc->dev, "APPLY: state->enabled = %d", state->enabled);
-
-	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns -> %llu cycles\n",
-		 PERIOD(pwm->hwpwm), state->period, period_cycles);
-
-    dev_info(pc->dev, "DUTY register (0x%x): %llu ns -> %u cycles\n",
-         DUTY(pwm->hwpwm), state->duty_cycle, duty_val);
-
-    dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", ctrl_val);
-
-	writel(ctrl_val, pc->base + PWM_CONTROL);
-
-	dev_info(pc->dev, "PWM_CONTROL after write:  0x%08x\n",
-         readl(pc->base + PWM_CONTROL));
 
 
-	return 0;
-}
 static int bcm2835_pwm_get_state(struct pwm_chip *chip,
                                  struct pwm_device *pwm,
                                  struct pwm_state *state)
@@ -231,7 +201,7 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 		dev_info(pc->dev, "GET_STATE: Converted duty   = %llu ns", state->duty_cycle);
 	} else {
 		state->duty_cycle = 0;
-		dev_info(pc->dev, "GET_STATE: DUTY is zero → duty_cycle = 0");
+		dev_info(pc->dev, "GET_STATE: DUTY is zero -> duty_cycle = 0");
 	}
 
 	dev_info(pc->dev, "GET_STATE: polarity = %s, enabled = %d",
