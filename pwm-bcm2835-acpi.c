@@ -323,8 +323,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	// Optional: add a delay to ensure the clock is stable
 	udelay(10);
 
-	// Print out the clock rate
-	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
+	
+
 
 dev_info(&pdev->dev, "PWM clock manually enabled via MMIO\n");
 dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
