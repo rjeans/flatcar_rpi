@@ -3,14 +3,13 @@
  * Copyright 2014 Richard Jeans <rich@jeansy.org>
  */
 
-#include <linux/clk.h>
+
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 #include <linux/acpi.h>
-#include <linux/clk-provider.h>
 #include <linux/pinctrl/consumer.h> 
 #include <linux/pinctrl/machine.h>
 #include <linux/delay.h>
@@ -49,6 +48,7 @@ struct bcm2835_pwm {
 	struct device *dev;
 	void __iomem *base;
 	void __iomem *cm_base;
+	unsigned long clk_rate
 	
 
 };
