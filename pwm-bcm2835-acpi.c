@@ -38,6 +38,14 @@ static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
         return container_of(chip, struct bcm2835_pwm, chip);
 }
 
+static struct clk_fixed_rate fallback_pwm_clk = {
+    .fixed_rate = 19200000,
+    .hw.init = &(struct clk_init_data){
+        .name = "pwm-fallback",
+        .ops = &clk_fixed_rate_ops,
+    },
+};
+
 
 static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
@@ -168,13 +176,26 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 
 	dev_info(&pdev->dev, "Attempting to get clock\n");
-	pc->clk = devm_clk_get(&pdev->dev, "apb_pclk");
+pc->clk = devm_clk_get(&pdev->dev, NULL);
 
+if (IS_ERR(pc->clk)) {
+	dev_warn(&pdev->dev, "No usable clock found, registering fallback 19.2MHz clock\n");
 
+	// Register fallback clock
+	ret = devm_clk_hw_register(pc->dev, &fallback_pwm_clk);
+	if (ret) {
+		dev_err(pc->dev, "Fallback clock registration failed: %d\n", ret);
+		return ret;
+	}
+
+	// Get clk from the clk_hw
+	pc->clk = clk_hw_get_clk(&fallback_pwm_clk.hw, NULL);
 	if (IS_ERR(pc->clk)) {
-		dev_err_probe(&pdev->dev, PTR_ERR(pc->clk), "No usable clock found\n");
+		dev_err(pc->dev, "Failed to get fallback clock pointer\n");
 		return PTR_ERR(pc->clk);
 	}
+}
+
 	dev_info(&pdev->dev, "Clock obtained successfully\n");
 
 	ret = clk_prepare_enable(pc->clk);
