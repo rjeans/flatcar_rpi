@@ -354,13 +354,13 @@ if (IS_ERR(pc->clk)) {
     udelay(10);
 
     // Set divider (500 MHz / 32 = 15.625 MHz)
-    writel(CM_PASSWORD | (32 << 12), pc->cm_base + CM_PWMDIV);
+    writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
 
     // Enable PWM clock with PLLD as source
-    val = CM_PASSWORD | CM_SRC_PLLD | CM_ENABLE;
-    writel(val, cm_base + CM_PWMCTL);
+    val = CM_PASSwD | CM_SRC_PLLD | CM_ENABLE;
+    writel(val, pc->cm_base + CM_PWMCTL);
 
-dev_info(dev, "PWM clock manually enabled via MMIO\n");
+dev_info(pdev->dev, "PWM clock manually enabled via MMIO\n");
 
 // Optional: store fallback rate in your driver context
 pwm->clk_rate = FALLBACK_PWM_CLK_HZ;
