@@ -122,6 +122,14 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
     duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
+	// Reset PWM block
+    writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
+    udelay(10);
+    writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
+    writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
+    udelay(10);
+
+
     // Warn about small period
     if (period_cycles < PERIOD_MIN) {
         dev_warn(pc->dev, "Period too small (%llu cycles), skipping hardware write\n", period_cycles);
