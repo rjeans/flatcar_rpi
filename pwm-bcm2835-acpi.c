@@ -146,7 +146,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         dev_warn(pc->dev, "PERIOD write verify failed (retry %d)", 5 - retries);
     }
     if (retries <= 0) {
-        dev_err(pc->dev, "PERIOD register stuck — wrote %llu, read back %u",
+        dev_err(pc->dev, "PERIOD register stuck - wrote %llu, read back %u",
                 period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
     }
 
