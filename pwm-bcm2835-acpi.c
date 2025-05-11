@@ -357,7 +357,7 @@ if (IS_ERR(pc->clk)) {
     writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
 
     // Enable PWM clock with PLLD as source
-    val = CM_PASSwD | CM_SRC_PLLD | CM_ENABLE;
+    val = CM_PASSWD | CM_SRC_PLLD | CM_ENABLE;
     writel(val, pc->cm_base + CM_PWMCTL);
 
 dev_info(&pdev->dev, "PWM clock manually enabled via MMIO\n");
@@ -404,7 +404,7 @@ if (pc->clk_base) {
 	dev_warn(&pdev->dev, "Clock manager base was NULL\n");
 }
 
-if (cm_base) {
+if (pc->cm_base) {
     iounmap(pc->cm_base);
 	dev_info(&pdev->dev, "Unmapped base\n");
 } else {
