@@ -113,7 +113,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	unsigned long long period_cycles;
 	u64 max_period;
 
-	u32 val;
+	u32 duty_val,ctrl_val;
 
 	dev_info(pc->dev, "Clock rate: %lu\n", rate);
 	if (!rate) {
@@ -153,33 +153,33 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
 
 	/* set duty cycle */
-	val = DIV_ROUND_CLOSEST_ULL(state->duty_cycle * rate, NSEC_PER_SEC);
-	writel(val, pc->base + DUTY(pwm->hwpwm));
+    duty_val = DIV_ROUND_CLOSEST_ULL(state->duty_cycle * rate, NSEC_PER_SEC);
+    writel(duty_val, pc->base + DUTY(pwm->hwpwm));
 
 	/* set polarity */
-	val = readl(pc->base + PWM_CONTROL);
+	ctrl_val = readl(pc->base + PWM_CONTROL);
 
 	if (state->polarity == PWM_POLARITY_NORMAL)
-		val &= ~(PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm));
+		ctrl_val &= ~(PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm));
 	else
-		val |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
+		ctrl_val |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
 	/* enable/disable */
 	if (state->enabled)
-		val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+		ctrl_val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
 	else
-		val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
+		ctrl-val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
 
-	dev_info(pc->dev, "PERIOD register (0x%x): %u ns → %u cycles\n",
-		 PERIOD(pwm->hwpwm), (unsigned int)state->period, (unsigned int)period_cycles);
+	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns → %u cycles\n",
+		 PERIOD(pwm->hwpwm), state->period, period_cycles);
 
-    dev_info(pc->dev, "DUTY register (0x%x): %u ns → %u cycles\n",
-         DUTY(pwm->hwpwm), (unsigned int)state->duty_cycle, (unsigned int)val);
+    dev_info(pc->dev, "DUTY register (0x%x): %llu ns → %u cycles\n",
+         DUTY(pwm->hwpwm), state->duty_cycle, duty_val);
 
-    dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", val);
+    dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", ctrl_val);
 
-	writel(val, pc->base + PWM_CONTROL);
+	writel(ctrl_val, pc->base + PWM_CONTROL);
 
 	dev_info(pc->dev, "PWM_CONTROL after write:  0x%08x\n",
          readl(pc->base + PWM_CONTROL));
