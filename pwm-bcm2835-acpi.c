@@ -191,25 +191,40 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
-
-
 static int bcm2835_pwm_get_state(struct pwm_chip *chip,
-                                  struct pwm_device *pwm,
-                                  struct pwm_state *state)
+                                 struct pwm_device *pwm,
+                                 struct pwm_state *state)
 {
 	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
 	u32 ctrl = readl(pc->base + PWM_CONTROL);
 	u32 period = readl(pc->base + PERIOD(pwm->hwpwm));
 	u32 duty = readl(pc->base + DUTY(pwm->hwpwm));
 
+	dev_info(pc->dev, "GET_STATE: CONTROL = 0x%08x", ctrl);
+	dev_info(pc->dev, "GET_STATE: PERIOD[%u] = %u", pwm->hwpwm, period);
+	dev_info(pc->dev, "GET_STATE: DUTY[%u]   = %u", pwm->hwpwm, duty);
+
 	state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
 	state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm))) ?
-		PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
-	state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
-	state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
+	                  PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
+
+	if (period) {
+		state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
+		dev_info(pc->dev, "GET_STATE: Converted period = %llu ns", state->period);
+	} else {
+		dev_warn(pc->dev, "GET_STATE: PERIOD is zero, using fallback 1 ms");
+		state->period = 1000000;
+	}
+
+	if (duty) {
+		state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
+		dev_info(pc->dev, "GET_STATE: Converted duty   = %llu ns", state->duty_cycle);
+	} else {
+		dev_info(pc->dev, "GET_STATE: DUTY is zero, setting duty_cycle = 0");
+		state->duty_cycle = 0;
+	}
 
 	return 0;
-	
 }
 
 
