@@ -309,6 +309,7 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 
 pwmchip_remove(&pc->chip);
 clk_disable_unprepare(pc->clk);
+pinctrl_unregister_map(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
 
 dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
 return 0;
