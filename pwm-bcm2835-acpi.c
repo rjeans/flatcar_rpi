@@ -13,7 +13,7 @@
 #include <linux/pinctrl/consumer.h> 
 #include <linux/pinctrl/machine.h>
 #include <linux/delay.h>
-#include <linux/raspberrypi-exp.h>
+#include <soc/bcm2835/raspberrypi-firmware.h>
 #include <linux/platform_device.h>
 
 
