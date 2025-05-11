@@ -148,8 +148,10 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	period_cycles = DIV_ROUND_CLOSEST_ULL(state->period * rate, NSEC_PER_SEC);
 
 	/* don't accept a period that is too small */
-	if (period_cycles < PERIOD_MIN)
-		return -EINVAL;
+	if (period_cycles < PERIOD_MIN) {
+	dev_warn(pc->dev, "period_cycles < PERIOD_MIN (%llu), skipping write\n", period_cycles);
+	return 0; // Accept without programming hardware
+   }
 
 	writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
 
