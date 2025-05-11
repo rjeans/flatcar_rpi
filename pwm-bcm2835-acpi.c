@@ -87,7 +87,7 @@ static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
   dev_info(pc->dev, "  PERIOD0: %u\n", readl(pc->base + PERIOD(0)));
   dev_info(pc->dev, "  DUTY0:   %u\n", readl(pc->base + DUTY(0)));
   dev_info(pc->dev, "  PERIOD1: %u\n", readl(pc->base + PERIOD(1)));
-d  ev_info(pc->dev, "  DUTY1:   %u\n", readl(pc->base + DUTY(1)));
+  dev_info(pc->dev, "  DUTY1:   %u\n", readl(pc->base + DUTY(1)));
 
 
 	return 0;
