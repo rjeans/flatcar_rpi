@@ -67,8 +67,8 @@ static const struct pinctrl_map bcm2835_pwm_map[] = {
         .type = PIN_MAP_TYPE_MUX_GROUP,
         .ctrl_dev_name = "BCM2845:00",      // ACPI _HID of your pinctrl (GPIO) device
         .data.mux = {
-            .group = "gpio18",
-            .function = "alt5",             // ALT5 is PWM0 output on GPIO18
+            .group = "gpio13",
+            .function = "alt0",            
         },
     },
 };
@@ -200,7 +200,6 @@ if (readback != period_cycles) {
 
 	return 0;
 }
-
 static int bcm2835_pwm_get_state(struct pwm_chip *chip,
                                  struct pwm_device *pwm,
                                  struct pwm_state *state)
@@ -212,30 +211,32 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 
 	dev_info(pc->dev, "GET_STATE: CONTROL = 0x%08x", ctrl);
 	dev_info(pc->dev, "GET_STATE: hwpwm = %u", pwm->hwpwm);
-	dev_info(pc->dev, "GET_STATE: state->period = %llu", state->period);
-	dev_info(pc->dev, "GET_STATE: state->duty_cycle = %llu", state->duty_cycle);
-	dev_info(pc->dev, "GET_STATE: state->polarity = %d", state->polarity);
-	dev_info(pc->dev, "GET_STATE: state->enabled = %d", state->enabled);
+	dev_info(pc->dev, "GET_STATE: PERIOD reg = %u", period);
+	dev_info(pc->dev, "GET_STATE: DUTY reg   = %u", duty);
 
 	state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
 	state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm))) ?
 	                  PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
 
-	if (period) {
+	if (period != 0) {
 		state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
 		dev_info(pc->dev, "GET_STATE: Converted period = %llu ns", state->period);
 	} else {
-		dev_warn(pc->dev, "GET_STATE: PERIOD is zero, using fallback 1 ms");
+		dev_warn(pc->dev, "GET_STATE: PERIOD is zero — fallback period used (1 ms)");
 		state->period = 1000000;
 	}
 
-	if (duty) {
+	if (duty != 0) {
 		state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
 		dev_info(pc->dev, "GET_STATE: Converted duty   = %llu ns", state->duty_cycle);
 	} else {
-		dev_info(pc->dev, "GET_STATE: DUTY is zero, setting duty_cycle = 0");
 		state->duty_cycle = 0;
+		dev_info(pc->dev, "GET_STATE: DUTY is zero → duty_cycle = 0");
 	}
+
+	dev_info(pc->dev, "GET_STATE: polarity = %s, enabled = %d",
+	         state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal",
+	         state->enabled);
 
 	return 0;
 }
