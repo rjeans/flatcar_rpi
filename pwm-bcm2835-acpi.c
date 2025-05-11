@@ -60,7 +60,7 @@ static inline struct bcm2835_pwm *to_bcm2835_pwm(struct pwm_chip *chip)
 }
 
 static struct clk_fixed_rate fallback_pwm_clk = {
-    .fixed_rate = 19200000,
+    .fixed_rate = FALLBACK_PWM_CLK_HZ,
     .hw.init = &(struct clk_init_data){
         .name = "pwm-fallback",
         .ops = &clk_fixed_rate_ops,
@@ -360,10 +360,10 @@ if (IS_ERR(pc->clk)) {
     val = CM_PASSwD | CM_SRC_PLLD | CM_ENABLE;
     writel(val, pc->cm_base + CM_PWMCTL);
 
-dev_info(pdev->dev, "PWM clock manually enabled via MMIO\n");
+dev_info(&pdev->dev, "PWM clock manually enabled via MMIO\n");
 
 // Optional: store fallback rate in your driver context
-pwm->clk_rate = FALLBACK_PWM_CLK_HZ;
+
 	dev_info(&pdev->dev, "PWM chip added successfully\n");
 
 	return 0;
