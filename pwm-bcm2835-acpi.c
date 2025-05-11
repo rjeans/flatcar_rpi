@@ -116,7 +116,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 {
 
 	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-	uunsigned long rate = pc->clk_rate;
+	unsigned long rate = pc->clk_rate;
 	unsigned long long period_cycles;
 	u64 max_period;
 
@@ -358,7 +358,6 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
 
 pwmchip_remove(&pc->chip);
-clk_disable_unprepare(pc->clk);
 pinctrl_unregister_mappings(bcm2835_pwm_map);
 
 
