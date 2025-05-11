@@ -265,11 +265,7 @@ if (IS_ERR(pc->clk)) {
 	pc->chip.dev->of_node = NULL;
 
 
-	platform_set_drvdata(pdev, pc);
-	dev_info(&pdev->dev, "PWM chip initialized\n");
-
-
-		ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
+			ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
 
@@ -287,6 +283,13 @@ if (IS_ERR(pc->clk)) {
 	} else {
 		dev_info(&pdev->dev, "Applied default pinctrl state\n");
 	}
+
+
+	platform_set_drvdata(pdev, pc);
+	dev_info(&pdev->dev, "PWM chip initialized\n");
+
+
+
 
 	// Dump chip configuration before registering
 	dev_info(&pdev->dev, "About to add PWM chip...");
