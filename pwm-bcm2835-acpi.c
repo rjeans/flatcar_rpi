@@ -345,16 +345,16 @@ if (IS_ERR(pc->clk)) {
 // Map the Clock Manager registers
     pc->cm_base = ioremap(CM_BASE_PHYS, 0x100);
     if (!pc->cm_base) {
-        dev_err(dev, "Failed to ioremap Clock Manager\n");
+        dev_err(&pdev->dev, "Failed to ioremap Clock Manager\n");
         return -ENOMEM;
     }
 
     // Disable PWM clock before configuring
-    writel(CM_PASSWORD | 0x0, cm_base + CM_PWMCTL);
+    writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
     udelay(10);
 
     // Set divider (500 MHz / 32 = 15.625 MHz)
-    writel(CM_PASSWORD | (32 << 12), cm_base + CM_PWMDIV);
+    writel(CM_PASSWORD | (32 << 12), pc->cm_base + CM_PWMDIV);
 
     // Enable PWM clock with PLLD as source
     val = CM_PASSWORD | CM_SRC_PLLD | CM_ENABLE;
