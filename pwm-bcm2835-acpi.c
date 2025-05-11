@@ -234,36 +234,6 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
 
 
-	dev_info(&pdev->dev, "Attempting to get clock\n");
-pc->clk = devm_clk_get(&pdev->dev, NULL);
-
-if (IS_ERR(pc->clk)) {
-	dev_warn(&pdev->dev, "No usable clock found, registering fallback 19.2MHz clock\n");
-
-	// Register fallback clock
-	ret = devm_clk_hw_register(pc->dev, &fallback_pwm_clk.hw);
-	if (ret) {
-		dev_err(pc->dev, "Fallback clock registration failed: %d\n", ret);
-		return ret;
-	}
-
-	// Get clk from the clk_hw
-	pc->clk = clk_hw_get_clk(&fallback_pwm_clk.hw, NULL);
-	if (IS_ERR(pc->clk)) {
-		dev_err(pc->dev, "Failed to get fallback clock pointer\n");
-		return PTR_ERR(pc->clk);
-	}
-}
-
-	dev_info(&pdev->dev, "Clock obtained successfully\n");
-
-	ret = clk_prepare_enable(pc->clk);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to enable clock, error: %d\n", ret);
-		return ret;
-	}
-	dev_info(&pdev->dev, "Clock enabled successfully\n");
-
 	pc->chip.dev = &pdev->dev;
 	pc->chip.ops = &bcm2835_pwm_ops;
 	pc->chip.npwm = 2;
@@ -328,7 +298,7 @@ if (IS_ERR(pc->clk)) {
 			dev_err(&pdev->dev, "pwm_ops is NULL\n");
 		}
 
-		goto add_fail;
+		return ret;
 	}
 
 // Map the Clock Manager registers
@@ -348,7 +318,7 @@ if (IS_ERR(pc->clk)) {
     // Enable PWM clock with PLLD as source
     val = CM_PASSWD | CM_SRC_PLLD | CM_ENABLE;
     writel(val, pc->cm_base + CM_PWMCTL);
-	pc->clk_ratte = FALLBACK_PWM_CLK_HZ;
+	pc->clk_rate = FALLBACK_PWM_CLK_HZ;
 
 	// Optional: add a delay to ensure the clock is stable
 	udelay(10);
@@ -364,10 +334,7 @@ dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
 
 	return 0;
 
-add_fail:
-	clk_disable_unprepare(pc->clk);
-	dev_err(&pdev->dev, "PWM probe failed, cleaning up\n");
-	return ret;
+
 }
 
 static int bcm2835_pwm_suspend(struct device *dev)
