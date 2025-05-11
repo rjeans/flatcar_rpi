@@ -404,6 +404,13 @@ if (pc->clk_base) {
 	dev_warn(&pdev->dev, "Clock manager base was NULL\n");
 }
 
+if (cm_base) {
+    iounmap(pc->cm_base);
+	dev_info(&pdev->dev, "Unmapped base\n");
+} else {
+	dev_warn(&pdev->dev, "Base was NULL\n");
+}
+
 
 
 dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
