@@ -191,13 +191,29 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 
+static void bcm2835_pwm_get_state(struct pwm_chip *chip,
+                                  struct pwm_device *pwm,
+                                  struct pwm_state *state)
+{
+	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+	u32 ctrl = readl(pc->base + PWM_CONTROL);
+	u32 period = readl(pc->base + PERIOD(pwm->hwpwm));
+	u32 duty = readl(pc->base + DUTY(pwm->hwpwm));
 
+	state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
+	state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm))) ?
+		PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
+	state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
+	state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
+	state->phase = 0;
+}
 
 
 static const struct pwm_ops bcm2835_pwm_ops = {
 	.request = bcm2835_pwm_request,
 	.free = bcm2835_pwm_free,
 	.apply = bcm2835_pwm_apply,
+	.get_state = bcm2835_pwm_get_state,
 	.owner = THIS_MODULE,
 };
 
