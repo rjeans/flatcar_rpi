@@ -282,26 +282,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "chip.of_pwm_n_cells = %d", pc->chip.of_pwm_n_cells);
 
 
-     
-
-
-	ret = pwmchip_add(&pc->chip);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
-		
-
-		// Print out pwm_ops function pointers
-		if (pc->chip.ops) {
-			dev_err(&pdev->dev, "pwm_ops: apply=%p, request=%p, free=%p\n",
-				pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
-		} else {
-			dev_err(&pdev->dev, "pwm_ops is NULL\n");
-		}
-
-		return ret;
-	}
-
-// Map the Clock Manager registers
+     // Map the Clock Manager registers
     pc->cm_base = ioremap(CM_BASE_PHYS, 0x100);
     if (!pc->cm_base) {
         dev_err(&pdev->dev, "Failed to ioremap Clock Manager\n");
@@ -322,6 +303,25 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	// Optional: add a delay to ensure the clock is stable
 	udelay(10);
+
+
+
+	ret = pwmchip_add(&pc->chip);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
+		
+
+		// Print out pwm_ops function pointers
+		if (pc->chip.ops) {
+			dev_err(&pdev->dev, "pwm_ops: apply=%p, request=%p, free=%p\n",
+				pc->chip.ops->apply, pc->chip.ops->request, pc->chip.ops->free);
+		} else {
+			dev_err(&pdev->dev, "pwm_ops is NULL\n");
+		}
+
+		return ret;
+	}
+
 
 	
 
