@@ -191,7 +191,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 
-static void bcm2835_pwm_get_state(struct pwm_chip *chip,
+static int bcm2835_pwm_get_state(struct pwm_chip *chip,
                                   struct pwm_device *pwm,
                                   struct pwm_state *state)
 {
@@ -205,7 +205,9 @@ static void bcm2835_pwm_get_state(struct pwm_chip *chip,
 		PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
 	state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
 	state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
-	state->phase = 0;
+
+	return 0;
+	
 }
 
 
