@@ -49,7 +49,7 @@ struct bcm2835_pwm {
 	struct device *dev;
 	void __iomem *base;
 	void __iomem *cm_base;
-	struct clk *clk;
+	
 
 };
 
@@ -288,7 +288,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
-		dev_err(&pdev->dev, "Debug info: base=%p, clk=%p\n", pc->base, pc->clk);
+		
 
 		// Print out pwm_ops function pointers
 		if (pc->chip.ops) {
@@ -341,7 +341,7 @@ static int bcm2835_pwm_suspend(struct device *dev)
 {
 	struct bcm2835_pwm *pc = dev_get_drvdata(dev);
 
-	clk_disable_unprepare(pc->clk);
+	
 
 	return 0;
 }
@@ -350,7 +350,7 @@ static int bcm2835_pwm_resume(struct device *dev)
 {
 	struct bcm2835_pwm *pc = dev_get_drvdata(dev);
 
-	return clk_prepare_enable(pc->clk);
+	return 0;
 }
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
