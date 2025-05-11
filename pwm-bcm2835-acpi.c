@@ -11,6 +11,8 @@
 #include <linux/pwm.h>
 #include <linux/acpi.h>
 #include <linux/clk-provider.h>
+#include <linux/pinctrl/consumer.h> 
+#include <linux/pinctrl/machine.h>
 
 
 #define PWM_CONTROL		0x000
@@ -43,6 +45,19 @@ static struct clk_fixed_rate fallback_pwm_clk = {
     .hw.init = &(struct clk_init_data){
         .name = "pwm-fallback",
         .ops = &clk_fixed_rate_ops,
+    },
+};
+
+static const struct pinctrl_map bcm2835_pwm0_map[] = {
+    {
+        .dev_name = "BCM2844:00",           // ACPI _HID of your PWM device
+        .name = "default",
+        .type = PIN_MAP_TYPE_MUX_GROUP,
+        .ctrl_dev_name = "BCM2845:00",      // ACPI _HID of your pinctrl (GPIO) device
+        .data.mux = {
+            .group = "gpio18",
+            .function = "alt5",             // ALT5 is PWM0 output on GPIO18
+        },
     },
 };
 
@@ -154,6 +169,7 @@ static const struct pwm_ops bcm2835_pwm_ops = {
 static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
 	struct bcm2835_pwm *pc;
+	struct pinctrl *pinctrl;
 	int ret;
 
 	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
@@ -216,6 +232,26 @@ if (IS_ERR(pc->clk)) {
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
+
+
+		ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
+	if (ret)
+		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
+
+	dev_info(&pdev->dev, "Before pinctrl_get_select_default\n");
+
+
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+
+	dev_info(&pdev->dev, "After pinctrl_get_select_default: pinctrl=%p, ERR=%d\n",
+		pinctrl, PTR_ERR_OR_ZERO(pinctrl));
+
+
+	if (IS_ERR(pinctrl)) {
+		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
+	} else {
+		dev_info(&pdev->dev, "Applied default pinctrl state\n");
+	}
 
 	// Dump chip configuration before registering
 	dev_info(&pdev->dev, "About to add PWM chip...");
