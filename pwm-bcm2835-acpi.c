@@ -171,7 +171,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 
 	dev_info(pc->dev, "PERIOD register (0x%x): %u ns → %u cycles\n",
-         PERIOD(pwm->hwpwm), state->period, (u32)period_cycles);
+		 PERIOD(pwm->hwpwm), state->period, (unsigned int)period_cycles);
 
     dev_info(pc->dev, "DUTY register (0x%x): %u ns → %u cycles\n",
          DUTY(pwm->hwpwm), state->duty_cycle, val);
