@@ -168,7 +168,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (state->enabled)
 		ctrl_val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
 	else
-		ctrl-val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
+		ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
 
 	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns → %u cycles\n",
