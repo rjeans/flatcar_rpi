@@ -153,7 +153,15 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0; // Accept without programming hardware
    }
 
-	writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
+writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
+
+udelay(10);  // give time to latch
+
+u32 readback = readl(pc->base + PERIOD(pwm->hwpwm));
+if (readback != period_cycles) {
+	dev_warn(pc->dev, "PERIOD write verification failed: wrote %llu, read back %u",
+	         period_cycles, readback);
+}
 
 	/* set duty cycle */
     duty_val = DIV_ROUND_CLOSEST_ULL(state->duty_cycle * rate, NSEC_PER_SEC);
@@ -338,7 +346,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	// Optional: add a delay to ensure the clock is stable
 	udelay(10);
 
-
+val = readl(pc->cm_base + CM_PWMCTL);
+dev_info(pc->dev, "CM_PWMCTL readback: 0x%08x", val);
 
 	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
