@@ -35,6 +35,13 @@
 #define CM_ENABLE      (1 << 4)
 #define CM_SRC_OSC     1           // Use 19.2 MHz oscillator
 
+#define CM_BASE_PHYS     0xFE101000  // Clock manager base on Raspberry Pi 4
+#define CM_PWMCTL        0xA0        // PWM control register offset
+#define CM_PWMDIV        0xA4        // PWM divider register offset
+#define CM_SRC_PLLD      0x6         // 500 MHz PLLD
+
+#define FALLBACK_PWM_CLK_HZ (500000000 / 32) // 15.625 MHz
+
 #define PERIOD_MIN		0x2
 
 struct bcm2835_pwm {
@@ -42,6 +49,7 @@ struct bcm2835_pwm {
 	struct device *dev;
 	void __iomem *base;
 	void __iomem *clk_base;
+	void __iomem *cm_base;
 	struct clk *clk;
 
 };
@@ -205,7 +213,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	struct bcm2835_pwm *pc;
 	struct pinctrl *pinctrl;
 	int ret;
-    u32 divider;
+    u32 divider,val;
 
 	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
 
@@ -333,6 +341,29 @@ if (IS_ERR(pc->clk)) {
 
 		goto add_fail;
 	}
+
+// Map the Clock Manager registers
+    pc->cm_base = ioremap(CM_BASE_PHYS, 0x100);
+    if (!pc->cm_base) {
+        dev_err(dev, "Failed to ioremap Clock Manager\n");
+        return -ENOMEM;
+    }
+
+    // Disable PWM clock before configuring
+    writel(CM_PASSWORD | 0x0, cm_base + CM_PWMCTL);
+    udelay(10);
+
+    // Set divider (500 MHz / 32 = 15.625 MHz)
+    writel(CM_PASSWORD | (32 << 12), cm_base + CM_PWMDIV);
+
+    // Enable PWM clock with PLLD as source
+    val = CM_PASSWORD | CM_SRC_PLLD | CM_ENABLE;
+    writel(val, cm_base + CM_PWMCTL);
+
+dev_info(dev, "PWM clock manually enabled via MMIO\n");
+
+// Optional: store fallback rate in your driver context
+pwm->clk_rate = FALLBACK_PWM_CLK_HZ;
 	dev_info(&pdev->dev, "PWM chip added successfully\n");
 
 	return 0;
