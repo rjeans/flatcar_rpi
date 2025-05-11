@@ -25,12 +25,22 @@
 #define PERIOD(x)		(((x) * 0x10) + 0x10)
 #define DUTY(x)			(((x) * 0x10) + 0x14)
 
+#define BCM2711_CLK_BASE 0xFE101000     // For Pi 4 
+
+#define CM_PWMCTL  0xA0
+#define CM_PWMDIV  0xA4
+
+#define CM_PASSWD      0x5A000000
+#define CM_ENABLE      (1 << 4)
+#define CM_SRC_OSC     1           // Use 19.2 MHz oscillator
+
 #define PERIOD_MIN		0x2
 
 struct bcm2835_pwm {
 	struct pwm_chip chip;
 	struct device *dev;
 	void __iomem *base;
+	void __iomem *clk_base;
 	struct clk *clk;
 
 };
@@ -72,6 +82,14 @@ static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 	value |= (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 	writel(value, pc->base + PWM_CONTROL);
 
+  dev_info(pc->dev, "Register dump:\n");
+  dev_info(pc->dev, "  CONTROL: 0x%08x\n", readl(pc->base + PWM_CONTROL));
+  dev_info(pc->dev, "  PERIOD0: %u\n", readl(pc->base + PERIOD(0)));
+  dev_info(pc->dev, "  DUTY0:   %u\n", readl(pc->base + DUTY(0)));
+  dev_info(pc->dev, "  PERIOD1: %u\n", readl(pc->base + PERIOD(1)));
+d  ev_info(pc->dev, "  DUTY1:   %u\n", readl(pc->base + DUTY(1)));
+
+
 	return 0;
 }
 
@@ -100,7 +118,9 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (!rate) {
 		dev_err(pc->dev, "failed to get clock rate\n");
 		return -EINVAL;
-}
+
+
+   }
 
 
 
@@ -149,7 +169,20 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	else
 		val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
+
+	dev_info(pc->dev, "PERIOD register (0x%x): %u ns → %u cycles\n",
+         PERIOD(pwm->hwpwm), state->period, (u32)period_cycles);
+
+    dev_info(pc->dev, "DUTY register (0x%x): %u ns → %u cycles\n",
+         DUTY(pwm->hwpwm), state->duty_cycle, val);
+
+    dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", val);
+
 	writel(val, pc->base + PWM_CONTROL);
+
+	dev_info(pc->dev, "PWM_CONTROL after write:  0x%08x\n",
+         readl(pc->base + PWM_CONTROL));
+
 
 	return 0;
 }
@@ -171,6 +204,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	struct bcm2835_pwm *pc;
 	struct pinctrl *pinctrl;
 	int ret;
+    u32 divider;
 
 	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
 
@@ -262,6 +296,24 @@ if (IS_ERR(pc->clk)) {
 	dev_info(&pdev->dev, "chip.of_xlate = %p", pc->chip.of_xlate);
 	dev_info(&pdev->dev, "chip.of_pwm_n_cells = %d", pc->chip.of_pwm_n_cells);
 
+
+     
+    pc->clk_base = ioremap(0xFE101000, 0x100);
+    if (!pc->clk_base) {
+        dev_warn(&pdev->dev, "Failed to ioremap clock manager\n");
+    } else {
+        writel(CM_PASSWD | CM_SRC_OSC, pc->clk_base + CM_PWMCTL);    // Disable clock first
+        udelay(10);
+
+        divider = (192 << 12);  // Divide by 192: gives 100 kHz
+        writel(CM_PASSWD | divider, pc->clk_base + CM_PWMDIV);
+
+        writel(CM_PASSWD | CM_SRC_OSC | CM_ENABLE, pc->clk_base + CM_PWMCTL);
+
+        dev_info(&pdev->dev, "Manually enabled PWM clock via CM_PWMCTL\n");
+}
+
+
 	ret = pwmchip_add(&pc->chip);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add PWM chip, error: %d\n", ret);
@@ -310,6 +362,25 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 pwmchip_remove(&pc->chip);
 clk_disable_unprepare(pc->clk);
 pinctrl_unregister_mappings(bcm2835_pwm_map);
+if (pc->clk_base) {
+	iounmap(pc->clk_base);
+	dev_info(&pdev->dev, "Unmapped clock manager\n");
+} else {
+	dev_warn(&pdev->dev, "Clock manager base was NULL\n");
+}
+
+	// Unregister the fallback clock
+	if (pc->clk == &fallback_pwm_clk) {
+		clk_hw_unregister(&fallback_pwm_clk.hw);
+		dev_info(&pdev->dev, "Unregistered fallback clock\n");
+	} else {
+		dev_warn(&pdev->dev, "Fallback clock was not used\n");
+	}
+
+	dev_info(&pdev->dev, "Unregistered pinctrl mappings\n");
+	dev_info(&pdev->dev, "Unregistered PWM chip\n");
+	dev_info(&pdev->dev, "Unprepared and disabled clock\n");
+	dev_info(&pdev->dev, "Unregistered pinctrl mappings\n");
 
 dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
 return 0;
