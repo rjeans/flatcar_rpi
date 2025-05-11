@@ -13,6 +13,7 @@
 #include <linux/clk-provider.h>
 #include <linux/pinctrl/consumer.h> 
 #include <linux/pinctrl/machine.h>
+#include <linux/delay.h>
 
 
 #define PWM_CONTROL		0x000
@@ -174,7 +175,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		 PERIOD(pwm->hwpwm), (unsigned int)state->period, (unsigned int)period_cycles);
 
     dev_info(pc->dev, "DUTY register (0x%x): %u ns → %u cycles\n",
-         DUTY(pwm->hwpwm), state->duty_cycle, val);
+         DUTY(pwm->hwpwm), (unsigned int)state->duty_cycle, (unsigned int)val);
 
     dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", val);
 
@@ -369,18 +370,7 @@ if (pc->clk_base) {
 	dev_warn(&pdev->dev, "Clock manager base was NULL\n");
 }
 
-	// Unregister the fallback clock
-	if (pc->clk == &fallback_pwm_clk) {
-		clk_hw_unregister(&fallback_pwm_clk.hw);
-		dev_info(&pdev->dev, "Unregistered fallback clock\n");
-	} else {
-		dev_warn(&pdev->dev, "Fallback clock was not used\n");
-	}
 
-	dev_info(&pdev->dev, "Unregistered pinctrl mappings\n");
-	dev_info(&pdev->dev, "Unregistered PWM chip\n");
-	dev_info(&pdev->dev, "Unprepared and disabled clock\n");
-	dev_info(&pdev->dev, "Unregistered pinctrl mappings\n");
 
 dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
 return 0;
