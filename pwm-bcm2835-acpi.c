@@ -173,6 +173,8 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	else
 		ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
+    dev_info(pc->dev, "APPLY: pwm->hwpwm = %u", pwm->hwpwm);
+	dev_info(pc->dev, "APPLY: state->enabled = %d", state->enabled);
 
 	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns -> %llu cycles\n",
 		 PERIOD(pwm->hwpwm), state->period, period_cycles);
@@ -201,8 +203,11 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 	u32 duty = readl(pc->base + DUTY(pwm->hwpwm));
 
 	dev_info(pc->dev, "GET_STATE: CONTROL = 0x%08x", ctrl);
-	dev_info(pc->dev, "GET_STATE: PERIOD[%u] = %u", pwm->hwpwm, period);
-	dev_info(pc->dev, "GET_STATE: DUTY[%u]   = %u", pwm->hwpwm, duty);
+	dev_info(pc->dev, "GET_STATE: hwpwm = %u", pwm->hwpwm);
+	dev_info(pc->dev, "GET_STATE: state->period = %llu", state->period);
+	dev_info(pc->dev, "GET_STATE: state->duty_cycle = %llu", state->duty_cycle);
+	dev_info(pc->dev, "GET_STATE: state->polarity = %d", state->polarity);
+	dev_info(pc->dev, "GET_STATE: state->enabled = %d", state->enabled);
 
 	state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
 	state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm))) ?
