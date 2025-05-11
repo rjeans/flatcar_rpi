@@ -171,10 +171,10 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
 
 
-	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns → %u cycles\n",
+	dev_info(pc->dev, "PERIOD register (0x%x): %llu ns -> %u cycles\n",
 		 PERIOD(pwm->hwpwm), state->period, period_cycles);
 
-    dev_info(pc->dev, "DUTY register (0x%x): %llu ns → %u cycles\n",
+    dev_info(pc->dev, "DUTY register (0x%x): %llu ns -> %u cycles\n",
          DUTY(pwm->hwpwm), state->duty_cycle, duty_val);
 
     dev_info(pc->dev, "PWM_CONTROL before write: 0x%08x\n", ctrl_val);
