@@ -182,7 +182,7 @@ if (IS_ERR(pc->clk)) {
 	dev_warn(&pdev->dev, "No usable clock found, registering fallback 19.2MHz clock\n");
 
 	// Register fallback clock
-	ret = devm_clk_hw_register(pc->dev, &fallback_pwm_clk);
+	ret = devm_clk_hw_register(pc->dev, &fallback_pwm_clk.hw);
 	if (ret) {
 		dev_err(pc->dev, "Fallback clock registration failed: %d\n", ret);
 		return ret;
