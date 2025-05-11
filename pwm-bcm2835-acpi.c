@@ -48,7 +48,7 @@ static struct clk_fixed_rate fallback_pwm_clk = {
     },
 };
 
-static const struct pinctrl_map bcm2835_pwm0_map[] = {
+static const struct pinctrl_map bcm2835_pwm_map[] = {
     {
         .dev_name = "BCM2844:00",           // ACPI _HID of your PWM device
         .name = "default",
@@ -234,7 +234,7 @@ if (IS_ERR(pc->clk)) {
 	dev_info(&pdev->dev, "PWM chip initialized\n");
 
 
-		ret = pinctrl_register_mappings(bcm2835_i2c1_map, ARRAY_SIZE(bcm2835_i2c1_map));
+		ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d\n", ret);
 
