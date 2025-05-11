@@ -48,7 +48,6 @@ struct bcm2835_pwm {
 	struct pwm_chip chip;
 	struct device *dev;
 	void __iomem *base;
-	void __iomem *clk_base;
 	void __iomem *cm_base;
 	struct clk *clk;
 
@@ -117,7 +116,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 {
 
 	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-	unsigned long rate = clk_get_rate(pc->clk);
+	uunsigned long rate = pc->clk_rate;
 	unsigned long long period_cycles;
 	u64 max_period;
 
@@ -214,6 +213,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	struct pinctrl *pinctrl;
 	int ret;
     u32 divider,val;
+	struct pinctrl_state *state;
 
 	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
 
@@ -280,18 +280,21 @@ if (IS_ERR(pc->clk)) {
 	dev_info(&pdev->dev, "Before pinctrl_get_select_default\n");
 
 
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-
-	dev_info(&pdev->dev, "After pinctrl_get_select_default: pinctrl=%p, ERR=%d\n",
-		pinctrl, PTR_ERR_OR_ZERO(pinctrl));
-
-
-	if (IS_ERR(pinctrl)) {
-		dev_warn(&pdev->dev, "Failed to apply default pinctrl state\n");
+	pinctrl = devm_pinctrl_get(&pdev->dev);
+    if (IS_ERR(pinctrl)) {
+	  dev_warn(&pdev->dev, "Failed to get pinctrl handle\n");
+    } else {
+	  state = pinctrl_lookup_state(pinctrl, "default");
+	if (IS_ERR(state)) {
+		dev_warn(&pdev->dev, "Failed to lookup pinctrl default state\n");
 	} else {
-		dev_info(&pdev->dev, "Applied default pinctrl state\n");
+		ret = pinctrl_select_state(pinctrl, state);
+		if (ret)
+			dev_warn(&pdev->dev, "Failed to select pinctrl default state: %d\n", ret);
+		else
+			dev_info(&pdev->dev, "Applied default pinctrl state explicitly\n");
 	}
-
+}
 
 	platform_set_drvdata(pdev, pc);
 	dev_info(&pdev->dev, "PWM chip initialized\n");
@@ -310,20 +313,6 @@ if (IS_ERR(pc->clk)) {
 
 
      
-    pc->clk_base = ioremap(0xFE101000, 0x100);
-    if (!pc->clk_base) {
-        dev_warn(&pdev->dev, "Failed to ioremap clock manager\n");
-    } else {
-        writel(CM_PASSWD | CM_SRC_OSC, pc->clk_base + CM_PWMCTL);    // Disable clock first
-        udelay(10);
-
-        divider = (192 << 12);  // Divide by 192: gives 100 kHz
-        writel(CM_PASSWD | divider, pc->clk_base + CM_PWMDIV);
-
-        writel(CM_PASSWD | CM_SRC_OSC | CM_ENABLE, pc->clk_base + CM_PWMCTL);
-
-        dev_info(&pdev->dev, "Manually enabled PWM clock via CM_PWMCTL\n");
-}
 
 
 	ret = pwmchip_add(&pc->chip);
@@ -359,10 +348,17 @@ if (IS_ERR(pc->clk)) {
     // Enable PWM clock with PLLD as source
     val = CM_PASSWD | CM_SRC_PLLD | CM_ENABLE;
     writel(val, pc->cm_base + CM_PWMCTL);
+	pc->clk_ratte = FALLBACK_PWM_CLK_HZ;
+
+	// Optional: add a delay to ensure the clock is stable
+	udelay(10);
+
+	// Print out the clock rate
+	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
 
 dev_info(&pdev->dev, "PWM clock manually enabled via MMIO\n");
+dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
 
-// Optional: store fallback rate in your driver context
 
 	dev_info(&pdev->dev, "PWM chip added successfully\n");
 
@@ -397,12 +393,7 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 pwmchip_remove(&pc->chip);
 clk_disable_unprepare(pc->clk);
 pinctrl_unregister_mappings(bcm2835_pwm_map);
-if (pc->clk_base) {
-	iounmap(pc->clk_base);
-	dev_info(&pdev->dev, "Unmapped clock manager\n");
-} else {
-	dev_warn(&pdev->dev, "Clock manager base was NULL\n");
-}
+
 
 if (pc->cm_base) {
     iounmap(pc->cm_base);
