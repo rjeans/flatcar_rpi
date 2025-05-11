@@ -67,7 +67,7 @@ static const struct pinctrl_map bcm2835_pwm_map[] = {
         .type = PIN_MAP_TYPE_MUX_GROUP,
         .ctrl_dev_name = "BCM2845:00",      // ACPI _HID of your pinctrl (GPIO) device
         .data.mux = {
-            .group = "gpio13",
+            .group = "gpio12",
             .function = "alt0",            
         },
     },
@@ -111,7 +111,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
     unsigned long rate = pc->clk_rate;
     u64 period_cycles, duty_cycles;
-    u32 ctrl_val;
+    u32 ctrl_val,value;
     int retries = 5;
 
     dev_info(pc->dev, "Clock rate: %lu Hz", rate);
@@ -128,6 +128,15 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return 0;
     }
 
+	value = readl(pc->base + PWM_CONTROL);
+    dev_info(pc->dev, "Pre-write CONTROL = 0x%08x", value);
+    dev_info(pc->dev, "CM_PWMCTL = 0x%08x", readl(pc->cm_base + CM_PWMCTL));
+    dev_info(pc->dev, "CM_PWMDIV = 0x%08x", readl(pc->cm_base + CM_PWMDIV));
+
+    writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
+    udelay(10);
+    writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
+    writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
     // Retry loop for PERIOD
     while (retries--) {
         writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
