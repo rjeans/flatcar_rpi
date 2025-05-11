@@ -284,10 +284,6 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->dev = &pdev->dev;
 
-	// Add the power-on call here, before accessing hardware
-	ret = bcm2835_pwm_enable_firmware_power(&pdev->dev);
-	if (ret)
-		dev_warn(&pdev->dev, "PWM firmware domain may not be active\n");
 
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
@@ -296,6 +292,12 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		return PTR_ERR(pc->base);
 	}
 	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
+
+		// Add the power-on call here, before accessing hardware
+	ret = bcm2835_pwm_enable_firmware_power(&pdev->dev);
+	if (ret)
+		dev_warn(&pdev->dev, "PWM firmware domain may not be active\n");
+
 
 
 	pc->chip.dev = &pdev->dev;
