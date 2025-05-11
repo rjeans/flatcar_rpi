@@ -13,6 +13,9 @@
 #include <linux/pinctrl/consumer.h> 
 #include <linux/pinctrl/machine.h>
 #include <linux/delay.h>
+#include <linux/raspberrypi-exp.h>
+#include <linux/platform_device.h>
+
 
 
 #define PWM_CONTROL		0x000
@@ -72,6 +75,27 @@ static const struct pinctrl_map bcm2835_pwm_map[] = {
         },
     },
 };
+
+static int bcm2835_pwm_enable_firmware_power(struct device *dev)
+{
+	struct rpi_firmware *fw;
+	u32 active = 1;
+	int ret;
+
+	fw = rpi_firmware_get(NULL);
+	if (!fw)
+		return -ENODEV;
+
+	ret = rpi_firmware_property(fw, RPI_FIRMWARE_SET_DOMAIN_STATE,
+		(u32[2]){ RPI_FIRMWARE_DOMAIN_PWM, active }, sizeof(u32) * 2);
+
+	if (ret)
+		dev_err(dev, "Failed to enable PWM power domain via firmware: %d\n", ret);
+	else
+		dev_info(dev, "PWM power domain enabled via firmware mailbox\n");
+
+	return ret;
+}
 
 
 static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
@@ -259,6 +283,12 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->dev = &pdev->dev;
 
+	// Add the power-on call here, before accessing hardware
+	ret = bcm2835_pwm_enable_firmware_power(&pdev->dev);
+	if (ret)
+		dev_warn(&pdev->dev, "PWM firmware domain may not be active\n");
+
+
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base)) {
 		dev_err(&pdev->dev, "Failed to map I/O memory\n");
@@ -274,6 +304,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->chip.of_xlate = NULL;
 	pc->chip.of_pwm_n_cells = 0;
 	pc->chip.dev->of_node = NULL;
+
+	
 
 
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
