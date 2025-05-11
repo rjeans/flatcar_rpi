@@ -123,11 +123,14 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
 	// Reset PWM block
+	dev_info(pc->dev, "Resetting PWM peripheral before applying settings");
     writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
     udelay(10);
     writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
     writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
     udelay(10);
+    dev_info(pc->dev, "Post-reset CM_PWMCTL = 0x%08x", readl(pc->cm_base + CM_PWMCTL));
+    dev_info(pc->dev, "Post-reset CM_PWMDIV = 0x%08x", readl(pc->cm_base + CM_PWMDIV));
 
 
     // Warn about small period
@@ -209,7 +212,7 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 		state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
 		dev_info(pc->dev, "GET_STATE: Converted period = %llu ns", state->period);
 	} else {
-		dev_warn(pc->dev, "GET_STATE: PERIOD is zero — fallback period used (1 ms)");
+		dev_warn(pc->dev, "GET_STATE: PERIOD is zero - fallback period used (1 ms)");
 		state->period = 1000000;
 	}
 
