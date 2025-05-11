@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 
 
+#define RPI_FIRMWARE_DOMAIN_PWM 2
 
 #define PWM_CONTROL		0x000
 #define PWM_CONTROL_SHIFT(x)	((x) * 8)
