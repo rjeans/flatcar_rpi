@@ -48,7 +48,7 @@ struct bcm2835_pwm {
 	struct device *dev;
 	void __iomem *base;
 	void __iomem *cm_base;
-	unsigned long clk_rate
+	unsigned long clk_rate;
 	
 
 };
@@ -206,7 +206,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	struct bcm2835_pwm *pc;
 	struct pinctrl *pinctrl;
 	int ret;
-    u32 divider,val;
+    u32 val;
 	struct pinctrl_state *state;
 
 	dev_info(&pdev->dev, "Probing BCM2835 PWM driver\n");
@@ -333,7 +333,7 @@ dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
 
 static int bcm2835_pwm_suspend(struct device *dev)
 {
-	struct bcm2835_pwm *pc = dev_get_drvdata(dev);
+	
 
 	
 
@@ -342,7 +342,7 @@ static int bcm2835_pwm_suspend(struct device *dev)
 
 static int bcm2835_pwm_resume(struct device *dev)
 {
-	struct bcm2835_pwm *pc = dev_get_drvdata(dev);
+	
 
 	return 0;
 }
