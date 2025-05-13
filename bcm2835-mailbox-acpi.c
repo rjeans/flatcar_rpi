@@ -24,7 +24,7 @@
 #define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
 struct mbox_controller *rpi_mbox_global = NULL;
-
+EXPORT_SYMBOL(rpi_mbox_global);
 
 struct bcm2835_mbox {
 	void __iomem *regs;
