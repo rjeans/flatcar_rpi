@@ -43,8 +43,9 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	}
 
 	// 3. Get Linux device
-	mbox_dev = acpi_get_first_physical_node(adev);
-	if (!mbox_dev) {
+	dev_info(dev, "Resolved mbox_dev = %s\n", dev_name(mbox_dev));
+    mbox_ctrl = dev_get_drvdata(mbox_dev);
+    dev_info(dev, "dev_get_drvdata(mbox_dev) = %p\n", mbox_ctrl);if (!mbox_dev) {
 		dev_err(dev, "Failed to get platform device for BCM2849\n");
 		acpi_dev_put(adev);
 		return ERR_PTR(-ENODEV);
