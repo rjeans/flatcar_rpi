@@ -1,56 +1,27 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- *  Copyright (C) 2010,2015 Broadcom
- *  Copyright (C) 2013-2014 Lubomir Rintel
- *  Copyright (C) 2013 Craig McGeachie
- *
- * Parts of the driver are based on:
- *  - arch/arm/mach-bcm2708/vcio.c file written by Gray Girling that was
- *    obtained from branch "rpi-3.6.y" of git://github.com/raspberrypi/
- *    linux.git
- *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
- *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
- *    mailbox/bcm2835-ipc.c
- *  - documentation available on the following web site:
- *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
- */
-
+#include <linux/acpi.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/mailbox_controller.h>
 #include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
+#include <linux/property.h>
 
-/* Mailboxes */
-#define ARM_0_MAIL0	0x00
-#define ARM_0_MAIL1	0x20
+#define MAIL0_RD    0x00
+#define MAIL0_STA   0x18
+#define MAIL0_CNF   0x1C
+#define MAIL1_WRT   0x00
+#define MAIL1_STA   0x18
 
-/*
- * Mailbox registers. We basically only support mailbox 0 & 1. We
- * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
- * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
- * the placement of memory barriers.
- */
-#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
-#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
-#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
-#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
-#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
-#define MAIL1_STA	(ARM_0_MAIL1 + 0x18)
-
-/* Status register: FIFO state. */
-#define ARM_MS_FULL		BIT(31)
-#define ARM_MS_EMPTY		BIT(30)
-
-/* Configuration register: Enable interrupts. */
-#define ARM_MC_IHAVEDATAIRQEN	BIT(0)
+#define ARM_MS_FULL     BIT(31)
+#define ARM_MS_EMPTY    BIT(30)
+#define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
 struct bcm2835_mbox {
 	void __iomem *regs;
@@ -92,17 +63,13 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 static int bcm2835_startup(struct mbox_chan *link)
 {
 	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
-
-	/* Enable the interrupt on data reception */
 	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
-
 	return 0;
 }
 
 static void bcm2835_shutdown(struct mbox_chan *link)
 {
 	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
-
 	writel(0, mbox->regs + MAIL0_CNF);
 }
 
@@ -118,53 +85,49 @@ static bool bcm2835_last_tx_done(struct mbox_chan *link)
 }
 
 static const struct mbox_chan_ops bcm2835_mbox_chan_ops = {
-	.send_data	= bcm2835_send_data,
-	.startup	= bcm2835_startup,
-	.shutdown	= bcm2835_shutdown,
-	.last_tx_done	= bcm2835_last_tx_done
+	.send_data     = bcm2835_send_data,
+	.startup       = bcm2835_startup,
+	.shutdown      = bcm2835_shutdown,
+	.last_tx_done  = bcm2835_last_tx_done
 };
-
-static struct mbox_chan *bcm2835_mbox_index_xlate(struct mbox_controller *mbox,
-		    const struct of_phandle_args *sp)
-{
-	if (sp->args_count != 0)
-		return ERR_PTR(-EINVAL);
-
-	return &mbox->chans[0];
-}
 
 static int bcm2835_mbox_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	int ret = 0;
 	struct bcm2835_mbox *mbox;
+	struct resource *res;
+	int irq, ret;
 
 	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-	if (mbox == NULL)
+	if (!mbox)
 		return -ENOMEM;
+
 	spin_lock_init(&mbox->lock);
 
-	ret = devm_request_irq(dev, irq_of_parse_and_map(dev->of_node, 0),
-			       bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(dev),
-			       mbox);
-	if (ret) {
-		dev_err(dev, "Failed to register a mailbox IRQ handler: %d\n",
-			ret);
-		return -ENODEV;
-	}
+	// Request memory region from ACPI-defined _CRS
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	mbox->regs = devm_ioremap_resource(dev, res);
+	if (IS_ERR(mbox->regs))
+		return PTR_ERR(mbox->regs);
 
-	mbox->regs = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(mbox->regs)) {
-		ret = PTR_ERR(mbox->regs);
+	// Get IRQ from _CRS
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0)
+		return irq;
+
+	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND,
+	                       dev_name(dev), mbox);
+	if (ret) {
+		dev_err(dev, "Failed to request IRQ %d: %d\n", irq, ret);
 		return ret;
 	}
 
 	mbox->controller.txdone_poll = true;
 	mbox->controller.txpoll_period = 5;
 	mbox->controller.ops = &bcm2835_mbox_chan_ops;
-	mbox->controller.of_xlate = &bcm2835_mbox_index_xlate;
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
+
 	mbox->controller.chans = devm_kzalloc(dev,
 		sizeof(*mbox->controller.chans), GFP_KERNEL);
 	if (!mbox->controller.chans)
@@ -174,27 +137,25 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	platform_set_drvdata(pdev, mbox);
-	dev_info(dev, "mailbox enabled\n");
-
-	return ret;
+	dev_info(dev, "BCM2835 ACPI mailbox controller initialized\n");
+	return 0;
 }
 
-static const struct of_device_id bcm2835_mbox_of_match[] = {
-	{ .compatible = "brcm,bcm2835-mbox", },
-	{},
+static const struct acpi_device_id bcm2835_mbox_acpi_ids[] = {
+	{ "BCM2840", 0 }, // Matches your ACPI table
+	{ },
 };
-MODULE_DEVICE_TABLE(of, bcm2835_mbox_of_match);
+MODULE_DEVICE_TABLE(acpi, bcm2835_mbox_acpi_ids);
 
 static struct platform_driver bcm2835_mbox_driver = {
+	.probe  = bcm2835_mbox_probe,
 	.driver = {
-		.name = "bcm2835-mbox",
-		.of_match_table = bcm2835_mbox_of_match,
+		.name = "bcm2835-mbox-acpi",
+		.acpi_match_table = bcm2835_mbox_acpi_ids,
 	},
-	.probe		= bcm2835_mbox_probe,
 };
 module_platform_driver(bcm2835_mbox_driver);
 
-MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
-MODULE_DESCRIPTION("BCM2835 mailbox IPC driver");
+MODULE_AUTHOR("Converted by ChatGPT for ACPI use");
+MODULE_DESCRIPTION("BCM2835 Mailbox driver (ACPI-only)");
 MODULE_LICENSE("GPL v2");
