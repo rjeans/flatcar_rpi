@@ -17,39 +17,32 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
 	struct fwnode_handle *mbox_fwnode;
 	struct mbox_chan *chan;
+	struct device *mbox_dev;
+	struct mbox_controller *mbox_ctrl;
 
-	// Read mbox reference from ACPI _DSD
 	mbox_fwnode = fwnode_find_reference(dev_fwnode(dev), "mbox", 0);
 	if (IS_ERR(mbox_fwnode)) {
 		dev_err(dev, "Failed to find ACPI mailbox fwnode\n");
 		return ERR_CAST(mbox_fwnode);
 	}
 
-	// Get mbox controller device from the fwnode
-	struct device *mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, mbox_fwnode);
+	mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, mbox_fwnode);
 	fwnode_handle_put(mbox_fwnode);
 	if (!mbox_dev) {
 		dev_err(dev, "Failed to find mailbox device\n");
 		return ERR_PTR(-ENODEV);
 	}
 
-	// Get mbox controller instance
-	struct mbox_controller *mbox_ctrl = dev_get_drvdata(mbox_dev);
-	if (!mbox_ctrl) {
-		dev_err(dev, "Mailbox controller not ready\n");
+	mbox_ctrl = dev_get_drvdata(mbox_dev);
+	if (!mbox_ctrl || !mbox_ctrl->chans) {
+		dev_err(dev, "Mailbox controller not ready or has no channels\n");
 		put_device(mbox_dev);
 		return ERR_PTR(-ENODEV);
 	}
 
-	// Access the first channel using mbox_client
-	chan = mbox_request_channel(&mbox_ctrl->client, 0);
-	if (IS_ERR(chan)) {
-		dev_err(dev, "Failed to request mailbox channel\n");
-		put_device(mbox_dev);
-		return chan;
-	}
-
+	chan = &mbox_ctrl->chans[0];
 	put_device(mbox_dev);
+
 	return chan;
 }
 
@@ -116,11 +109,15 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = false;
 
-    rpd->chan = rpi_acpi_find_mbox_channel(dev);	if (IS_ERR(rpd->chan)) {
-		ret = PTR_ERR(rpd->chan);
-		dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
-		return ret;
-	}
+    rpd->chan = rpi_acpi_find_mbox_channel(dev);
+    if (IS_ERR(rpd->chan)) {
+	ret = PTR_ERR(rpd->chan);
+	dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
+	return ret;
+}
+
+rpd->chan->cl = &rpd->mbox_client;
+
 	dev_info(dev, "Mailbox channel acquired\n");
 
 	// Configure GENPD
