@@ -171,6 +171,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mbox);
 
+	dev_info(dev, "platform_set_drvdata confirmed: %p\n", dev_get_drvdata(&pdev->dev));
+
+
 
 	dev_info(dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
 	return 0;
