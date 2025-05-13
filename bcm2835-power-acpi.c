@@ -114,7 +114,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 }
 
 static const struct acpi_device_id rpi_power_acpi_ids[] = {
-	{ "BCM2850", 0 },
+	{ "RPIPWR0", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, rpi_power_acpi_ids);
