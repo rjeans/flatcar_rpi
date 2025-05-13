@@ -21,6 +21,18 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
+static int find_bcm2849_device(struct device *dev, void *data)
+{
+	struct device **out = data;
+
+	if (strcmp(dev_name(dev), "BCM2849:00") == 0) {
+		*out = dev;
+		return 1; // non-zero stops iteration early
+	}
+
+	return 0;
+}
+
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
 	int index;
@@ -35,21 +47,8 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	}
 	dev_info(dev, "Using mbox-index = %d\n", index);
 
-	// 2. Search for platform device named "BCM2849:00"
-	struct device *candidate;
-	struct bus_type *bus = &platform_bus_type;
-
-	dev_info(dev, "Searching platform bus for BCM2849:00...\n");
-
-	for_each_dev(candidate) {
-		if (!candidate->bus || candidate->bus != bus)
-			continue;
-
-		if (strcmp(dev_name(candidate), "BCM2849:00") == 0) {
-			mbox_dev = candidate;
-			break;
-		}
-	}
+	// 2. Search platform bus for "BCM2849:00"
+	bus_for_each_dev(&platform_bus_type, NULL, &mbox_dev, find_bcm2849_device);
 
 	if (!mbox_dev) {
 		dev_err(dev, "Failed to find platform device 'BCM2849:00'\n");
@@ -58,7 +57,7 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 
 	dev_info(dev, "Matched platform device: %s\n", dev_name(mbox_dev));
 
-	// 3. Retrieve mailbox controller from drvdata
+	// 3. Get mailbox controller
 	mbox_ctrl = dev_get_drvdata(mbox_dev);
 	if (!mbox_ctrl) {
 		dev_err(dev, "dev_get_drvdata(%s) returned NULL — controller not ready\n", dev_name(mbox_dev));
@@ -68,17 +67,16 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	dev_info(dev, "Mailbox controller at %p (num_chans = %d)\n",
 	         mbox_ctrl, mbox_ctrl->num_chans);
 
-	// 4. Validate and return channel
 	if (index >= mbox_ctrl->num_chans) {
 		dev_err(dev, "Invalid mbox-index %d (max = %d)\n",
 		        index, mbox_ctrl->num_chans - 1);
 		return ERR_PTR(-EINVAL);
 	}
 
+	// 4. Return channel
 	chan = &mbox_ctrl->chans[index];
 	return chan;
 }
-
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
 
