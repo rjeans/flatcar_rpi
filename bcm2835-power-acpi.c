@@ -15,35 +15,50 @@
 #include <linux/mailbox_controller.h>
 
 
+#include <linux/acpi.h>
+#include <linux/device.h>
+#include <linux/mailbox_controller.h>
+#include <linux/platform_device.h>
+#include <linux/property.h>
+
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
-	struct fwnode_handle *mbox_fwnode;
-	struct mbox_chan *chan;
+	int index;
 	struct device *mbox_dev;
 	struct mbox_controller *mbox_ctrl;
+	struct mbox_chan *chan;
 
-	mbox_fwnode = fwnode_find_reference(dev_fwnode(dev), "mbox", 0);
-	if (IS_ERR(mbox_fwnode)) {
-		dev_err(dev, "Failed to find ACPI mailbox fwnode\n");
-		return ERR_CAST(mbox_fwnode);
+	// 1. Read mbox-index from _DSD
+	if (device_property_read_u32(dev, "mbox-index", &index)) {
+		dev_err(dev, "Missing or invalid 'mbox-index' property\n");
+		return ERR_PTR(-EINVAL);
+	}
+	dev_info(dev, "Using mbox-index = %d\n", index);
+
+	// 2. Find the ACPI device with HID BCM2849
+	struct acpi_device *adev = acpi_dev_get_first_match_dev("BCM2849", NULL, -1);
+	if (!adev) {
+		dev_err(dev, "Failed to find ACPI device with HID BCM2849\n");
+		return ERR_PTR(-ENODEV);
 	}
 
-    mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, mbox_fwnode);	fwnode_handle_put(mbox_fwnode);
+	// 3. Get Linux device
+	mbox_dev = acpi_get_first_physical_node(adev);
 	if (!mbox_dev) {
-		dev_err(dev, "Failed to find mailbox device\n");
+		dev_err(dev, "Failed to get platform device for BCM2849\n");
+		acpi_dev_put(adev);
 		return ERR_PTR(-ENODEV);
 	}
+	acpi_dev_put(adev); // drop reference
 
+	// 4. Extract mailbox controller and return channel
 	mbox_ctrl = dev_get_drvdata(mbox_dev);
-	if (!mbox_ctrl || !mbox_ctrl->chans) {
-		dev_err(dev, "Mailbox controller not ready or has no channels\n");
-		put_device(mbox_dev);
+	if (!mbox_ctrl || index >= mbox_ctrl->num_chans) {
+		dev_err(dev, "Mailbox controller not ready or invalid index\n");
 		return ERR_PTR(-ENODEV);
 	}
 
-	chan = &mbox_ctrl->chans[0];
-	put_device(mbox_dev);
-
+	chan = &mbox_ctrl->chans[index];
 	return chan;
 }
 
