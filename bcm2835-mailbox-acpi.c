@@ -23,6 +23,9 @@
 #define ARM_MS_EMPTY    BIT(30)
 #define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
+struct mbox_controller *rpi_mbox_global = NULL;
+
+
 struct bcm2835_mbox {
 	void __iomem *regs;
 	spinlock_t lock;
@@ -173,7 +176,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 	dev_info(dev, "platform_set_drvdata confirmed: %p\n", dev_get_drvdata(&pdev->dev));
 
-
+    rpi_mbox_global = &mbox->controller; // Set the global pointer to the mailbox controller
+	dev_info(dev, "Global mailbox controller set: %p\n", rpi_mbox_global);
 
 	dev_info(dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
 	return 0;

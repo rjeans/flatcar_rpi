@@ -21,62 +21,33 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
-static int find_bcm2849_device(struct device *dev, void *data)
-{
-	struct device **out = data;
+extern struct mbox_controller *rpi_mbox_global;
 
-	if (strcmp(dev_name(dev), "BCM2849:00") == 0) {
-		*out = dev;
-		return 1; // non-zero stops iteration early
-	}
-
-	return 0;
-}
 
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
 	int index;
-	struct device *mbox_dev = NULL;
-	struct mbox_controller *mbox_ctrl;
-	struct mbox_chan *chan;
 
-	// 1. Read mbox-index from _DSD
 	if (device_property_read_u32(dev, "mbox-index", &index)) {
 		dev_err(dev, "Missing or invalid 'mbox-index' property\n");
 		return ERR_PTR(-EINVAL);
 	}
-	dev_info(dev, "Using mbox-index = %d\n", index);
 
-	// 2. Search platform bus for "BCM2849:00"
-	bus_for_each_dev(&platform_bus_type, NULL, &mbox_dev, find_bcm2849_device);
-
-	if (!mbox_dev) {
-		dev_err(dev, "Failed to find platform device 'BCM2849:00'\n");
-		return ERR_PTR(-ENODEV);
-	}
-
-	dev_info(dev, "Matched platform device: %s\n", dev_name(mbox_dev));
-
-	// 3. Get mailbox controller
-	mbox_ctrl = dev_get_drvdata(mbox_dev);
-	if (!mbox_ctrl) {
-		dev_err(dev, "dev_get_drvdata(%s) returned NULL — controller not ready\n", dev_name(mbox_dev));
+	if (!rpi_mbox_global) {
+		dev_err(dev, "Global mailbox controller not ready\n");
 		return ERR_PTR(-EPROBE_DEFER);
 	}
 
-	dev_info(dev, "Mailbox controller at %p (num_chans = %d)\n",
-	         mbox_ctrl, mbox_ctrl->num_chans);
-
-	if (index >= mbox_ctrl->num_chans) {
+	if (index >= rpi_mbox_global->num_chans) {
 		dev_err(dev, "Invalid mbox-index %d (max = %d)\n",
-		        index, mbox_ctrl->num_chans - 1);
+		        index, rpi_mbox_global->num_chans - 1);
 		return ERR_PTR(-EINVAL);
 	}
 
-	// 4. Return channel
-	chan = &mbox_ctrl->chans[index];
-	return chan;
+	return &rpi_mbox_global->chans[index];
 }
+
+
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
 
