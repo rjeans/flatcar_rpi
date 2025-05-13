@@ -24,8 +24,7 @@
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
 	int index;
-	struct acpi_device *adev;
-	struct device *mbox_dev;
+	struct device *mbox_dev = NULL;
 	struct mbox_controller *mbox_ctrl;
 	struct mbox_chan *chan;
 
@@ -36,45 +35,49 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	}
 	dev_info(dev, "Using mbox-index = %d\n", index);
 
-	// 2. Find ACPI device with HID "BCM2849"
-	adev = acpi_dev_get_first_match_dev("BCM2849", NULL, -1);
-	if (!adev) {
-		dev_err(dev, "Failed to find ACPI device with HID BCM2849\n");
-		return ERR_PTR(-ENODEV);
-	}
+	// 2. Search for platform device named "BCM2849:00"
+	struct device *candidate;
+	struct bus_type *bus = &platform_bus_type;
 
-	// 3. Resolve to platform_device from ACPI
-	mbox_dev = acpi_get_first_physical_node(adev);
-	acpi_dev_put(adev); // release ACPI device ref immediately
+	dev_info(dev, "Searching platform bus for BCM2849:00...\n");
+
+	for_each_dev(candidate) {
+		if (!candidate->bus || candidate->bus != bus)
+			continue;
+
+		if (strcmp(dev_name(candidate), "BCM2849:00") == 0) {
+			mbox_dev = candidate;
+			break;
+		}
+	}
 
 	if (!mbox_dev) {
-		dev_err(dev, "Failed to get platform device for BCM2849\n");
+		dev_err(dev, "Failed to find platform device 'BCM2849:00'\n");
 		return ERR_PTR(-ENODEV);
 	}
 
-	dev_info(dev, "Resolved mbox_dev = %s\n", dev_name(mbox_dev));
+	dev_info(dev, "Matched platform device: %s\n", dev_name(mbox_dev));
 
-	// 4. Extract mailbox controller
+	// 3. Retrieve mailbox controller from drvdata
 	mbox_ctrl = dev_get_drvdata(mbox_dev);
 	if (!mbox_ctrl) {
-		dev_err(dev, "dev_get_drvdata() returned NULL — mailbox controller not ready\n");
-		return ERR_PTR(-EPROBE_DEFER); // driver not yet ready
+		dev_err(dev, "dev_get_drvdata(%s) returned NULL — controller not ready\n", dev_name(mbox_dev));
+		return ERR_PTR(-EPROBE_DEFER);
 	}
 
-	dev_info(dev, "Mailbox controller found at %p (num_chans = %d)\n",
+	dev_info(dev, "Mailbox controller at %p (num_chans = %d)\n",
 	         mbox_ctrl, mbox_ctrl->num_chans);
 
+	// 4. Validate and return channel
 	if (index >= mbox_ctrl->num_chans) {
-		dev_err(dev, "Invalid mailbox index %d (max %d)\n",
+		dev_err(dev, "Invalid mbox-index %d (max = %d)\n",
 		        index, mbox_ctrl->num_chans - 1);
 		return ERR_PTR(-EINVAL);
 	}
 
-	// 5. Return pointer to mailbox channel
 	chan = &mbox_ctrl->chans[index];
 	return chan;
 }
-
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
