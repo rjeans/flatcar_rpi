@@ -24,6 +24,7 @@
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
 	int index;
+	struct acpi_device *adev;
 	struct device *mbox_dev;
 	struct mbox_controller *mbox_ctrl;
 	struct mbox_chan *chan;
@@ -35,33 +36,45 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	}
 	dev_info(dev, "Using mbox-index = %d\n", index);
 
-	// 2. Find the ACPI device with HID BCM2849
-	struct acpi_device *adev = acpi_dev_get_first_match_dev("BCM2849", NULL, -1);
+	// 2. Find ACPI device with HID "BCM2849"
+	adev = acpi_dev_get_first_match_dev("BCM2849", NULL, -1);
 	if (!adev) {
 		dev_err(dev, "Failed to find ACPI device with HID BCM2849\n");
 		return ERR_PTR(-ENODEV);
 	}
 
-	// 3. Get Linux device
-	dev_info(dev, "Resolved mbox_dev = %s\n", dev_name(mbox_dev));
-    mbox_ctrl = dev_get_drvdata(mbox_dev);
-    dev_info(dev, "dev_get_drvdata(mbox_dev) = %p\n", mbox_ctrl);if (!mbox_dev) {
+	// 3. Resolve to platform_device from ACPI
+	mbox_dev = acpi_get_first_physical_node(adev);
+	acpi_dev_put(adev); // release ACPI device ref immediately
+
+	if (!mbox_dev) {
 		dev_err(dev, "Failed to get platform device for BCM2849\n");
-		acpi_dev_put(adev);
 		return ERR_PTR(-ENODEV);
 	}
-	acpi_dev_put(adev); // drop reference
 
-	// 4. Extract mailbox controller and return channel
+	dev_info(dev, "Resolved mbox_dev = %s\n", dev_name(mbox_dev));
+
+	// 4. Extract mailbox controller
 	mbox_ctrl = dev_get_drvdata(mbox_dev);
-	if (!mbox_ctrl || index >= mbox_ctrl->num_chans) {
-		dev_err(dev, "Mailbox controller not ready or invalid index\n");
-		return ERR_PTR(-ENODEV);
+	if (!mbox_ctrl) {
+		dev_err(dev, "dev_get_drvdata() returned NULL — mailbox controller not ready\n");
+		return ERR_PTR(-EPROBE_DEFER); // driver not yet ready
 	}
 
+	dev_info(dev, "Mailbox controller found at %p (num_chans = %d)\n",
+	         mbox_ctrl, mbox_ctrl->num_chans);
+
+	if (index >= mbox_ctrl->num_chans) {
+		dev_err(dev, "Invalid mailbox index %d (max %d)\n",
+		        index, mbox_ctrl->num_chans - 1);
+		return ERR_PTR(-EINVAL);
+	}
+
+	// 5. Return pointer to mailbox channel
 	chan = &mbox_ctrl->chans[index];
 	return chan;
 }
+
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
@@ -132,10 +145,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
 	return ret;
 }
-if (!rpd->chan->cl) {
-	dev_warn(dev, "Warning: mailbox channel has no client assigned, assigning manually\n");
 	rpd->chan->cl = &rpd->mbox_client;
-}
+
 
 	dev_info(dev, "Mailbox channel acquired\n");
 
