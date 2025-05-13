@@ -63,6 +63,11 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct device *dev = rpd->mbox_client.dev;
 	u32 msg;
 
+    if (!rpd->chan || !rpd->chan->cl) {
+	dev_err(dev, "Cannot send message: NULL chan or client\n");
+	return -ENODEV;
+}
+
 	msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
 	dev_info(dev, "Sending firmware power %s for domain '%s': 0x%08X\n",
 	         enable ? "ON" : "OFF", rpd->name, msg);
@@ -112,6 +117,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.knows_txdone = false;
 
     rpd->chan = rpi_acpi_find_mbox_channel(dev);
+    rpd->chan->mbox=rpi_mbox_global;
     if (IS_ERR(rpd->chan)) {
 	ret = PTR_ERR(rpd->chan);
 	dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);

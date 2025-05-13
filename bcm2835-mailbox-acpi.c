@@ -165,6 +165,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to allocate memory for mailbox channels\n");
 		return -ENOMEM;
 	}
+    mbox->controller.chans[0].mbox = &mbox->controller;
+
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
