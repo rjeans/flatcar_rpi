@@ -19,14 +19,14 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 	struct mbox_chan *chan;
 
 	// Read mbox reference from ACPI _DSD
-	mbox_fwnode = fwnode_get_named_reference(dev_fwnode(dev), "mbox", 0);
-	if (!mbox_fwnode) {
+	mbox_fwnode = fwnode_find_reference(dev_fwnode(dev), "mbox", 0);
+	if (IS_ERR(mbox_fwnode)) {
 		dev_err(dev, "Failed to find ACPI mailbox fwnode\n");
-		return ERR_PTR(-ENOENT);
+		return ERR_CAST(mbox_fwnode);
 	}
 
 	// Get mbox controller device from the fwnode
-	struct device *mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, mbox_fwnode);
+	struct device *mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, mbox_fwnode);
 	fwnode_handle_put(mbox_fwnode);
 	if (!mbox_dev) {
 		dev_err(dev, "Failed to find mailbox device\n");
@@ -41,12 +41,17 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 		return ERR_PTR(-ENODEV);
 	}
 
-	// Assume single channel for now
-	chan = &mbox_ctrl->chans[0];
+	// Access the first channel
+	chan = mbox_request_channel(&mbox_ctrl->client);
+	if (IS_ERR(chan)) {
+		dev_err(dev, "Failed to request mailbox channel\n");
+		put_device(mbox_dev);
+		return chan;
+	}
+
 	put_device(mbox_dev);
 	return chan;
 }
-
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
