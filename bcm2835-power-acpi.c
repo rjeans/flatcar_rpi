@@ -117,7 +117,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 	return ret;
 }
 
-rpd->chan->cl = &rpd->mbox_client;
 
 	dev_info(dev, "Mailbox channel acquired\n");
 
