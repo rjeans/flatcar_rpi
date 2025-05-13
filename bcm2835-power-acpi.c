@@ -12,6 +12,8 @@
 #include <linux/platform_device.h>
 #include <linux/acpi.h>
 #include <linux/fwnode.h>
+#include <linux/mailbox_controller.h>
+
 
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 {
@@ -26,8 +28,7 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 		return ERR_CAST(mbox_fwnode);
 	}
 
-	mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, NULL, mbox_fwnode);
-	fwnode_handle_put(mbox_fwnode);
+    mbox_dev = bus_find_device_by_fwnode(&platform_bus_type, mbox_fwnode);	fwnode_handle_put(mbox_fwnode);
 	if (!mbox_dev) {
 		dev_err(dev, "Failed to find mailbox device\n");
 		return ERR_PTR(-ENODEV);
