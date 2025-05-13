@@ -142,7 +142,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 }
 
 static const struct acpi_device_id bcm2835_mbox_acpi_ids[] = {
-	{ "BCM2840", 0 }, // Matches your ACPI table
+	{ "BCM2849", 0 }, // Matches your ACPI table
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, bcm2835_mbox_acpi_ids);
