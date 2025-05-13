@@ -41,8 +41,8 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 		return ERR_PTR(-ENODEV);
 	}
 
-	// Access the first channel
-	chan = mbox_request_channel(&mbox_ctrl->client);
+	// Access the first channel using mbox_client
+	chan = mbox_request_channel(&mbox_ctrl->client, 0);
 	if (IS_ERR(chan)) {
 		dev_err(dev, "Failed to request mailbox channel\n");
 		put_device(mbox_dev);
