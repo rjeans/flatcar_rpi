@@ -131,7 +131,10 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
 	return ret;
 }
-
+if (!rpd->chan->cl) {
+	dev_warn(dev, "Warning: mailbox channel has no client assigned, assigning manually\n");
+	rpd->chan->cl = &rpd->mbox_client;
+}
 
 	dev_info(dev, "Mailbox channel acquired\n");
 
