@@ -182,16 +182,16 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.chans = devm_kcalloc(dev, 1, sizeof(struct mbox_chan), GFP_KERNEL);
 	if (!mbox->controller.chans)
 		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
+	/* Initialize mailbox client */
+    mbox->client.dev = dev;
+    mbox->client.tx_block = false;
+    mbox->client.knows_txdone = true;
 
 mbox->controller.chans[0].cl = &mbox->client;
 mbox->controller.chans[0].mbox = &mbox->controller;
 init_completion(&mbox->controller.chans[0].tx_complete);
 
 
-	/* Initialize mailbox client */
-    mbox->client.dev = dev;
-    mbox->client.tx_block = false;
-    mbox->client.knows_txdone = true;
 
 
 
