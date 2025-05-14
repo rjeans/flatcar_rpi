@@ -201,6 +201,10 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	rpi_mbox_global = &mbox->controller;
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
 
+		dev_info(dev, "ACPI mbox driver sees chan = %px, cl = %px\n",
+    rpi_mbox_chan0, rpi_mbox_chan0 ? rpi_mbox_chan0->cl : NULL);
+
+
 	platform_set_drvdata(pdev, mbox);
 
 	dev_info(dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
