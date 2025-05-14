@@ -116,15 +116,18 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = false;
 
+	
+
+
     rpd->chan = rpi_acpi_find_mbox_channel(dev);
     if (IS_ERR(rpd->chan)) {
         ret = PTR_ERR(rpd->chan);
         dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
         return ret;
     }
-    rpd->chan->mbox = rpi_mbox_global;
+    
     rpd->chan->cl = &rpd->mbox_client;
-	rpd->chan->cl = &rpd->mbox_client;
+
 
 
 	dev_info(dev, "Mailbox channel acquired\n");
