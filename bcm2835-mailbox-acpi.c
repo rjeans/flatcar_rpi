@@ -57,22 +57,19 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
 static int bcm2835_send_data(struct mbox_chan *link, void *data)
 {
-	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
+	if (!link || !link->mbox || !data) {
+		pr_err("bcm2835-mbox: invalid arguments in send_data: link=%p, link->mbox=%p, data=%p\n",
+		       link, link ? link->mbox : NULL, data);
+		return -EINVAL;
+	}
+
+	struct bcm2835_mbox *mbox = container_of(link->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
 
 	dev_info(mbox->controller.dev, "SEND_DATA called with 0x%08X\n", msg);
 
-
-	if (!data) {
-		dev_err(mbox->controller.dev, "No data to send\n");
-		return -EINVAL;
-	}
-
-	dev_dbg(mbox->controller.dev, "Sending data: 0x%08X\n", msg);
-
 	spin_lock(&mbox->lock);
 
-	// Wait until mailbox is not full
 	while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
 		cpu_relax();
 
@@ -81,11 +78,14 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 
 	spin_unlock(&mbox->lock);
 
-	// Notify the mailbox framework that the transmission is complete
-	dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
-         link, link->mbox);
-	mbox_chan_txdone(link, 0);  // 0 = success
-    dev_info(mbox->controller.dev, "Successfully called mbox_chan_txdone\n");
+	// Notify mailbox subsystem if required
+	if (link->cl && link->cl->tx_block && !link->cl->knows_txdone) {
+		dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
+		         link, link->mbox);
+		mbox_chan_txdone(link, 0);
+		dev_info(mbox->controller.dev, "Successfully called mbox_chan_txdone\n");
+	}
+
 	return 0;
 }
 
