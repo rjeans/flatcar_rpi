@@ -189,6 +189,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 mbox->controller.chans[0].cl = &mbox->client;
 mbox->controller.chans[0].mbox = &mbox->controller;
+
+dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
+
 init_completion(&mbox->controller.chans[0].tx_complete);
 
 
@@ -202,12 +205,14 @@ init_completion(&mbox->controller.chans[0].tx_complete);
 
 	/* Global references for ACPI power driver */
 
-	    mbox->controller.chans[0].cl = &mbox->client;
+	
 
-    dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
+    
 
 	rpi_mbox_global = &mbox->controller;
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
+	mbox_chan_get(rpi_mbox_chan0);  // increment use count
+   
 
 		dev_info(dev, "ACPI mbox driver sees chan = %px, cl = %px\n",
     rpi_mbox_chan0, rpi_mbox_chan0 ? rpi_mbox_chan0->cl : NULL);
@@ -216,6 +221,24 @@ init_completion(&mbox->controller.chans[0].tx_complete);
 	platform_set_drvdata(pdev, mbox);
 
 	dev_info(dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
+	return 0;
+}
+
+static int bcm2835_mbox_remove(struct platform_device *pdev)
+{
+	struct bcm2835_mbox *mbox = platform_get_drvdata(pdev);
+
+	dev_info(&pdev->dev, "Removing BCM2835 mailbox driver\n");
+
+	mbox_chan_put(rpi_mbox_chan0);  
+
+
+	/* Unregister the mailbox controller */
+	devm_mbox_controller_unregister(&pdev->dev, &mbox->controller);
+
+	/* Free the allocated resources */
+	devm_kfree(&pdev->dev, mbox);
+
 	return 0;
 }
 
