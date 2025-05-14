@@ -60,15 +60,30 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
 	u32 msg = *(u32 *)data;
 
+	if (!data) {
+		dev_err(mbox->controller.dev, "No data to send\n");
+		return -EINVAL;
+	}
+
 	dev_dbg(mbox->controller.dev, "Sending data: 0x%08X\n", msg);
 
 	spin_lock(&mbox->lock);
+
+	// Wait until mailbox is not full
+	while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
+		cpu_relax();
+
 	writel(msg, mbox->regs + MAIL1_WRT);
 	dev_dbg(mbox->controller.dev, "Data 0x%08X written to MAIL1_WRT\n", msg);
+
 	spin_unlock(&mbox->lock);
+
+	// Notify the mailbox framework that the transmission is complete
+	mbox_chan_txdone(link, 0);  // 0 = success
 
 	return 0;
 }
+
 
 static int bcm2835_startup(struct mbox_chan *link)
 {
