@@ -24,7 +24,7 @@
 extern struct mbox_controller *rpi_mbox_global;
 
 
-struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
+struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_client *cl)
 {
 	int index;
 
@@ -44,9 +44,12 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return &rpi_mbox_global->chans[index];
-}
+	struct mbox_chan *chan = &rpi_mbox_global->chans[index];
+	chan->mbox = rpi_mbox_global;
+	chan->cl = cl;
 
+	return chan;
+}
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
@@ -126,8 +129,6 @@ static int rpi_power_probe(struct platform_device *pdev)
         return ret;
     }
     
-    rpd->chan->cl = &rpd->mbox_client;
-
 
 
 	dev_info(dev, "Mailbox channel acquired\n");
