@@ -104,6 +104,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
     rpd->mbox_client.tx_block = true;
     rpd->mbox_client.knows_txdone = true;  
+	rpd->mbox_client.fwnode = dev_fwnode(dev);
 	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
 	rpd->chan = mbox_request_channel(&rpd->mbox_client, 0);
