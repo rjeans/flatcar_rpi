@@ -50,6 +50,11 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct device *dev = rpd->mbox_client.dev;
 	u32 msg;
 
+	dev_info(rpd->mbox_client.dev,
+    "Sending message: chan=%px, chan->cl=%px\n",
+    rpd->chan, rpd->chan ? rpd->chan->cl : NULL);
+
+
     if (!rpd->chan || !rpd->chan->cl) {
 	dev_err(dev, "Cannot send message: NULL chan or client\n");
 	return -ENODEV;
@@ -113,6 +118,10 @@ static int rpi_power_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
 		return ret;
 	}
+
+	dev_info(dev, "ACPI power driver sees chan = %px, cl = %px\n",
+    rpd->chan, rpd->chan ? rpd->chan->cl : NULL);
+
 
 	dev_info(dev, "Mailbox channel acquired\n");
 

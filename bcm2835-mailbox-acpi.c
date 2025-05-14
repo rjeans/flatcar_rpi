@@ -190,6 +190,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     mbox->controller.chans[0].cl = &mbox->client;
 
+    dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
 
 	/* Register the mailbox controller */
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
