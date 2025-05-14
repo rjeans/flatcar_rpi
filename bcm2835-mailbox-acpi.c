@@ -12,6 +12,8 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/property.h>
+#include <linux/mailbox_client.h>
+
 
 #define MAIL0_RD    0x00
 #define MAIL0_STA   0x18
