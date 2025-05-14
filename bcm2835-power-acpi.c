@@ -106,7 +106,7 @@ static int rpi_power_probe(struct platform_device *pdev)
     rpd->mbox_client.knows_txdone = true;  
 	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
-	rpd->chan = mbox_request_channel(&rpd->mbox_client, 0);
+	rpd->chan = mbox_request_channel_byname(&rpd->mbox_client, "property");
 if (IS_ERR(rpd->chan)) {
 	dev_err(dev, "Failed to acquire mailbox channel: %ld\n", PTR_ERR(rpd->chan));
 	return PTR_ERR(rpd->chan);

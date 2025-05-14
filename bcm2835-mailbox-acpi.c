@@ -180,6 +180,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	if (!mbox->controller.chans)
 		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
 	/* Initialize mailbox client */
+	mbox->controller.chans[0].mbox = &mbox->controller;
+    mbox->controller.chans[0].con_id = "property"; 
     mbox->client.dev = dev;
     mbox->client.tx_block = false;
     mbox->client.knows_txdone = true;
