@@ -23,15 +23,7 @@
 
 
 
-struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_client *cl)
-{
-	if (!rpi_mbox_global || !rpi_mbox_chan0) {
-		dev_err(dev, "Global mailbox controller not ready\n");
-		return ERR_PTR(-EPROBE_DEFER);
-	}
 
-	return rpi_mbox_chan0;
-}
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
@@ -39,6 +31,7 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_cli
 struct rpi_power_domain {
 	struct generic_pm_domain genpd;
 	struct mbox_chan *chan;
+	struct mbox_client *mbox_client;
 	const char *name;
 };
 
@@ -47,7 +40,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct device *dev = rpd->mbox_client.dev;
 	u32 msg;
 
-	dev_info(rpd->mbox_client.dev,
+	dev_info(dev,
     "Sending message: chan=%px, chan->cl=%px\n",
     rpd->chan, rpd->chan ? rpd->chan->cl : NULL);
 
@@ -119,6 +112,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_info(dev, "Mailbox channel acquired\n");
 
 	// Setup generic power domain
+	rpd->mbox_client.dev = dev;
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;

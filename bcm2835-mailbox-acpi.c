@@ -217,7 +217,7 @@ dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
 
 static int bcm2835_mbox_remove(struct platform_device *pdev)
 {
-	struct bcm2835_mbox *mbox = platform_get_drvdata(pdev);
+	
 
 	dev_info(&pdev->dev, "Removing BCM2835 mailbox driver\n");
 
