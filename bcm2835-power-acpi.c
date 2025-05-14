@@ -31,13 +31,13 @@
 struct rpi_power_domain {
 	struct generic_pm_domain genpd;
 	struct mbox_chan *chan;
-	struct mbox_client *mbox_client;
+	struct device *dev;
 	const char *name;
 };
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
-	struct device *dev = rpd->mbox_client->dev;
+	struct device *dev = rpd->dev;
 	u32 msg;
 
 	dev_info(dev,
@@ -112,7 +112,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_info(dev, "Mailbox channel acquired\n");
 
 	// Setup generic power domain
-	rpd->mbox_client.dev = dev;
+	rpd->dev = dev;
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;
