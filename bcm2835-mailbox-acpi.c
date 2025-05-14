@@ -211,8 +211,7 @@ init_completion(&mbox->controller.chans[0].tx_complete);
 
 	rpi_mbox_global = &mbox->controller;
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
-	mbox_chan_get(rpi_mbox_chan0);  // increment use count
-   
+  
 
 		dev_info(dev, "ACPI mbox driver sees chan = %px, cl = %px\n",
     rpi_mbox_chan0, rpi_mbox_chan0 ? rpi_mbox_chan0->cl : NULL);
@@ -230,7 +229,6 @@ static int bcm2835_mbox_remove(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Removing BCM2835 mailbox driver\n");
 
-	mbox_chan_put(rpi_mbox_chan0);  
 
 
 	/* Unregister the mailbox controller */
@@ -251,6 +249,7 @@ MODULE_DEVICE_TABLE(acpi, bcm2835_mbox_acpi_ids);
 
 static struct platform_driver bcm2835_mbox_driver = {
 	.probe  = bcm2835_mbox_probe,
+	.remove = bcm2835_mbox_remove,
 	.driver = {
 		.name = "bcm2835-mbox-acpi",
 		.acpi_match_table = bcm2835_mbox_acpi_ids,
