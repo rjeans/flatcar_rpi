@@ -180,7 +180,12 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
-
+    mbox->controller.chans = devm_kcalloc(dev,
+    mbox->controller.num_chans,
+    sizeof(struct mbox_chan),
+    GFP_KERNEL);
+    if (!mbox->controller.chans)
+	    return -ENOMEM;
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
