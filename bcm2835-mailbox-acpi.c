@@ -180,11 +180,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
-ret = devm_mbox_controller_register(dev, &mbox->controller);
-	if (ret) {
-		dev_err(dev, "Failed to register mailbox controller: %d\n", ret);
-		return ret;
-	}
+
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
