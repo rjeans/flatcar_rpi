@@ -60,6 +60,9 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
 	u32 msg = *(u32 *)data;
 
+	dev_info(mbox->controller.dev, "SEND_DATA called with 0x%08X\n", msg);
+
+
 	if (!data) {
 		dev_err(mbox->controller.dev, "No data to send\n");
 		return -EINVAL;
@@ -168,8 +171,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	}
 
 	dev_dbg(dev, "Initializing mailbox controller\n");
-	mbox->controller.txdone_poll = true;
-	mbox->controller.txpoll_period = 5;
 	mbox->controller.ops = &bcm2835_mbox_chan_ops;
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
