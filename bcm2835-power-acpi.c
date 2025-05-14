@@ -65,11 +65,15 @@ if (ret < 0) {
 	dev_err(dev, "Failed to send message: %d\n", ret);
 	return ret;
 }
+dev_info(dev, "Waiting for completion timeout...\n");
 
 if (!wait_for_completion_timeout(&rpd->chan->tx_complete, msecs_to_jiffies(100))) {
 	dev_err(dev, "Timeout waiting for mailbox tx completion\n");
 	return -ETIMEDOUT;
 }
+	dev_info(dev, "Mailbox tx completed successfully\n");
+
+
 
 return 0;
 
@@ -118,7 +122,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	rpd->mbox_client.dev = dev;
     rpd->mbox_client.tx_block = true;
-    rpd->mbox_client.knows_txdone = true;  
+    rpd->mbox_client.knows_txdone = false;  
 	//rpd->mbox_client.fwnode = dev_fwnode(dev);
 	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
