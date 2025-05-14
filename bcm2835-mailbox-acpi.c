@@ -207,7 +207,7 @@ init_completion(&mbox->controller.chans[0].tx_complete);
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
 
 	dev_info(dev, "rpi_mbox_chan0 = %px\n", rpi_mbox_chan0);
-	dev_info(dev, "mbox->controller.chans[0] = %px\n", mbox->controller.chans[0]);
+
 
 
 
