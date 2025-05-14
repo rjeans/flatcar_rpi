@@ -97,6 +97,9 @@ dev_info(mbox->controller.dev, "chan->mbox = %px\n", link->mbox);
 
 
 
+dev_info(mbox->controller.dev,
+         "TXDONE on chan = %px, tx_complete = %px\n",
+         link, &link->tx_complete);
 
 
 	
@@ -180,13 +183,15 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	if (!mbox->controller.chans)
 		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
 
-	init_completion(&mbox->controller.chans[0].tx_complete);
-	mbox->controller.chans[0].mbox = &mbox->controller;
+mbox->controller.chans[0].cl = &mbox->client;
+mbox->controller.chans[0].mbox = &mbox->controller;
+init_completion(&mbox->controller.chans[0].tx_complete);
+
 
 	/* Initialize mailbox client */
     mbox->client.dev = dev;
-    mbox->client.tx_block = true;
-    mbox->client.knows_txdone = false;
+    mbox->client.tx_block = false;
+    mbox->client.knows_txdone = true;
 
 
 
@@ -200,7 +205,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	    mbox->controller.chans[0].cl = &mbox->client;
 
     dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
-	
+
 	rpi_mbox_global = &mbox->controller;
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
 

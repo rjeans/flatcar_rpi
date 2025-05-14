@@ -64,6 +64,10 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	dev_info(dev, "Sending firmware power %s for domain '%s': 0x%08X\n",
 	         enable ? "ON" : "OFF", rpd->name, msg);
 
+			 dev_info(dev, "Power driver: sending via chan = %px, tx_complete = %px\n",
+         rpd->chan, &rpd->chan->tx_complete);
+
+
 	return mbox_send_message(rpd->chan, &msg);
 }
 
