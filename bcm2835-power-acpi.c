@@ -31,13 +31,13 @@
 struct rpi_power_domain {
 	struct generic_pm_domain genpd;
 	struct mbox_chan *chan;
-	struct device *dev;
+	struct mbox_client mbox_client;
 	const char *name;
 };
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
-	struct device *dev = rpd->dev;
+	struct device *dev = rpd->mbox_client.dev;
 	u32 msg;
 
 	dev_info(dev,
@@ -101,8 +101,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 	if (device_property_read_u32(dev, "rpi,active", &active))
 		active = 0;
 
+		rpd->mbox_client.dev = dev;
+        rpd->mbox_client.tx_block = true;
+        rpd->mbox_client.knows_txdone = true;  
+	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
-	rpd->chan = mbox_request_channel_byname(dev, "property");
+	rpd->chan = mbox_request_channel_byname(&rpd->mbox_client, "property");
 	if (IS_ERR(rpd->chan)) {
 		ret = PTR_ERR(rpd->chan);
 		dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
@@ -112,7 +116,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_info(dev, "Mailbox channel acquired\n");
 
 	// Setup generic power domain
-	rpd->dev = dev;
+
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;
