@@ -196,12 +196,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
-	mbox->controller.chans = devm_kcalloc(dev,
-    mbox->controller.num_chans,
-    sizeof(struct mbox_chan),
-    GFP_KERNEL);
-if (!mbox->controller.chans)
-    return -ENOMEM;
+
 
 rpi_mbox_global = &mbox->controller;
 rpi_mbox_chan0 = &mbox->controller.chans[0]; // Set the global pointer to the mailbox channel
