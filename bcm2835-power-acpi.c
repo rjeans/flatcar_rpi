@@ -21,8 +21,6 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 
-extern struct mbox_controller *rpi_mbox_global;
-extern struct mbox_chan *rpi_mbox_chan0;
 
 
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_client *cl)
@@ -40,7 +38,6 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_cli
 
 struct rpi_power_domain {
 	struct generic_pm_domain genpd;
-	struct mbox_client mbox_client;
 	struct mbox_chan *chan;
 	const char *name;
 };
@@ -87,7 +84,6 @@ static void rpi_power_release(struct device *dev)
 {
 	dev_info(dev, "Released power domain device\n");
 }
-
 static int rpi_power_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -101,7 +97,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	if (!rpd)
 		return -ENOMEM;
 
-	// Required: name of the firmware power domain ("pwm", "vec", etc.)
+	// Required: power domain name (e.g. "pwm", "vec")
 	if (device_property_read_string(dev, "rpi,devicename", &rpd->name)) {
 		dev_err(dev, "Missing required property 'rpi,devicename'\n");
 		return -EINVAL;
@@ -112,24 +108,17 @@ static int rpi_power_probe(struct platform_device *pdev)
 	if (device_property_read_u32(dev, "rpi,active", &active))
 		active = 0;
 
-	rpd->mbox_client.dev = dev;
-	rpd->mbox_client.tx_block = true;
-	rpd->mbox_client.knows_txdone = false;
-
-	rpd->chan = rpi_acpi_find_mbox_channel(dev, &rpd->mbox_client);
+	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
+	rpd->chan = mbox_request_channel_byname(dev, "property");
 	if (IS_ERR(rpd->chan)) {
 		ret = PTR_ERR(rpd->chan);
 		dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
 		return ret;
 	}
 
-	dev_info(dev, "ACPI power driver sees chan = %px, cl = %px\n",
-    rpd->chan, rpd->chan ? rpd->chan->cl : NULL);
-
-
 	dev_info(dev, "Mailbox channel acquired\n");
 
-	// Configure GENPD
+	// Setup generic power domain
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;
@@ -139,6 +128,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	ret = pm_genpd_init(&rpd->genpd, NULL, false);
 	if (ret) {
 		dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
+		mbox_free_channel(rpd->chan);
 		return ret;
 	}
 
@@ -146,6 +136,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "Failed to add device to power domain: %d\n", ret);
 		pm_genpd_remove(&rpd->genpd);
+		mbox_free_channel(rpd->chan);
 		return ret;
 	}
 
@@ -165,14 +156,16 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 static int rpi_power_remove(struct platform_device *pdev)
 {
-	struct rpi_power_domain *rpd = dev_get_drvdata(&pdev->dev);
+	struct rpi_power_domain *rpd = platform_get_drvdata(pdev);
 
 	pm_genpd_remove_device(&pdev->dev);
 	pm_genpd_remove(&rpd->genpd);
 
+	if (rpd->chan)
+		mbox_free_channel(rpd->chan);
+
 	return 0;
 }
-
 
 
 static const struct acpi_device_id rpi_power_acpi_ids[] = {

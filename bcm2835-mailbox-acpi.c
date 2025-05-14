@@ -25,10 +25,7 @@
 #define ARM_MS_EMPTY    BIT(30)
 #define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
-struct mbox_controller *rpi_mbox_global = NULL;
-struct mbox_chan *rpi_mbox_chan0 = NULL;
-EXPORT_SYMBOL(rpi_mbox_global);
-EXPORT_SYMBOL(rpi_mbox_chan0);
+
 
 struct bcm2835_mbox {
 	void __iomem *regs;
@@ -209,12 +206,7 @@ dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
 
     
 
-	rpi_mbox_global = &mbox->controller;
-	rpi_mbox_chan0 = &mbox->controller.chans[0];
-  
 
-		dev_info(dev, "ACPI mbox driver sees chan = %px, cl = %px\n",
-    rpi_mbox_chan0, rpi_mbox_chan0 ? rpi_mbox_chan0->cl : NULL);
 
 
 	platform_set_drvdata(pdev, mbox);
@@ -230,12 +222,6 @@ static int bcm2835_mbox_remove(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Removing BCM2835 mailbox driver\n");
 
 
-
-	/* Unregister the mailbox controller */
-	devm_mbox_controller_unregister(&pdev->dev, &mbox->controller);
-
-	/* Free the allocated resources */
-	devm_kfree(&pdev->dev, mbox);
 
 	return 0;
 }
