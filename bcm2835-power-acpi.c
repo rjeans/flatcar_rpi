@@ -39,6 +39,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
 	struct device *dev = rpd->mbox_client.dev;
 	u32 msg;
+	int ret_val,ret;
 
 	dev_info(dev,
     "Sending message: chan=%px, chan->cl=%px\n",
@@ -57,8 +58,22 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 			 dev_info(dev, "Power driver: sending via chan = %px, tx_complete = %px\n",
          rpd->chan, &rpd->chan->tx_complete);
 
+    reinit_completion(&rpd->chan->tx_complete);  // ← THIS IS ESSENTIAL
 
-	return mbox_send_message(rpd->chan, &msg);
+	ret= mbox_send_message(rpd->chan, &msg);
+if (ret < 0) {
+	dev_err(dev, "Failed to send message: %d\n", ret);
+	return ret;
+}
+
+if (!wait_for_completion_timeout(&rpd->chan->tx_complete, msecs_to_jiffies(100))) {
+	dev_err(dev, "Timeout waiting for mailbox tx completion\n");
+	return -ETIMEDOUT;
+}
+
+return 0;
+
+
 }
 
 static int rpi_power_on(struct generic_pm_domain *genpd)
