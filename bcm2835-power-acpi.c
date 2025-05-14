@@ -37,7 +37,7 @@ struct rpi_power_domain {
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
-	struct device *dev = rpd->mbox_client.dev;
+	struct device *dev = rpd->mbox_client->dev;
 	u32 msg;
 
 	dev_info(dev,
