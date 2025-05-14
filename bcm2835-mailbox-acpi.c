@@ -187,14 +187,14 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->client.tx_block = false;
     mbox->client.knows_txdone = true;
 
+
+
+init_completion(&mbox->controller.chans[0].tx_complete);
+
 mbox->controller.chans[0].cl = &mbox->client;
 mbox->controller.chans[0].mbox = &mbox->controller;
 
 dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
-
-init_completion(&mbox->controller.chans[0].tx_complete);
-
-
 
 
 
