@@ -78,6 +78,9 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 
 	spin_unlock(&mbox->lock);
 
+	dev_info(mbox->controller.dev, "chan=%p, &tx_complete=%p\n",
+         link, &link->tx_complete);
+
 	// Notify mailbox subsystem if required
 	
 		dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
@@ -177,14 +180,11 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
-	mbox->controller.chans = devm_kzalloc(dev,
-		sizeof(*mbox->controller.chans), GFP_KERNEL);
-	if (!mbox->controller.chans) {
-		dev_err(dev, "Failed to allocate memory for mailbox channels\n");
-		return -ENOMEM;
+ret = devm_mbox_controller_register(dev, &mbox->controller);
+	if (ret) {
+		dev_err(dev, "Failed to register mailbox controller: %d\n", ret);
+		return ret;
 	}
-    mbox->controller.chans[0].mbox = &mbox->controller;
-
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
