@@ -152,8 +152,10 @@ static int rpi_power_probe(struct platform_device *pdev)
 	genpd_data->domains[0] = &rpd->genpd;
 
 	ret = of_genpd_add_provider_onecell(dev->of_node, genpd_data);
-	if (ret)
+	if (ret) {
 		dev_warn(dev, "GENPD registration failed: %d (continuing)\n", ret);
+		return ret;
+	}
 
 	// Power on immediately if requested
 	if (active) {
