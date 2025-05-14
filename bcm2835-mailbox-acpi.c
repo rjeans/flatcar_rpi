@@ -188,9 +188,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->client.tx_block = true;
     mbox->client.knows_txdone = false;
 
-    mbox->controller.chans[0].cl = &mbox->client;
 
-    dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
 
 	/* Register the mailbox controller */
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
@@ -198,6 +196,11 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, ret, "Failed to register mailbox controller\n");
 
 	/* Global references for ACPI power driver */
+
+	    mbox->controller.chans[0].cl = &mbox->client;
+
+    dev_info(dev, "Assigned chan->cl = %px\n", &mbox->client);
+	
 	rpi_mbox_global = &mbox->controller;
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
 
