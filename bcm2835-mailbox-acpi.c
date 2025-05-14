@@ -106,6 +106,12 @@ dev_info(mbox->controller.dev,
 		         link, link->mbox);
 		mbox_chan_txdone(link, 0);
 		dev_info(mbox->controller.dev, "Successfully called mbox_chan_txdone\n");
+
+		complete(&link->tx_complete);
+		dev_info(mbox->controller.dev, "Completion signaled\n");
+		dev_info(mbox->controller.dev, "tx_complete = %px\n", &link->tx_complete);
+		dev_info(mbox->controller.dev, "tx_complete->done = %px\n", &link->tx_complete.done);
+		dev_info(mbox->controller.dev, "tx_complete->done = %d\n", link->tx_complete.done);
 	
 
 	return 0;
