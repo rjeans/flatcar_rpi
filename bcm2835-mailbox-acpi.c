@@ -95,11 +95,8 @@ dev_info(mbox->controller.dev,
 dev_info(mbox->controller.dev, "chan->mbox = %px\n", link->mbox);
 
 
-if (!completion_done(&link->tx_complete)) {
-	dev_warn(mbox->controller.dev, "tx_complete not marked yet\n");
-}
 
-memset(&link->tx_complete, 0x55, sizeof(link->tx_complete));  // trap bad access
+
 
 
 	
