@@ -180,7 +180,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.ops = &bcm2835_mbox_chan_ops;
 	mbox->controller.txdone_irq = false;
-	mbox->controller.txdone_by_ack = true;
+	
 mbox->controller.txdone_poll = false;
 
 
