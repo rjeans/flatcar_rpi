@@ -45,7 +45,7 @@ struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_cli
 		return ERR_PTR(-EINVAL);
 	}
 
-	struct mbox_chan *chan = &rpi_mbox_chan0;
+	struct mbox_chan *chan = rpi_mbox_chan0;
 	chan->mbox = rpi_mbox_global;
 
 	chan->cl = cl;
