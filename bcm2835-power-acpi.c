@@ -27,30 +27,12 @@ extern struct mbox_chan *rpi_mbox_chan0;
 
 struct mbox_chan *rpi_acpi_find_mbox_channel(struct device *dev, struct mbox_client *cl)
 {
-	int index;
-
-	if (device_property_read_u32(dev, "mbox-index", &index)) {
-		dev_err(dev, "Missing or invalid 'mbox-index' property\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	if (!rpi_mbox_global) {
+	if (!rpi_mbox_global || !rpi_mbox_chan0) {
 		dev_err(dev, "Global mailbox controller not ready\n");
 		return ERR_PTR(-EPROBE_DEFER);
 	}
 
-	if (index >= rpi_mbox_global->num_chans) {
-		dev_err(dev, "Invalid mbox-index %d (max = %d)\n",
-		        index, rpi_mbox_global->num_chans - 1);
-		return ERR_PTR(-EINVAL);
-	}
-
-	struct mbox_chan *chan = rpi_mbox_chan0;
-	chan->mbox = rpi_mbox_global;
-
-	chan->cl = cl;
-
-	return chan;
+	return rpi_mbox_chan0;
 }
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)

@@ -160,72 +160,56 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 	dev_info(dev, "Probing BCM2835 mailbox driver\n");
 
+	/* Allocate and initialize private data */
 	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-	if (!mbox) {
-		dev_err(dev, "Failed to allocate memory for mailbox structure\n");
-		return -ENOMEM;
-	}
+	if (!mbox)
+		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox struct\n");
 
 	spin_lock_init(&mbox->lock);
 
-	dev_dbg(dev, "Requesting memory region from ACPI-defined _CRS\n");
+	/* Map MMIO region from ACPI _CRS */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mbox->regs = devm_ioremap_resource(dev, res);
-	if (IS_ERR(mbox->regs)) {
-		dev_err(dev, "Failed to map memory resource\n");
-		return PTR_ERR(mbox->regs);
-	}
+	if (IS_ERR(mbox->regs))
+		return dev_err_probe(dev, PTR_ERR(mbox->regs), "Failed to map MMIO resource\n");
 
-	dev_dbg(dev, "Getting IRQ from ACPI-defined _CRS\n");
+	/* Set up IRQ from ACPI _CRS */
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0) {
-		dev_err(dev, "Failed to get IRQ: %d\n", irq);
-		return irq;
-	}
+	if (irq < 0)
+		return dev_err_probe(dev, irq, "Failed to retrieve IRQ\n");
 
-	dev_dbg(dev, "Requesting IRQ %d\n", irq);
 	ret = devm_request_irq(dev, irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND,
 	                       dev_name(dev), mbox);
-	if (ret) {
-		dev_err(dev, "Failed to request IRQ %d: %d\n", irq, ret);
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to request IRQ %d\n", irq);
 
-	dev_dbg(dev, "Initializing mailbox controller\n");
-	mbox->controller.ops = &bcm2835_mbox_chan_ops;
-	mbox->controller.dev = dev;
+	/* Prepare mailbox channel */
 	mbox->controller.num_chans = 1;
+	mbox->controller.dev = dev;
+	mbox->controller.ops = &bcm2835_mbox_chan_ops;
 
-mbox->controller.chans = devm_kcalloc(dev, 1, sizeof(struct mbox_chan), GFP_KERNEL);
-if (!mbox->controller.chans) {
-	dev_err(dev, "Failed to allocate memory for mailbox channels\n");
-	return -ENOMEM;
-}
+	mbox->controller.chans = devm_kcalloc(dev, 1, sizeof(struct mbox_chan), GFP_KERNEL);
+	if (!mbox->controller.chans)
+		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
 
-init_completion(&mbox->controller.chans[0].tx_complete);
-mbox->controller.chans[0].mbox = &mbox->controller;
+	init_completion(&mbox->controller.chans[0].tx_complete);
+	mbox->controller.chans[0].mbox = &mbox->controller;
 
+	/* Register the mailbox controller */
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
-	if (ret) {
-		dev_err(dev, "Failed to register mailbox controller: %d\n", ret);
-		return ret;
-	}
+	if (ret)
+		return dev_err_probe(dev, ret, "Failed to register mailbox controller\n");
 
-rpi_mbox_global = &mbox->controller;
-rpi_mbox_chan0 = &mbox->controller.chans[0]; // Set the global pointer to the mailbox channel
-
-
+	/* Global references for ACPI power driver */
+	rpi_mbox_global = &mbox->controller;
+	rpi_mbox_chan0 = &mbox->controller.chans[0];
 
 	platform_set_drvdata(pdev, mbox);
-
-	dev_info(dev, "platform_set_drvdata confirmed: %p\n", dev_get_drvdata(&pdev->dev));
-
-    rpi_mbox_global = &mbox->controller; // Set the global pointer to the mailbox controller
-	dev_info(dev, "Global mailbox controller set: %p\n", rpi_mbox_global);
 
 	dev_info(dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
 	return 0;
 }
+
 
 static const struct acpi_device_id bcm2835_mbox_acpi_ids[] = {
 	{ "BCM2849", 0 }, // Matches your ACPI table
