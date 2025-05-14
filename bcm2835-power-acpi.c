@@ -94,7 +94,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rpi_power_domain *rpd;
-	struct genpd_onecell_data *genpd_data;
 	u32 active;
 	int ret;
 
@@ -145,7 +144,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	return ret;
 }
 
-   ret = dev_pm_domain_attach(dev, &rpd->genpd);
+   ret = dev_pm_domain_attach(dev, (void *)&rpd->genpd);
    if (ret) {
 	dev_err(dev, "Failed to attach device to power domain: %d\n", ret);
 	pm_genpd_remove(&rpd->genpd);  // Clean up on failure
