@@ -93,6 +93,13 @@ static void rpi_power_release(struct device *dev)
 	dev_info(dev, "Released power domain device\n");
 }
 
+static void rpi_mbox_tx_done(struct mbox_client *cl, void *msg, int r)
+{
+    struct device *dev = cl->dev;
+    dev_info(dev, "tx_done callback called\n");
+    complete(&rpi_mbox_chan0->tx_complete);
+}
+
 // Probe function for the power domain driver
 static int rpi_power_probe(struct platform_device *pdev)
 {
@@ -123,6 +130,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
+	rpd->mbox_client.tx_done = rpi_mbox_tx_done;
+
 
 	// Acquire the mailbox channel
 	rpd->chan = rpi_mbox_chan0;
