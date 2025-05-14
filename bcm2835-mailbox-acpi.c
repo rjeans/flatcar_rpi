@@ -129,7 +129,7 @@ static const struct mbox_chan_ops bcm2835_mbox_chan_ops = {
 	.send_data     = bcm2835_send_data,
 	.startup       = bcm2835_startup,
 	.shutdown      = bcm2835_shutdown,
-	.last_tx_done  = bcm2835_last_tx_done
+
 };
 
 static int bcm2835_mbox_probe(struct platform_device *pdev)
