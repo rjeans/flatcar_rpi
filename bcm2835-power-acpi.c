@@ -113,11 +113,8 @@ if (IS_ERR(rpd->chan)) {
 	return PTR_ERR(rpd->chan);
 }
 
-ret = __mbox_bind_client(rpd->chan, &rpd->mbox_client);
-if (ret) {
-	dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
-	return ret;
-}
+init_completion(&rpd->chan->tx_complete);    // ← binds the TX completion handler
+rpd->chan->cl = &rpd->mbox_client;           // ← binds your client to the channel
 
 	dev_info(dev, "Mailbox channel acquired\n");
 
