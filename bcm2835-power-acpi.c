@@ -139,23 +139,18 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->genpd.power_off = rpi_power_off;
 	rpd->genpd.flags = GENPD_FLAG_PM_CLK | GENPD_FLAG_ALWAYS_ON;
 
-	// Register as a single power domain (onecell)
-	genpd_data = devm_kzalloc(dev, sizeof(*genpd_data), GFP_KERNEL);
-	if (!genpd_data)
-		return -ENOMEM;
+	ret = pm_genpd_init(&rpd->genpd, NULL, false);
+    if (ret) {
+	dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
+	return ret;
+}
 
-	genpd_data->domains = devm_kzalloc(dev, sizeof(struct generic_pm_domain *), GFP_KERNEL);
-	if (!genpd_data->domains)
-		return -ENOMEM;
-
-	genpd_data->num_domains = 1;
-	genpd_data->domains[0] = &rpd->genpd;
-
-	ret = of_genpd_add_provider_onecell(dev->of_node, genpd_data);
-	if (ret) {
-		dev_warn(dev, "GENPD registration failed: %d (continuing)\n", ret);
-		return ret;
-	}
+   ret = dev_pm_domain_attach(dev, &rpd->genpd);
+   if (ret) {
+	dev_err(dev, "Failed to attach device to power domain: %d\n", ret);
+	pm_genpd_remove(&rpd->genpd);  // Clean up on failure
+	return ret;
+    }  
 
 	// Power on immediately if requested
 	if (active) {
