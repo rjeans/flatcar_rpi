@@ -142,9 +142,9 @@ static int rpi_power_probe(struct platform_device *pdev)
     if (ret) {
 	dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
 	return ret;
-}
-
-   ret = dev_pm_domain_attach(dev, (void *)&rpd->genpd);
+   }
+   struct generic_pm_domain *genpdptr = &rpd->genpd;
+   ret = dev_pm_domain_attach(dev, genpdptr);
    if (ret) {
 	dev_err(dev, "Failed to attach device to power domain: %d\n", ret);
 	pm_genpd_remove(&rpd->genpd);  // Clean up on failure
