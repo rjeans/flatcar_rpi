@@ -101,9 +101,9 @@ static int rpi_power_probe(struct platform_device *pdev)
 	if (device_property_read_u32(dev, "rpi,active", &active))
 		active = 0;
 
-		rpd->mbox_client.dev = dev;
-        rpd->mbox_client.tx_block = true;
-        rpd->mbox_client.knows_txdone = true;  
+	rpd->mbox_client.dev = dev;
+    rpd->mbox_client.tx_block = true;
+    rpd->mbox_client.knows_txdone = true;  
 	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
 	rpd->chan = mbox_request_channel_byname(&rpd->mbox_client, "property");
