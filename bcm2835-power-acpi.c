@@ -74,6 +74,11 @@ static int rpi_power_off(struct generic_pm_domain *genpd)
 	return rpi_power_send(rpd, false);
 }
 
+static void rpi_power_release(struct device *dev)
+{
+	dev_info(dev, "Released power domain device\n");
+}
+
 static int rpi_power_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -155,10 +160,7 @@ static int rpi_power_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void rpi_power_release(struct device *dev)
-{
-	dev_info(dev, "Released power domain device\n");
-}
+
 
 static const struct acpi_device_id rpi_power_acpi_ids[] = {
 	{ "BCM2851", 0 },
