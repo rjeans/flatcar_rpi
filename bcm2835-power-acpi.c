@@ -113,6 +113,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	// Configure GENPD
 	rpd->genpd.name = rpd->name;
+	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;
 	rpd->genpd.power_off = rpi_power_off;
 	rpd->genpd.flags = GENPD_FLAG_PM_CLK | GENPD_FLAG_ALWAYS_ON;
@@ -152,6 +153,11 @@ static int rpi_power_remove(struct platform_device *pdev)
 	pm_genpd_remove(&rpd->genpd);
 
 	return 0;
+}
+
+static void rpi_power_release(struct device *dev)
+{
+	dev_info(dev, "Released power domain device\n");
 }
 
 static const struct acpi_device_id rpi_power_acpi_ids[] = {
