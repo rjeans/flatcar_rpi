@@ -185,7 +185,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.ops = &bcm2835_mbox_chan_ops;
 	mbox->controller.txdone_irq = false;
 mbox->controller.txdone_poll = false;
-mbox->controller.chans[0].txdone_method = TXDONE_BY_ACK;
+
 
 
 	mbox->controller.chans = devm_kcalloc(dev, 1, sizeof(struct mbox_chan), GFP_KERNEL);
