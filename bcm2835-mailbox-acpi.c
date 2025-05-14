@@ -24,7 +24,9 @@
 #define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
 struct mbox_controller *rpi_mbox_global = NULL;
+struct mbox_chan *rpi_mbox_chan0 = NULL;
 EXPORT_SYMBOL(rpi_mbox_global);
+EXPORT_SYMBOL(rpi_mbox_chan0);
 
 struct bcm2835_mbox {
 	void __iomem *regs;
@@ -194,6 +196,15 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
+	mbox->controller.chans = devm_kcalloc(dev,
+    mbox->controller.num_chans,
+    sizeof(struct mbox_chan),
+    GFP_KERNEL);
+if (!mbox->controller.chans)
+    return -ENOMEM;
+
+rpi_mbox_global = &mbox->controller;
+rpi_mbox_chan0 = &mbox->controller.chans[0]; // Set the global pointer to the mailbox channel
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
