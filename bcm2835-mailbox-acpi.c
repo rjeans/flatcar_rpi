@@ -182,7 +182,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.txdone_irq = false;
 	mbox->controller.txdone_by_ack = true;
 mbox->controller.txdone_poll = false;
-mbox->controller.chans[0].cl = &mbox->client; // ✅ REQUIRED!
 
 
 
@@ -191,6 +190,10 @@ mbox->controller.chans[0].cl = &mbox->client; // ✅ REQUIRED!
 	if (!mbox->controller.chans)
 		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
 	/* Initialize mailbox client */
+	
+	mbox->controller.chans[0].cl = &mbox->client; 
+
+	
 	mbox->controller.chans[0].mbox = &mbox->controller;
     mbox->client.dev = dev;
     mbox->client.tx_block = false;
@@ -243,7 +246,7 @@ static int bcm2835_mbox_remove(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Removing BCM2835 mailbox driver\n");
 
 
-
+    rpi_mbox_chan0 = NULL;
 	return 0;
 }
 
