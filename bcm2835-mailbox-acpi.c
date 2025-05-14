@@ -79,12 +79,12 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 	spin_unlock(&mbox->lock);
 
 	// Notify mailbox subsystem if required
-	if (link->cl && link->cl->tx_block && !link->cl->knows_txdone) {
+	
 		dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
 		         link, link->mbox);
 		mbox_chan_txdone(link, 0);
 		dev_info(mbox->controller.dev, "Successfully called mbox_chan_txdone\n");
-	}
+	
 
 	return 0;
 }
