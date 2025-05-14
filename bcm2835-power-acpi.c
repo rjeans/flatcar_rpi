@@ -118,17 +118,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = false;
 
-	
-
-
-    rpd->chan = rpi_acpi_find_mbox_channel(dev, &rpd->mbox_client);
-    if (IS_ERR(rpd->chan)) {
-        ret = PTR_ERR(rpd->chan);
-        dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
-        return ret;
-    }
-    
-
+	rpd->chan = rpi_acpi_find_mbox_channel(dev, &rpd->mbox_client);
+	if (IS_ERR(rpd->chan)) {
+		ret = PTR_ERR(rpd->chan);
+		dev_err(dev, "Failed to acquire mailbox channel: %d\n", ret);
+		return ret;
+	}
 
 	dev_info(dev, "Mailbox channel acquired\n");
 
@@ -139,17 +134,17 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->genpd.flags = GENPD_FLAG_PM_CLK | GENPD_FLAG_ALWAYS_ON;
 
 	ret = pm_genpd_init(&rpd->genpd, NULL, false);
-    if (ret) {
-	dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
-	return ret;
-   }
-   struct generic_pm_domain *genpdptr = &rpd->genpd;
-   ret = dev_pm_domain_attach(dev, genpdptr);
-   if (ret) {
-	dev_err(dev, "Failed to attach device to power domain: %d\n", ret);
-	pm_genpd_remove(&rpd->genpd);  // Clean up on failure
-	return ret;
-    }  
+	if (ret) {
+		dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
+		return ret;
+	}
+
+	ret = pm_genpd_add_device(&rpd->genpd, dev);
+	if (ret) {
+		dev_err(dev, "Failed to add device to power domain: %d\n", ret);
+		pm_genpd_remove(&rpd->genpd); // Clean up on failure
+		return ret;
+	}
 
 	// Power on immediately if requested
 	if (active) {
