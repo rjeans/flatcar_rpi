@@ -133,8 +133,11 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	// Initialize the completion structure and bind the client
 	init_completion(&rpd->chan->tx_complete);
-	rpd->chan->cl = &rpd->mbox_client;
-
+ret = mbox_bind_client(rpd->chan, &rpd->mbox_client);
+if (ret) {
+    dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
+    return ret;
+}
 	dev_info(dev, "Mailbox channel acquired\n");
 
 	// Setup the generic power domain
