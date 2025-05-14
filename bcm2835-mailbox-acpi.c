@@ -32,6 +32,8 @@ struct bcm2835_mbox {
 	void __iomem *regs;
 	spinlock_t lock;
 	struct mbox_controller controller;
+	struct mbox_client client;
+
 };
 
 static struct bcm2835_mbox *bcm2835_link_mbox(struct mbox_chan *link)
@@ -129,20 +131,7 @@ static void bcm2835_shutdown(struct mbox_chan *link)
 	dev_dbg(mbox->controller.dev, "Interrupts disabled for mailbox\n");
 }
 
-static bool bcm2835_last_tx_done(struct mbox_chan *link)
-{
-	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
-	bool ret;
 
-	dev_dbg(mbox->controller.dev, "Checking if last transmission is done\n");
-
-	spin_lock(&mbox->lock);
-	ret = !(readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL);
-	spin_unlock(&mbox->lock);
-
-	dev_dbg(mbox->controller.dev, "Last transmission done: %s\n", ret ? "yes" : "no");
-	return ret;
-}
 
 static const struct mbox_chan_ops bcm2835_mbox_chan_ops = {
 	.send_data     = bcm2835_send_data,
@@ -194,6 +183,14 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 	init_completion(&mbox->controller.chans[0].tx_complete);
 	mbox->controller.chans[0].mbox = &mbox->controller;
+
+	/* Initialize mailbox client */
+    mbox->client.dev = dev;
+    mbox->client.tx_block = true;
+    mbox->client.knows_txdone = false;
+
+    mbox->controller.chans[0].cl = &mbox->client;
+
 
 	/* Register the mailbox controller */
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
