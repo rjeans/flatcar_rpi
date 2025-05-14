@@ -126,9 +126,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 	ret = pm_genpd_add_device(&rpd->genpd, dev);
 	if (ret) {
 		dev_err(dev, "Failed to add device to power domain: %d\n", ret);
-		pm_genpd_remove(&rpd->genpd); // Clean up on failure
+		pm_genpd_remove(&rpd->genpd);
 		return ret;
 	}
+
+	platform_set_drvdata(pdev, rpd);
+	dev_info(dev, "Power domain '%s' initialized\n", rpd->name);
 
 	// Power on immediately if requested
 	if (active) {
@@ -141,6 +144,16 @@ static int rpi_power_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int rpi_power_remove(struct platform_device *pdev)
+{
+	struct rpi_power_domain *rpd = dev_get_drvdata(&pdev->dev);
+
+	pm_genpd_remove_device(&pdev->dev);
+	pm_genpd_remove(&rpd->genpd);
+
+	return 0;
+}
+
 static const struct acpi_device_id rpi_power_acpi_ids[] = {
 	{ "BCM2851", 0 },
 	{ }
@@ -149,6 +162,7 @@ MODULE_DEVICE_TABLE(acpi, rpi_power_acpi_ids);
 
 static struct platform_driver rpi_power_driver = {
 	.probe = rpi_power_probe,
+	.remove = rpi_power_remove,
 	.driver = {
 		.name = "raspberrypi-power-acpi",
 		.acpi_match_table = rpi_power_acpi_ids,
