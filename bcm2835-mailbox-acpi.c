@@ -82,6 +82,20 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
          link, &link->tx_complete);
 
 	// Notify mailbox subsystem if required
+dev_info(mbox->controller.dev,
+         "verifying tx_complete: link=%p, tx_complete.addr=%px\n",
+         link, &link->tx_complete);
+
+dev_info(mbox->controller.dev, "chan->mbox = %px\n", link->mbox);
+
+
+if (!completion_done(&link->tx_complete)) {
+	dev_warn(mbox->controller.dev, "tx_complete not marked yet\n");
+}
+
+memset(&link->tx_complete, 0x55, sizeof(link->tx_complete));  // trap bad access
+
+
 	
 		dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
 		         link, link->mbox);
@@ -180,12 +194,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
-    mbox->controller.chans = devm_kcalloc(dev,
-    mbox->controller.num_chans,
-    sizeof(struct mbox_chan),
-    GFP_KERNEL);
-    if (!mbox->controller.chans)
-	    return -ENOMEM;
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
