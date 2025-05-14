@@ -31,44 +31,45 @@ struct rpi_power_domain {
 // Function to send power domain messages
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
+	struct mbox_chan *chan = rpd->chan;
 	struct device *dev = rpd->mbox_client.dev;
+	struct completion *txc;
 	u32 msg;
 	int ret;
-	struct mbox_chan *chan = rpd->chan;
-    struct completion *txc = &chan->tx_complete;
 
-	dev_info(dev, "Sending message: chan=%px, chan->cl=%px\n",
-	         rpd->chan, rpd->chan ? rpd->chan->cl : NULL);
-
-	if (!rpd->chan || !rpd->chan->cl) {
+	if (!chan || !chan->cl) {
 		dev_err(dev, "Cannot send message: NULL chan or client\n");
 		return -ENODEV;
 	}
 
+	txc = &chan->tx_complete;
+
+	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
+	         enable ? "ON" : "OFF", rpd->name);
+
 	msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
-	dev_info(dev, "Sending firmware power %s for domain '%s': 0x%08X\n",
-	         enable ? "ON" : "OFF", rpd->name, msg);
 
-	dev_info(dev, "Power driver: sending via chan = %px, tx_complete = %px\n",
-	         rpd->chan, &rpd->chan->tx_complete);
+	dev_dbg(dev, "Message: 0x%08X | chan = %px | chan->cl = %px\n",
+	        msg, chan, chan->cl);
+	dev_dbg(dev, "tx_complete at %px\n", txc);
 
-dev_info(dev, "Waiting on tx_complete at %px\n", txc);
+	reinit_completion(txc);  // 🔧 Reset before send
 
-reinit_completion(txc);
+	ret = mbox_send_message(chan, &msg);
+	if (ret < 0) {
+		dev_err(dev, "Failed to send message: %d\n", ret);
+		return ret;
+	}
 
-ret = mbox_send_message(chan, &msg);
-if (ret < 0) {
-	dev_err(dev, "Failed to send message: %d\n", ret);
-	return ret;
-}
+	dev_dbg(dev, "Waiting for tx completion...\n");
 
-ret = wait_for_completion_timeout(txc, msecs_to_jiffies(100));
-if (ret == 0) {
-	dev_err(dev, "Timeout waiting for mailbox tx completion\n");
-	return -ETIMEDOUT;
-}
+	ret = wait_for_completion_timeout(txc, msecs_to_jiffies(100));
+	if (ret == 0) {
+		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
+		return -ETIMEDOUT;
+	}
 
-	dev_info(dev, "Mailbox tx completed successfully\n");
+	dev_info(dev, "Mailbox tx completed successfully for domain '%s'\n", rpd->name);
 	return 0;
 }
 
