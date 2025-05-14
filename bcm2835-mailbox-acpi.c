@@ -196,16 +196,25 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.num_chans = 1;
 
+mbox->controller.chans = devm_kcalloc(dev, 1, sizeof(struct mbox_chan), GFP_KERNEL);
+if (!mbox->controller.chans) {
+	dev_err(dev, "Failed to allocate memory for mailbox channels\n");
+	return -ENOMEM;
+}
 
-
-rpi_mbox_global = &mbox->controller;
-rpi_mbox_chan0 = &mbox->controller.chans[0]; // Set the global pointer to the mailbox channel
+init_completion(&mbox->controller.chans[0].tx_complete);
+mbox->controller.chans[0].mbox = &mbox->controller;
 
 	ret = devm_mbox_controller_register(dev, &mbox->controller);
 	if (ret) {
 		dev_err(dev, "Failed to register mailbox controller: %d\n", ret);
 		return ret;
 	}
+
+rpi_mbox_global = &mbox->controller;
+rpi_mbox_chan0 = &mbox->controller.chans[0]; // Set the global pointer to the mailbox channel
+
+
 
 	platform_set_drvdata(pdev, mbox);
 
