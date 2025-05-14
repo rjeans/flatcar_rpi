@@ -23,7 +23,7 @@
 
 
 
-
+extern struct mbox_chan *rpi_mbox_chan0;
 
 #define POWER_DOMAIN_ON     0x03  // ON (bit 0) + WAIT (bit 1)
 #define POWER_DOMAIN_OFF    0x02  // OFF (bit 0 clear) + WAIT (bit 1)
@@ -107,7 +107,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	//rpd->mbox_client.fwnode = dev_fwnode(dev);
 	
 	// Acquire mailbox channel via ACPI _DSD "mbox-names" = "property"
-	rpd->chan = mbox_request_channel(&rpd->mbox_client, 0);
+	rpd->chan = rpi_mbox_chan0
 if (IS_ERR(rpd->chan)) {
 	dev_err(dev, "Failed to acquire mailbox channel: %ld\n", PTR_ERR(rpd->chan));
 	return PTR_ERR(rpd->chan);

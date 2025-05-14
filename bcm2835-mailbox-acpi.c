@@ -25,6 +25,8 @@
 #define ARM_MS_EMPTY    BIT(30)
 #define ARM_MC_IHAVEDATAIRQEN BIT(0)
 
+struct mbox_chan *rpi_mbox_chan0;
+EXPORT_SYMBOL_GPL(rpi_mbox_chan0);
 
 
 struct bcm2835_mbox {
@@ -184,6 +186,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->client.dev = dev;
     mbox->client.tx_block = false;
     mbox->client.knows_txdone = true;
+
+	rpi_mbox_chan0 = &mbox->controller.chans[0];
 
 
 
