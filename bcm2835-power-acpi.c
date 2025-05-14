@@ -121,7 +121,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	// Initialize the mailbox client
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
-	rpd->mbox_client.knows_txdone = false;
+	rpd->mbox_client.knows_txdone = true;
 
 	// Acquire the mailbox channel
 	rpd->chan = rpi_mbox_chan0;
