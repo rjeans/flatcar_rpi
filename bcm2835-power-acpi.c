@@ -61,12 +61,12 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 	
 
-	dev_dbg(dev, "Message: 0x%px| chan = %px | chan->cl = %px\n",
+	dev_info(dev, "Message: 0x%px| chan = %px | chan->cl = %px\n",
 	        msg, chan, chan->cl);
 	
 
 	reinit_completion(&rpd->tx_done);  // 🔧 Reset before send
-    dev_dbg(dev, "TX: sending msg at %px\n", msg);
+    dev_info(dev, "TX: sending msg at %px\n", msg);
 
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
@@ -74,7 +74,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return ret;
 	}
 
-	dev_dbg(dev, "Waiting for tx completion...\n");
+	dev_info(dev, "Waiting for tx completion...\n");
 
 	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
 	if (ret == 0) {
