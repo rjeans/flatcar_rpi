@@ -65,8 +65,6 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 			continue;
 		}
 
-		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
-		mbox_chan_txdone(link, 0);
 
 		if (link->cl && link->cl->tx_done) {
 			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", msg);

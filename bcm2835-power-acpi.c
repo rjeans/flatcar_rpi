@@ -153,7 +153,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	// Initialize the mailbox client
 	rpd->mbox_client.dev = dev;
-	rpd->mbox_client.tx_block = true;
+	rpd->mbox_client.tx_block = false;
 	rpd->mbox_client.knows_txdone = true;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 
