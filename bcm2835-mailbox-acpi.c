@@ -195,7 +195,7 @@ mbox->controller.txdone_poll = false;
 	
 	mbox->controller.chans[0].mbox = &mbox->controller;
     mbox->client.dev = dev;
-    mbox->client.tx_block = false;
+    mbox->client.tx_block = true;
     mbox->client.knows_txdone = true;
 
 
