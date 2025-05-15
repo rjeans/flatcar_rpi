@@ -286,7 +286,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->dev = &pdev->dev;
 
 	ret = dev_pm_domain_attach(&pdev->dev, true);
-	if (IS_ERR_VALUE(ret)) {
+	if (ret) {
 		dev_warn(&pdev->dev, "Failed to attach power domain: %d\n", ret);
 	} else {
 		dev_info(&pdev->dev, "Power domain attached successfully\n");
