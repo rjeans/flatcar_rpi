@@ -197,7 +197,7 @@ mbox->controller.txdone_poll = false;
 		return dev_err_probe(dev, -ENOMEM, "Failed to allocate mailbox channel array\n");
 	/* Initialize mailbox client */
 	
-	mbox->controller.chans[0].cl = &mbox->client; 
+	mbox->controller.chans[0].cl = NULL; 
 
 	
 	mbox->controller.chans[0].mbox = &mbox->controller;
