@@ -111,10 +111,12 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
 	if (!clk)
 		return -ENOMEM;
+		dev_info(dev, "Returning from probe with error: %s\n", "-ENOMEM");
 
 	if (device_property_read_string(dev, "rpi,devicename", &clk->name)) {
 		dev_err(dev, "Missing required property 'rpi,devicename'\n");
 		return -EINVAL;
+		dev_info(dev, "Returning from probe with error: %s\n", "-EINVAL");
 	}
 
 	clk->mbox_client.dev = dev;
