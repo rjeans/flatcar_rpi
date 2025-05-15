@@ -51,32 +51,25 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	struct device *dev = mbox->controller.dev;
 	struct mbox_chan *link = &mbox->controller.chans[0];
 
-	void *msg = mbox->last_msg;
-    mbox->last_msg = NULL; // prevent reuse
-
-    if (!msg) {
-	    dev_warn(dev, "No stored message pointer — dropping reply\n");
-	    continue;
-}
-
 	dev_info(dev, "IRQ %d triggered for mailbox\n", irq);
 
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 raw = readl(mbox->regs + MAIL0_RD);
-
 		dev_info(dev, "Mailbox raw reply received: 0x%08X\n", raw);
 
-		/* Retrieve original message from framework state */
-		
+		void *msg = mbox->last_msg;
+		mbox->last_msg = NULL;
 
-	
-		/* Notify the mailbox core that the TX is done */
+		if (!msg) {
+			dev_warn(dev, "No stored message pointer — dropping reply\n");
+			continue;
+		}
+
 		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
-		mbox_chan_txdone(link, 0);  // Must be called before tx_done()
+		mbox_chan_txdone(link, 0);
 
-		/* Notify the client */
 		if (link->cl && link->cl->tx_done) {
-			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", raw);
+			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", msg);
 			link->cl->tx_done(link->cl, msg, 0);
 			dev_info(dev, "Client tx_done callback completed\n");
 		} else {
@@ -89,6 +82,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 }
 
 
+
 static int bcm2835_send_data(struct mbox_chan *link, void *data)
 {
 	if (!link || !link->mbox || !data) {
@@ -97,10 +91,11 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 		return -EINVAL;
 	}
 
-	mbox->last_msg = data;
+	
 	dev_dbg(mbox->controller.dev, "SEND_DATA called with data=%p\n", data);
 
 	struct bcm2835_mbox *mbox = container_of(link->mbox, struct bcm2835_mbox, controller);
+	mbox->last_msg = data;
 	u32 msg = *(u32 *)data;
 
 	dev_info(mbox->controller.dev, "SEND_DATA called with 0x%08X\n", msg);
