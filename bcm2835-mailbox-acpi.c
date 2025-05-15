@@ -50,17 +50,35 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	struct device *dev = mbox->controller.dev;
 	struct mbox_chan *link = &mbox->controller.chans[0];
 
-	dev_dbg(dev, "IRQ %d triggered\n", irq);
+	dev_info(dev, "IRQ %d triggered for mailbox\n", irq);
 
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-		u32 msg = readl(mbox->regs + MAIL0_RD);
-		dev_dbg(dev, "Reply 0x%08X received\n", msg);
-		mbox_chan_received_data(link, &msg);
+		u32 *msg = kmalloc(sizeof(u32), GFP_ATOMIC);
+		if (!msg) {
+			dev_warn(dev, "Failed to allocate memory for mailbox reply\n");
+			continue;
+		}
+
+		*msg = readl(mbox->regs + MAIL0_RD);
+		dev_info(dev, "Mailbox reply received: 0x%08X (msg pointer = %px)\n", *msg, msg);
+
+		mbox_chan_received_data(link, msg);  // optional, not used by your client
+		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
+		mbox_chan_txdone(link, 0);           // marks tx complete
+
+		if (link->cl && link->cl->tx_done) {
+			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", msg);
+			link->cl->tx_done(link->cl, msg, 0);
+			dev_info(dev, "Client tx_done callback completed\n");
+		} else {
+			dev_warn(dev, "No tx_done callback set on channel client\n");
+		}
 	}
 
-	dev_dbg(dev, "IRQ %d handled\n", irq);
+	dev_info(dev, "IRQ %d handled successfully\n", irq);
 	return IRQ_HANDLED;
 }
+
 
 static int bcm2835_send_data(struct mbox_chan *link, void *data)
 {
@@ -89,32 +107,7 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
          link, &link->tx_complete);
 
 	// Notify mailbox subsystem if required
-dev_info(mbox->controller.dev,
-         "verifying tx_complete: link=%p, tx_complete.addr=%px\n",
-         link, &link->tx_complete);
 
-dev_info(mbox->controller.dev, "chan->mbox = %px\n", link->mbox);
-
-
-
-
-dev_info(mbox->controller.dev,
-         "TXDONE on chan = %px, tx_complete = %px\n",
-         link, &link->tx_complete);
-
-
-	
-		dev_info(mbox->controller.dev, "About to call mbox_chan_txdone: link=%p, mbox=%p\n",
-		         link, link->mbox);
-		mbox_chan_txdone(link, 0);
-		dev_info(mbox->controller.dev, "Successfully called mbox_chan_txdone\n");
-
-	
-	if (link->cl && link->cl->tx_done) {
-		dev_info(mbox->controller.dev, "Calling tx_done callback\n");
-        link->cl->tx_done(link->cl, data, 0);
-		dev_info(mbox->controller.dev, "tx_done callback completed\n");
-}   
 	return 0;
 }
 
