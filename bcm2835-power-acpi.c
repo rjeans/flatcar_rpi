@@ -40,7 +40,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct mbox_chan *chan = rpd->chan;
 	struct device *dev = rpd->mbox_client.dev;
 	
-	u32 msg;
+	
 	int ret;
 	struct rpi_power_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
