@@ -109,10 +109,10 @@ dev_info(mbox->controller.dev,
 
 	
 	if (link->cl && link->cl->tx_done) {
-		dev_info(mbox->controller.dev, "Calling tx_done callback\n");}
+		dev_info(mbox->controller.dev, "Calling tx_done callback\n");
         link->cl->tx_done(link->cl, data, 0);
 		dev_info(mbox->controller.dev, "tx_done callback completed\n");
-  }   
+}   
 	return 0;
 }
 
@@ -183,7 +183,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	mbox->controller.dev = dev;
 	mbox->controller.ops = &bcm2835_mbox_chan_ops;
 	mbox->controller.txdone_irq = false;
-	mbox->controller.txdone_method = TXDONE_BY_ACK;
+
 
 mbox->controller.txdone_poll = false;
 
