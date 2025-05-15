@@ -29,14 +29,20 @@ struct rpi_power_domain {
 	struct completion tx_done;
 };
 
+struct rpi_power_msg {
+	u32 val;
+};
+
+
 // Function to send power domain messages
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
 	struct mbox_chan *chan = rpd->chan;
 	struct device *dev = rpd->mbox_client.dev;
-	struct completion *txc;
+	
 	u32 msg;
 	int ret;
+	struct rpi_power_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
 	if (!chan || !chan->cl) {
 		dev_err(dev, "Cannot send message: NULL chan or client\n");
@@ -44,19 +50,25 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	}
 
 	
+   if (!msg)
+	return -ENOMEM;
+
+    msg->val = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
+
 
 	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
 	         enable ? "ON" : "OFF", rpd->name);
 
-	msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
+	
 
 	dev_dbg(dev, "Message: 0x%08X | chan = %px | chan->cl = %px\n",
 	        msg, chan, chan->cl);
-	dev_dbg(dev, "tx_complete at %px\n", txc);
+	
 
 	reinit_completion(&rpd->tx_done);  // 🔧 Reset before send
+    dev_dbg(dev, "TX: sending msg at %px\n", msg);
 
-	ret = mbox_send_message(chan, &msg);
+	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
 		dev_err(dev, "Failed to send message: %d\n", ret);
 		return ret;
@@ -98,7 +110,11 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 	dev_info(cl->dev, "tx_done callback called");
+	dev_dbg(cl->dev, "TX_DONE: msg pointer = %px\n", msg);
+
 	complete(&rpd->tx_done);
+	kfree(msg); // clean up
+
 	dev_info(cl->dev, "tx_done callback completed");
 }
 
