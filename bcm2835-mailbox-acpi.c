@@ -53,19 +53,25 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	dev_info(dev, "IRQ %d triggered for mailbox\n", irq);
 
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-		u32 *msg = kmalloc(sizeof(u32), GFP_ATOMIC);
+		u32 raw = readl(mbox->regs + MAIL0_RD);
+
+		dev_info(dev, "Mailbox raw reply received: 0x%08X\n", raw);
+
+		/* Retrieve original message from framework state */
+		struct rpi_power_msg *msg = (struct rpi_power_msg *)link->active_req->msg;
 		if (!msg) {
-			dev_warn(dev, "Failed to allocate memory for mailbox reply\n");
+			dev_warn(dev, "active_req->msg is NULL — cannot complete\n");
 			continue;
 		}
 
-		*msg = readl(mbox->regs + MAIL0_RD);
-		dev_info(dev, "Mailbox reply received: 0x%08X (msg pointer = %px)\n", *msg, msg);
+		dev_info(dev, "Recovered message pointer = %px, val = 0x%08x, rpd = %px\n",
+		         msg, msg->val, msg->rpd);
 
-		mbox_chan_received_data(link, msg);  // optional, not used by your client
+		/* Notify the mailbox core that the TX is done */
 		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
-		mbox_chan_txdone(link, 0);           // marks tx complete
+		mbox_chan_txdone(link, 0);  // Must be called before tx_done()
 
+		/* Notify the client */
 		if (link->cl && link->cl->tx_done) {
 			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", msg);
 			link->cl->tx_done(link->cl, msg, 0);
