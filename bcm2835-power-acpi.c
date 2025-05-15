@@ -26,6 +26,7 @@ struct rpi_power_domain {
 	struct mbox_chan *chan;
 	struct mbox_client mbox_client;
 	const char *name;
+	struct completion tx_done;
 };
 
 // Function to send power domain messages
@@ -42,7 +43,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	txc = &chan->tx_complete;
+	
 
 	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
 	         enable ? "ON" : "OFF", rpd->name);
@@ -53,7 +54,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	        msg, chan, chan->cl);
 	dev_dbg(dev, "tx_complete at %px\n", txc);
 
-	reinit_completion(txc);  // 🔧 Reset before send
+	reinit_completion(&rpd->tx_done);  // 🔧 Reset before send
 
 	ret = mbox_send_message(chan, &msg);
 	if (ret < 0) {
@@ -63,7 +64,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 	dev_dbg(dev, "Waiting for tx completion...\n");
 
-	ret = wait_for_completion_timeout(txc, msecs_to_jiffies(100));
+	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
 	if (ret == 0) {
 		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
 		return -ETIMEDOUT;
@@ -93,11 +94,12 @@ static void rpi_power_release(struct device *dev)
 	dev_info(dev, "Released power domain device\n");
 }
 
-static void rpi_mbox_tx_done(struct mbox_client *cl, void *msg, int r)
+static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
-    struct device *dev = cl->dev;
-    dev_info(dev, "tx_done callback called\n");
-    complete(&rpi_mbox_chan0->tx_complete);
+	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+	dev_info(cl->dev, "tx_done callback called");
+	complete(&rpd->tx_done);
+	dev_info(cl->dev, "tx_done callback completed");
 }
 
 // Probe function for the power domain driver
