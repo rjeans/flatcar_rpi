@@ -61,7 +61,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 	
 
-	dev_dbg(dev, "Message: 0x%08X | chan = %px | chan->cl = %px\n",
+	dev_dbg(dev, "Message: 0x%px| chan = %px | chan->cl = %px\n",
 	        msg, chan, chan->cl);
 	
 
