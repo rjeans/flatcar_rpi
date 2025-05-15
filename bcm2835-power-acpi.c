@@ -31,6 +31,7 @@ struct rpi_power_domain {
 
 struct rpi_power_msg {
 	u32 val;
+	struct rpi_power_domain *rpd;
 };
 
 
@@ -54,6 +55,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	return -ENOMEM;
 
     msg->val = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
+	msg->rpd = rpd;
 
 
 	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
@@ -106,14 +108,17 @@ static void rpi_power_release(struct device *dev)
 	dev_info(dev, "Released power domain device\n");
 }
 
-static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
+static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
 {
-	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+	struct rpi_power_msg *msg = msg_ptr;
+	struct rpi_power_domain *rpd = msg->rpd;
+
 	dev_info(cl->dev, "tx_done callback called");
 	dev_info(cl->dev, "TX_DONE: msg pointer = %px\n", msg);
 
+
 	complete(&rpd->tx_done);
-	kfree(msg); // clean up
+	kfree(msg);
 
 	dev_info(cl->dev, "tx_done callback completed");
 }
