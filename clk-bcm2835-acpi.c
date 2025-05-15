@@ -52,6 +52,20 @@ static void bcm2835_clk_tx_done(struct mbox_client *cl, void *msg, int r)
 	kfree(msg);
 }
 
+
+static int bcm2835_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+                                unsigned long parent_rate)
+{
+	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
+	clk->rate = rate;
+	return 0;
+}
+
+static long bcm2835_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+                                   unsigned long *parent_rate)
+{
+	return rate;
+}
 static int bcm2835_clk_enable(struct clk_hw *hw)
 {
 	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
@@ -75,6 +89,7 @@ static void bcm2835_clk_disable(struct clk_hw *hw)
 static unsigned long bcm2835_clk_recalc_rate(struct clk_hw *hw,
                                              unsigned long parent_rate)
 {
+	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
 	return clk->rate;
 }
 
@@ -157,17 +172,3 @@ module_platform_driver(bcm2835_clk_driver);
 MODULE_AUTHOR("ChatGPT + Richard");
 MODULE_DESCRIPTION("Raspberry Pi firmware clock via ACPI mailbox");
 MODULE_LICENSE("GPL");
-
-static int bcm2835_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-                                unsigned long parent_rate)
-{
-	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
-	clk->rate = rate;
-	return 0;
-}
-
-static long bcm2835_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-                                   unsigned long *parent_rate)
-{
-	return rate;
-}
