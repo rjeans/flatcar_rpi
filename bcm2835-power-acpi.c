@@ -13,7 +13,6 @@
 #include <linux/acpi.h>
 #include <linux/fwnode.h>
 #include <linux/mailbox_controller.h>
-#include <linux/fwnode.h>
 
 
 // External reference to mailbox channel
@@ -191,14 +190,7 @@ if (ret) {
 
 // Register this power domain as a provider for ACPI/firmware consumers
 dev_info(dev, "Registering power domain '%s' with genpd\n", rpd->name);
-ret = fwnode_add_power_domain(dev_fwnode(dev), &rpd->genpd);
 
-if (ret) {
-	dev_err(dev, "Failed to register genpd with firmware: %d\n", ret);
-	pm_genpd_remove(&rpd->genpd);
-	mbox_free_channel(rpd->chan);
-	return ret;
-}
 
 
 // Store driver data
