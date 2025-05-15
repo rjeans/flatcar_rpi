@@ -179,20 +179,27 @@ if (!rpd->chan->cl) {
 	rpd->genpd.power_off = rpi_power_off;
 	rpd->genpd.flags = GENPD_FLAG_PM_CLK ;
 
-	// Initialize the power domain
-	ret = pm_genpd_init(&rpd->genpd, NULL, false);
-	if (ret) {
-		dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
-		mbox_free_channel(rpd->chan);
-		return ret;
-	}
+// Initialize the power domain
+ret = pm_genpd_init(&rpd->genpd, NULL, false);
+if (ret) {
+	dev_err(dev, "Failed to initialize generic power domain: %d\n", ret);
+	mbox_free_channel(rpd->chan);
+	return ret;
+}
 
-    dev_info(dev, "Registering power domain '%s' with genpd\n", rpd->name);
-    ret = of_genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
+// Register this power domain as a provider for ACPI/firmware consumers
+dev_info(dev, "Registering power domain '%s' with genpd\n", rpd->name);
+ret = of_genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
+if (ret) {
+	dev_err(dev, "Failed to register genpd provider: %d\n", ret);
+	pm_genpd_remove(&rpd->genpd);
+	mbox_free_channel(rpd->chan);
+	return ret;
+}
 
-	platform_set_drvdata(pdev, rpd);
-	dev_info(dev, "Power domain '%s' initialized\n", rpd->name);
-
+// Store driver data
+platform_set_drvdata(pdev, rpd);
+dev_info(dev, "Power domain '%s' initialized\n", rpd->name);
 
 
 	return 0;
