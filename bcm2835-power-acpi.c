@@ -130,7 +130,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rpi_power_domain *rpd;
-	u32 active;
 	int ret;
 
 	dev_info(dev, "Probing raspberrypi-power ACPI driver\n");
@@ -147,9 +146,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 	}
 	dev_info(dev, "Firmware domain name: %s\n", rpd->name);
 
-	// Read the optional active property
-	if (device_property_read_u32(dev, "rpi,active", &active))
-		active = 0;
 
 	// Initialize the mailbox client
 	rpd->mbox_client.dev = dev;
@@ -203,13 +199,7 @@ if (!rpd->chan->cl) {
 	platform_set_drvdata(pdev, rpd);
 	dev_info(dev, "Power domain '%s' initialized\n", rpd->name);
 
-	// Power on immediately if requested
-	if (active) {
-		dev_info(dev, "Powering on domain '%s' (rpi,active = 1)\n", rpd->name);
-		ret = rpi_power_send(rpd, true);
-		if (ret)
-			dev_err(dev, "Failed to power on domain '%s': %d\n", rpd->name, ret);
-	}
+
 
 	return 0;
 }
