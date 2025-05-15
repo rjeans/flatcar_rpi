@@ -168,8 +168,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	// Initialize the completion structure and bind the client
 	
 	init_completion(&rpd->tx_done);
-if (!power->chan->cl) {
-	power->chan->cl = &power->mbox_client;
+if (!rpd->chan->cl) {
+	rpd->chan->cl = &rpd->mbox_client;
 	dev_info(dev, "Mailbox client assigned (without bind)\n");
 } else {
 	dev_warn(dev, "Mailbox channel already in use — assuming shared access\n");
