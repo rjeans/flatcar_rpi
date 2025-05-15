@@ -29,10 +29,7 @@ struct rpi_power_domain {
 	struct completion tx_done;
 };
 
-struct rpi_power_msg {
-	u32 val;
-	struct rpi_power_domain *rpd;
-};
+
 
 
 // Function to send power domain messages
@@ -111,7 +108,7 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
 	u32 *msg = msg_ptr;
 	struct device *dev = cl->dev;
 	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
-	
+
 	if (!rpd) {
 		dev_err(dev, "No rpd set\n");
 		kfree(msg);
@@ -120,7 +117,7 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
 
 
 	dev_info(cl->dev, "tx_done callback called");
-	dev_info(cl->dev, "TX_DONE: msg pointer = %px, val = 0x%08x\n", msg, msg->val);
+	dev_info(cl->dev, "TX_DONE: msg pointer = %px, val = 0x%px\n", msg, *msg);
 
 	complete(&rpd->tx_done);
 	kfree(msg);
