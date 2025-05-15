@@ -146,12 +146,12 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 
 	init_completion(&clk->tx_done);
 
-	ret = mbox_bind_client(clk->chan, &clk->mbox_client);
-	if (ret) {
-		dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
-		return ret;
-	}
-	dev_info(dev, "Mailbox client bound\n");
+	if (!clk->chan->cl) {
+	clk->chan->cl = &clk->mbox_client;
+	   dev_info(dev, "Mailbox client assigned (without bind)\n");
+    } else {
+	   dev_warn(dev, "Mailbox channel already in use — assuming shared access\n");
+    }
 
 	init.name = clk->name;
 	init.ops = &bcm2835_clk_ops;
