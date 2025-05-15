@@ -7,6 +7,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/mailbox_client.h>
+#include <linux/mailbox_controller.h>
+
 
 // Use your external mailbox channel
 extern struct mbox_chan *rpi_mbox_chan0;
