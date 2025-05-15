@@ -22,6 +22,7 @@ struct bcm2835_clk {
 	struct completion tx_done;
 	const char *name;
 	bool enabled;
+	unsigned long rate;
 };
 
 #define to_bcm2835_clk(_hw) container_of(_hw, struct bcm2835_clk, hw)
@@ -74,11 +75,13 @@ static void bcm2835_clk_disable(struct clk_hw *hw)
 static unsigned long bcm2835_clk_recalc_rate(struct clk_hw *hw,
                                              unsigned long parent_rate)
 {
-	return FIXED_RATE;
+	return clk->rate;
 }
 
 static const struct clk_ops bcm2835_clk_ops = {
 	.enable = bcm2835_clk_enable,
+	.set_rate = bcm2835_clk_set_rate,
+	.round_rate = bcm2835_clk_round_rate,
 	.disable = bcm2835_clk_disable,
 	.recalc_rate = bcm2835_clk_recalc_rate,
 };
@@ -103,6 +106,11 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
 	clk->mbox_client.tx_block = false;
 	clk->mbox_client.knows_txdone = true;
+	/* Optional: set rate from property, or use fixed default */
+	device_property_read_u32(dev, "clock-frequency", (u32 *)&clk->rate);
+	if (!clk->rate)
+		clk->rate = FIXED_RATE;
+
 
 	clk->chan = rpi_mbox_chan0;
 	if (IS_ERR(clk->chan))
@@ -115,7 +123,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 
 	init.name = clk->name;
 	init.ops = &bcm2835_clk_ops;
-	init.flags = CLK_IS_BASIC;
+	init.flags = 0; /* No CLK_IS_BASIC; use appropriate CLK_ flags if needed */
 
 	clk->hw.init = &init;
 
@@ -149,3 +157,17 @@ module_platform_driver(bcm2835_clk_driver);
 MODULE_AUTHOR("ChatGPT + Richard");
 MODULE_DESCRIPTION("Raspberry Pi firmware clock via ACPI mailbox");
 MODULE_LICENSE("GPL");
+
+static int bcm2835_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+                                unsigned long parent_rate)
+{
+	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
+	clk->rate = rate;
+	return 0;
+}
+
+static long bcm2835_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+                                   unsigned long *parent_rate)
+{
+	return rate;
+}
