@@ -58,14 +58,14 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 		dev_info(dev, "Mailbox raw reply received: 0x%08X\n", raw);
 
 		/* Retrieve original message from framework state */
-		struct rpi_power_msg *msg = (struct rpi_power_msg *)link->active_req->msg;
+		u32 *msg = (u32 *)link->active_req->msg;
 		if (!msg) {
 			dev_warn(dev, "active_req->msg is NULL — cannot complete\n");
 			continue;
 		}
 
-		dev_info(dev, "Recovered message pointer = %px, val = 0x%08x, rpd = %px\n",
-		         msg, msg->val, msg->rpd);
+		dev_info(dev, "Recovered message pointer = %px\n",
+		         msg;
 
 		/* Notify the mailbox core that the TX is done */
 		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
