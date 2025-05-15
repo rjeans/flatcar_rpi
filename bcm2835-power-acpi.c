@@ -43,7 +43,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	
 	
 	int ret;
-	struct rpi_power_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	u32 * msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
 	if (!chan || !chan->cl) {
 		dev_err(dev, "Cannot send message: NULL chan or client\n");
@@ -51,11 +51,10 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	}
 
 	
-   if (!msg)
-	return -ENOMEM;
 
-    msg->val = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
-	msg->rpd = rpd;
+
+    *msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
+	
 
 
 	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
@@ -68,8 +67,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	
 
 	reinit_completion(&rpd->tx_done);  // 🔧 Reset before send
-    dev_info(dev, "TX: sending msg at %px\n", msg);
-
+ 
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
 		dev_err(dev, "Failed to send message: %d\n", ret);
@@ -110,8 +108,16 @@ static void rpi_power_release(struct device *dev)
 
 static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
 {
-	struct rpi_power_msg *msg = msg_ptr;
-	struct rpi_power_domain *rpd = msg->rpd;
+	u32 *msg = msg_ptr;
+	struct device *dev = cl->dev;
+	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
+	
+	if (!rpd) {
+		dev_err(dev, "No rpd set\n");
+		kfree(msg);
+		return;
+	}
+
 
 	dev_info(cl->dev, "tx_done callback called");
 	dev_info(cl->dev, "TX_DONE: msg pointer = %px, val = 0x%08x\n", msg, msg->val);
