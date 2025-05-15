@@ -34,6 +34,7 @@ struct bcm2835_mbox {
 	spinlock_t lock;
 	struct mbox_controller controller;
 	struct mbox_client client;
+	void *last_msg; 
 
 };
 
@@ -49,6 +50,14 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	struct bcm2835_mbox *mbox = dev_id;
 	struct device *dev = mbox->controller.dev;
 	struct mbox_chan *link = &mbox->controller.chans[0];
+
+	void *msg = mbox->last_msg;
+    mbox->last_msg = NULL; // prevent reuse
+
+    if (!msg) {
+	    dev_warn(dev, "No stored message pointer — dropping reply\n");
+	    continue;
+}
 
 	dev_info(dev, "IRQ %d triggered for mailbox\n", irq);
 
@@ -68,7 +77,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 		/* Notify the client */
 		if (link->cl && link->cl->tx_done) {
 			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", raw);
-			link->cl->tx_done(link->cl, raw, 0);
+			link->cl->tx_done(link->cl, msg, 0);
 			dev_info(dev, "Client tx_done callback completed\n");
 		} else {
 			dev_warn(dev, "No tx_done callback set on channel client\n");
@@ -87,6 +96,9 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 		       link, link ? link->mbox : NULL, data);
 		return -EINVAL;
 	}
+
+	mbox->last_msg = data;
+	dev_dbg(mbox->controller.dev, "SEND_DATA called with data=%p\n", data);
 
 	struct bcm2835_mbox *mbox = container_of(link->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
