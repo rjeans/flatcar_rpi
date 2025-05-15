@@ -114,8 +114,7 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
 	struct rpi_power_domain *rpd = msg->rpd;
 
 	dev_info(cl->dev, "tx_done callback called");
-	dev_info(cl->dev, "TX_DONE: msg pointer = %px\n", msg);
-
+	dev_info(cl->dev, "TX_DONE: msg pointer = %px, val = 0x%08x\n", msg, msg->val);
 
 	complete(&rpd->tx_done);
 	kfree(msg);
