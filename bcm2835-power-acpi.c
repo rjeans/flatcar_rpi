@@ -177,7 +177,7 @@ if (!rpd->chan->cl) {
 	rpd->genpd.dev.release = rpi_power_release;
 	rpd->genpd.power_on = rpi_power_on;
 	rpd->genpd.power_off = rpi_power_off;
-	rpd->genpd.flags = GENPD_FLAG_PM_CLK | GENPD_FLAG_ALWAYS_ON;
+	rpd->genpd.flags = GENPD_FLAG_PM_CLK ;
 
 	// Initialize the power domain
 	ret = pm_genpd_init(&rpd->genpd, NULL, false);

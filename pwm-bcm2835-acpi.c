@@ -78,26 +78,7 @@ static const struct pinctrl_map bcm2835_pwm_map[] = {
     },
 };
 
-static int bcm2835_pwm_enable_firmware_power(struct device *dev)
-{
-	struct rpi_firmware *fw;
-	u32 active = 1;
-	int ret;
 
-	fw = rpi_firmware_get(NULL);
-	if (!fw)
-		return -ENODEV;
-
-	ret = rpi_firmware_property(fw, RPI_FIRMWARE_SET_DOMAIN_STATE,
-		(u32[2]){ RPI_FIRMWARE_DOMAIN_PWM, active }, sizeof(u32) * 2);
-
-	if (ret)
-		dev_err(dev, "Failed to enable PWM power domain via firmware: %d\n", ret);
-	else
-		dev_info(dev, "PWM power domain enabled via firmware mailbox\n");
-
-	return ret;
-}
 
 
 static int bcm2835_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
@@ -139,6 +120,9 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     u64 period_cycles, duty_cycles;
     u32 ctrl_val,value;
     int retries = 5;
+
+	pm_runtime_get_sync(pc->dev);
+
 
     dev_info(pc->dev, "Clock rate: %lu Hz", rate);
     if (!rate)
@@ -211,6 +195,9 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
              pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
              state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
+	pm_runtime_put(pc->dev);
+
+
     return 0;
 }
 
@@ -221,6 +208,8 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
                                  struct pwm_state *state)
 {
 	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+	pm_runtime_get_sync(pc->dev);
+
 	u32 ctrl = readl(pc->base + PWM_CONTROL);
 	u32 period = readl(pc->base + PERIOD(pwm->hwpwm));
 	u32 duty = readl(pc->base + DUTY(pwm->hwpwm));
@@ -254,6 +243,7 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 	         state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal",
 	         state->enabled);
 
+	pm_runtime_put(pc->dev);
 	return 0;
 }
 
@@ -292,6 +282,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "Power domain attached successfully\n");
 	}
 
+	pm_runtime_enable(&pdev->dev);
+    pm_runtime_get_sync(&pdev->dev);  // force power-on for setup
+
+
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base)) {
 		dev_err(&pdev->dev, "Failed to map I/O memory\n");
@@ -300,9 +294,6 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "I/O memory mapped successfully\n");
 
 		// Add the power-on call here, before accessing hardware
-	ret = bcm2835_pwm_enable_firmware_power(&pdev->dev);
-	if (ret)
-		dev_warn(&pdev->dev, "PWM firmware domain may not be active\n");
 
 
 
