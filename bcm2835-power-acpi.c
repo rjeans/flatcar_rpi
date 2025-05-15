@@ -187,14 +187,8 @@ if (!rpd->chan->cl) {
 		return ret;
 	}
 
-	// Add the device to the power domain
-	ret = pm_genpd_add_device(&rpd->genpd, dev);
-	if (ret) {
-		dev_err(dev, "Failed to add device to power domain: %d\n", ret);
-		pm_genpd_remove(&rpd->genpd);
-		mbox_free_channel(rpd->chan);
-		return ret;
-	}
+    dev_info(dev, "Registering power domain '%s' with genpd\n", rpd->name);
+    ret = of_genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
 
 	platform_set_drvdata(pdev, rpd);
 	dev_info(dev, "Power domain '%s' initialized\n", rpd->name);
