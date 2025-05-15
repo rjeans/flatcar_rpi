@@ -13,6 +13,7 @@
 #include <linux/acpi.h>
 #include <linux/fwnode.h>
 #include <linux/mailbox_controller.h>
+#include <linux/genpd.h> 
 
 // External reference to mailbox channel
 extern struct mbox_chan *rpi_mbox_chan0;
