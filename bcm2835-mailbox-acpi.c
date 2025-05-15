@@ -59,22 +59,16 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
 		/* Retrieve original message from framework state */
 		
-		if (!link->active_req->msg) {
-			dev_warn(dev, "active_req->msg is NULL — cannot complete\n");
-			continue;
-		}
 
-		dev_info(dev, "Recovered message pointer = %px\n",
-		         link->active_req->msg);
-
+	
 		/* Notify the mailbox core that the TX is done */
 		dev_info(dev, "Calling mbox_chan_txdone(chan = %px)\n", link);
 		mbox_chan_txdone(link, 0);  // Must be called before tx_done()
 
 		/* Notify the client */
 		if (link->cl && link->cl->tx_done) {
-			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", msg);
-			link->cl->tx_done(link->cl, link->active_req->msg, 0);
+			dev_info(dev, "Calling client tx_done callback (msg = %px)\n", raw);
+			link->cl->tx_done(link->cl, raw, 0);
 			dev_info(dev, "Client tx_done callback completed\n");
 		} else {
 			dev_warn(dev, "No tx_done callback set on channel client\n");
