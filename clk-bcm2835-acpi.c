@@ -108,35 +108,50 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	struct clk_init_data init = {};
 	int ret;
 
+	dev_info(dev, "Probing bcm2835-clk-acpi driver\n");
+
 	clk = devm_kzalloc(dev, sizeof(*clk), GFP_KERNEL);
-	if (!clk)
+	if (!clk) {
+		dev_info(dev, "Returning from probe with error: -ENOMEM\n");
 		return -ENOMEM;
-		dev_info(dev, "Returning from probe with error: %s\n", "-ENOMEM");
+	}
 
 	if (device_property_read_string(dev, "rpi,devicename", &clk->name)) {
 		dev_err(dev, "Missing required property 'rpi,devicename'\n");
+		dev_info(dev, "Returning from probe with error: -EINVAL\n");
 		return -EINVAL;
-		dev_info(dev, "Returning from probe with error: %s\n", "-EINVAL");
 	}
+	dev_info(dev, "Clock domain name: %s\n", clk->name);
 
 	clk->mbox_client.dev = dev;
 	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
 	clk->mbox_client.tx_block = false;
 	clk->mbox_client.knows_txdone = true;
+
 	/* Optional: set rate from property, or use fixed default */
 	device_property_read_u32(dev, "clock-frequency", (u32 *)&clk->rate);
-	if (!clk->rate)
+	if (!clk->rate) {
 		clk->rate = FIXED_RATE;
-
+		dev_info(dev, "No clock-frequency property, using default: %lu\n", clk->rate);
+	} else {
+		dev_info(dev, "Clock frequency set from property: %lu\n", clk->rate);
+	}
 
 	clk->chan = rpi_mbox_chan0;
-	if (IS_ERR(clk->chan))
+	if (IS_ERR(clk->chan)) {
+		dev_err(dev, "Failed to acquire mailbox channel: %ld\n", PTR_ERR(clk->chan));
 		return PTR_ERR(clk->chan);
+	}
+	dev_info(dev, "Mailbox channel acquired\n");
 
 	init_completion(&clk->tx_done);
+
 	ret = mbox_bind_client(clk->chan, &clk->mbox_client);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
 		return ret;
+	}
+	dev_info(dev, "Mailbox client bound\n");
 
 	init.name = clk->name;
 	init.ops = &bcm2835_clk_ops;
@@ -145,14 +160,19 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk->hw.init = &init;
 
 	ret = devm_clk_hw_register(dev, &clk->hw);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "Failed to register clk_hw: %d\n", ret);
 		return ret;
+	}
+	dev_info(dev, "clk_hw registered\n");
 
 	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get, &clk->hw);
-	if (ret)
+	if (ret) {
 		dev_err(dev, "Failed to register clk provider: %d\n", ret);
+	}
 
 	platform_set_drvdata(pdev, clk);
+	dev_info(dev, "bcm2835-clk-acpi probe completed successfully\n");
 	return ret;
 }
 
