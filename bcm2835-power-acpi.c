@@ -143,7 +143,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	}
 
 	// Initialize the completion structure and bind the client
-	init_completion(&rpd->chan->tx_complete);
+	
+	init_completion(&rpd->tx_done);
 ret = mbox_bind_client(rpd->chan, &rpd->mbox_client);
 if (ret) {
     dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
