@@ -90,11 +90,11 @@ static int bcm2835_send_data(struct mbox_chan *link, void *data)
 		       link, link ? link->mbox : NULL, data);
 		return -EINVAL;
 	}
+	struct bcm2835_mbox *mbox = container_of(link->mbox, struct bcm2835_mbox, controller);
 
 	
 	dev_dbg(mbox->controller.dev, "SEND_DATA called with data=%p\n", data);
 
-	struct bcm2835_mbox *mbox = container_of(link->mbox, struct bcm2835_mbox, controller);
 	mbox->last_msg = data;
 	u32 msg = *(u32 *)data;
 
