@@ -10,7 +10,7 @@
 #include <linux/slab.h>
 
 extern struct mbox_chan *rpi_mbox_chan0;
-extern void rpi_mbox_set_client(struct mbox_client *client);
+
 
 #define POWER_DOMAIN_ON     0x03
 #define POWER_DOMAIN_OFF    0x02
@@ -105,7 +105,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return PTR_ERR(rpd->chan);
 	}
 
-	rpi_mbox_set_client(&rpd->mbox_client);
+	
 
 	init_completion(&rpd->tx_done);
 

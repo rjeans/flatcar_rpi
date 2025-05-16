@@ -43,7 +43,7 @@ void rpi_mbox_set_client(struct mbox_client *client)
 {
     rpi_mbox_chan0->cl = client;
 }
-EXPORT_SYMBOL_GPL(rpi_mbox_set_client);
+
 
 static struct bcm2835_mbox *bcm2835_link_mbox(struct mbox_chan *link)
 {
@@ -223,10 +223,14 @@ init_completion(&mbox->controller.chans[0].tx_complete);
 	if (ret)
 		return dev_err_probe(dev, ret, "Failed to register mailbox controller\n");
 
-	/* Global references for ACPI power driver */
-
 	
+	/* Global references for ACPI power driver */
 	rpi_mbox_chan0 = &mbox->controller.chans[0];
+	dev_info(dev, "rpi_mbox_chan0 = %px\n", rpi_mbox_chan0);
+	dev_info(dev, "rpi_mbox_chan0->cl = %px\n", rpi_mbox_chan0->cl);
+
+	/* Set client after registration to ensure it's not overwritten */
+	rpi_mbox_set_client(&mbox->client);
 
 	dev_info(dev, "rpi_mbox_chan0 = %px\n", rpi_mbox_chan0);
 	dev_info(dev, "rpi_mbox_chan0->cl = %px\n", rpi_mbox_chan0->cl);
