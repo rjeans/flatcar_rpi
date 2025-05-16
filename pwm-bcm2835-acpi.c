@@ -213,7 +213,7 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
 
     
 	/* Defensive: Force PWM mode bit on at start */
-	u32 ctrl = readl(pc->base + PWM_CONTROL);
+	ctrl = readl(pc->base + PWM_CONTROL);
 	ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
 	ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
 	writel(ctrl, pc->base + PWM_CONTROL);
