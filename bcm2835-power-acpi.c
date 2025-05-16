@@ -28,30 +28,35 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	int ret;
 	u32 *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
-	if (!chan ) {
-		dev_err(dev, "Cannot send message: NULL chan or client\n");
+	if (!chan || !chan->cl) {
+		dev_err(dev, "Cannot send message: NULL chan or client
+");
 		return -ENODEV;
 	}
 
 	*msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
 
-	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
+	dev_info(dev, "Sending firmware power %s for domain '%s'
+",
 	         enable ? "ON" : "OFF", rpd->name);
 
 	reinit_completion(&rpd->tx_done);
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
-		dev_err(dev, "Failed to send message: %d\n", ret);
+		dev_err(dev, "Failed to send message: %d
+", ret);
 		return ret;
 	}
 
 	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
 	if (ret == 0) {
-		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
+		dev_err(dev, "Timeout waiting for mailbox tx completion
+");
 		return -ETIMEDOUT;
 	}
 
-	dev_info(dev, "Firmware mailbox transaction complete\n");
+	dev_info(dev, "Firmware mailbox transaction complete
+");
 	return 0;
 }
 
@@ -81,17 +86,20 @@ static int rpi_power_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rpi_power_domain *rpd;
 
-	dev_info(dev, "Probing raspberrypi-power ACPI runtime-PM driver\n");
+	dev_info(dev, "Probing raspberrypi-power ACPI runtime-PM driver
+");
 
 	rpd = devm_kzalloc(dev, sizeof(*rpd), GFP_KERNEL);
 	if (!rpd)
 		return -ENOMEM;
 
 	if (device_property_read_string(dev, "rpi,devicename", &rpd->name)) {
-		dev_err(dev, "Missing property 'rpi,devicename'\n");
+		dev_err(dev, "Missing property 'rpi,devicename'
+");
 		return -EINVAL;
 	}
-	dev_info(dev, "Power domain name: %s\n", rpd->name);
+	dev_info(dev, "Power domain name: %s
+", rpd->name);
 
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = false;
@@ -100,13 +108,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	rpd->chan = rpi_mbox_chan0;
 	if (IS_ERR(rpd->chan)) {
-		dev_err(dev, "Failed to acquire mailbox channel\n");
+		dev_err(dev, "Failed to acquire mailbox channel
+");
 		return PTR_ERR(rpd->chan);
 	}
 
 	init_completion(&rpd->tx_done);
-	if (!rpd->chan->cl)
-		rpd->chan->cl = &rpd->mbox_client;
 
 	platform_set_drvdata(pdev, rpd);
 
@@ -116,7 +123,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_enable(dev);
 	pm_runtime_resume(dev);
 
-	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
+	dev_info(dev, "Power domain '%s' runtime PM ready
+", rpd->name);
 	return 0;
 }
 
