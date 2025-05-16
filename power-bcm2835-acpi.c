@@ -79,9 +79,14 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
 
 	dev_info(dev, "DMA handle: 0x%pad, msg ptr: %p\n", &rpd->dma_handle, msg);
-    dev_info(dev, "msg.size = 0x%x, tag = 0x%x, domain = 0x%x, state = 0x%x\n",
-         msg->size, msg->tag.tag, msg->tag.power_state.domain, msg->tag.power_state.state);
-
+	dev_info(dev, "msg->size = 0x%08x", msg->size);
+	dev_info(dev, "msg->code = 0x%08x", msg->code);
+	dev_info(dev, "msg->body.tag = 0x%08x", msg->body.tag);
+	dev_info(dev, "msg->body.buf_size = 0x%08x", msg->body.buf_size);
+	dev_info(dev, "msg->body.val_len = 0x%08x", msg->body.val_len);
+	dev_info(dev, "msg->body.domain = 0x%08x", msg->body.domain);
+	dev_info(dev, "msg->body.state = 0x%08x", msg->body.state);
+	dev_info(dev, "msg->end_tag = 0x%08x", msg->end_tag);
 
 	reinit_completion(&rpd->tx_done);
 
