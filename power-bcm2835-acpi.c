@@ -54,18 +54,18 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	memset(msg, 0, sizeof(rpd->msg)); // Ensure it's clean
+	memset(rpd->msg, 0, sizeof(rpd->msg)); // Ensure it's clean
 
-	msg->size = sizeof(rpd->msg);
-	msg->code = 0;  // process request
+	rpd->msg->size = sizeof(rpd->msg);
+	rpd->msg->code = 0;  // process request
 
-	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
-	msg->body.buf_size = 8;
-	msg->body.val_len = 8;
-	msg->body.domain = rpd->fw_domain_id;
-	msg->body.state = enable ? 3 : 0; // bit 0 = ON, bit 1 = WAIT
+	rpd->msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	rpd->msg->body.buf_size = 8;
+	rpd->msg->body.val_len = 8;
+	rpd->msg->body.domain = rpd->fw_domain_id;
+	rpd->msg->body.state = enable ? 3 : 0; // bit 0 = ON, bit 1 = WAIT
 
-	msg->end_tag = 0;
+	rpd->msg->end_tag = 0;
 
 	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
