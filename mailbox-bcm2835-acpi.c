@@ -27,7 +27,6 @@ struct bcm2835_mbox {
     struct mbox_chan chan;
     struct completion tx_complete;
     spinlock_t lock;
-    u32 last_msg;
 };
 
 static struct bcm2835_mbox *global_mbox;
@@ -56,14 +55,17 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
 
     reinit_completion(&mbox->tx_complete);
-    dev_info(mbox->dev, "SEND_DATA called with 0x%08x\n", *(u32 *)data);
-
-    mbox->last_msg = *(u32 *)data;
+ 
+  
 
     spin_lock(&mbox->lock);
     while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
         cpu_relax();
-    writel(*(u32 *)data, mbox->regs + MAIL1_WRT);
+
+
+    dma_addr_t msg_phys = virt_to_phys(data);  // Replace with dma_map_single() later if needed
+    u32 msg_addr = msg_phys | 8;  // Channel 8 = property channel
+    writel(msg_addr, mbox->regs + MAIL1_WRT);
     spin_unlock(&mbox->lock);
 
     if (!wait_for_completion_timeout(&mbox->tx_complete, msecs_to_jiffies(100))) {

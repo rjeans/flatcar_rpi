@@ -142,7 +142,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
-	rpd->mbox_client.tx_done = rpi_power_tx_done;
+	rpd->mbox_client.tx_done = rpi_NULLpower_tx_done;
 	
 	rpd->chan = bcm2835_get_mbox_chan(&rpd->mbox_client);
 	if (IS_ERR(rpd->chan)) {
