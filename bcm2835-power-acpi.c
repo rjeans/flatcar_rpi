@@ -28,7 +28,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	int ret;
 	u32 *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
-	if (!chan || !chan->cl) {
+	if (!chan ||) {
 		dev_err(dev, "Cannot send message: NULL chan or client\n");
 		return -ENODEV;
 	}
@@ -41,8 +41,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	reinit_completion(&rpd->tx_done);
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
-		dev_err(dev, "Failed to send message: %d
-", ret);
+		dev_err(dev, "Failed to send message: %d\n", ret);
 		return ret;
 	}
 
