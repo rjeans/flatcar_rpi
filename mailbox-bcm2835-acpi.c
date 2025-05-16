@@ -76,7 +76,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
         dev_err(mbox->dev, "Failed to DMA map message buffer\n");
         return -EFAULT;
     }
-    pr_info("Mailbox message DMA address: %p (before write)\n", dma | 8);
+    pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
 
 
 
