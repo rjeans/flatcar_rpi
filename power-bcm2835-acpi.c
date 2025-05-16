@@ -30,7 +30,7 @@ struct rpi_firmware_power_msg {
 
 extern struct mbox_chan *rpi_mbox_chan0;
 
-#define RPI_FIRMWARE_POWER_DOMAIN_PWM 0x000000000
+#define RPI_FIRMWARE_POWER_DOMAIN_PWM 0x000000008
 
 
 #define POWER_DOMAIN_ON     0x03
@@ -42,6 +42,7 @@ struct rpi_power_domain {
 	const char *name;
 	struct completion tx_done;
 	u32 fw_domain_id;
+	dma_addr_t dma_handle
 };
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
@@ -56,7 +57,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	msg = dma_alloc_coherent(dev, sizeof(*msg), &rpd->dma_handle, GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
@@ -79,8 +80,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
 		dev_err(dev, "Failed to send mailbox message: %d\n", ret);
-		kfree(msg);
-		return ret;
+		goto out;
 	}
 
 	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
@@ -91,8 +91,12 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	}
 
 	dev_info(dev, "Firmware mailbox power message completed successfully\n");
-	kfree(msg);
-	return 0;
+	
+	ret=0;
+
+	out:
+	dma_free_coherent(dev, sizeof(*msg), msg, rpd->dma_handle);
+
 }
 
 static int rpi_power_runtime_resume(struct device *dev)
