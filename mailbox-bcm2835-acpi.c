@@ -70,8 +70,16 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
         cpu_relax();
 
 
-    dma_addr_t msg_phys = virt_to_phys(data);  // Replace with dma_map_single() later if needed
-    u32 msg_addr = msg_phys | 8;  // Channel 8 = property channel
+    dma_addr_t dma = dma_map_single(mbox->dev, data, sizeof(struct rpi_firmware_power_msg), DMA_TO_DEVICE);
+    if (dma_mapping_error(mbox->dev, dma)) {
+        dev_err(mbox->dev, "Failed to DMA map message buffer\n");
+        return -EFAULT;
+    }
+    pr_info("Mailbox message DMA address: 0x%08x (before write)\n", dma | 8);
+
+
+
+    u32 msg_addr = dma | 8;  // Channel 8 = property channel
     writel(msg_addr, mbox->regs + MAIL1_WRT);
     spin_unlock(&mbox->lock);
 
