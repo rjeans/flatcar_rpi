@@ -5,6 +5,7 @@
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/mailbox_controller.h>
+#include <linux/mailbox_client.h>
 #include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -29,6 +30,9 @@ struct bcm2835_mbox {
 };
 
 static struct bcm2835_mbox *global_mbox;
+struct mbox_chan *rpi_mbox_chan0;
+EXPORT_SYMBOL(rpi_mbox_chan0);
+
 
 static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 {
@@ -78,6 +82,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     platform_set_drvdata(pdev, mbox);
     mbox->dev = &pdev->dev;
     global_mbox = mbox;
+    rpi_mbox_chan0 = &mbox->chan;
+
 
     spin_lock_init(&mbox->lock);
     init_completion(&mbox->tx_complete);

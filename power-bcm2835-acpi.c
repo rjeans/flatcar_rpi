@@ -100,6 +100,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 
 	rpd->chan = rpi_mbox_chan0;
+    rpd->chan->cl = &rpd->mbox_client;
+
+	dev_info(dev, "Mailbox channel client set: cl = %px\n", rpd->chan->cl);
+    dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
+
+
 	if (IS_ERR(rpd->chan)) {
 		dev_err(dev, "Failed to acquire mailbox channel\n");
 		return PTR_ERR(rpd->chan);
