@@ -78,6 +78,11 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
 
+	dev_info(dev, "DMA handle: 0x%pad, msg ptr: %p\n", &rpd->dma_handle, msg);
+    dev_info(dev, "msg.size = 0x%x, tag = 0x%x, domain = 0x%x, state = 0x%x\n",
+         msg->size, msg->tag.tag, msg->tag.power_state.domain, msg->tag.power_state.state);
+
+
 	reinit_completion(&rpd->tx_done);
 
 	ret = mbox_send_message(chan, msg);
