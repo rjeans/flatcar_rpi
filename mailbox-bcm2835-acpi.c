@@ -216,7 +216,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     
     writel(PROPERTY_CHANNEL_IRQ, mbox->regs + MAIL0_IRQ_EN);
 
-    u32 val = readl(mbox->regs + MAIL0_IRQ_EN);
+    val = readl(mbox->regs + MAIL0_IRQ_EN);
     dev_info(&pdev->dev, "Mailbox IRQ enable register now: 0x%08x\n", val);
 
 
