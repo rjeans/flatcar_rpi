@@ -100,6 +100,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	out:
 	dma_free_coherent(dev, sizeof(*msg), msg, rpd->dma_handle);
 
+	return ret;
 }
 
 static int rpi_power_runtime_resume(struct device *dev)
