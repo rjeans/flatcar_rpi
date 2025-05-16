@@ -332,17 +332,6 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	
 
 
-dev_info(&pdev->dev, "PWM clock manually enabled via MMIO\n");
-dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
-
-
-	dev_info(&pdev->dev, "PWM chip added successfully\n");
-
-	return 0;
-
-
-}
-
 
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
