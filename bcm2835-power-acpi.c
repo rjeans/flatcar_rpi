@@ -188,6 +188,11 @@ if (ret) {
 	return ret;
 }
 
+ret = dev_pm_genpd_add(dev, &rpd->genpd);
+if (ret) {
+    dev_err(dev, "Failed to add genpd to device: %d\n", ret);
+    return ret;
+}
 // Register this power domain as a provider for ACPI/firmware consumers
 dev_info(dev, "Registering power domain '%s' with genpd\n", rpd->name);
 
