@@ -132,7 +132,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
-    rmd->fw_domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
+    rpd->fw_domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = false;
 	rpd->mbox_client.knows_txdone = true;
