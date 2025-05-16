@@ -83,8 +83,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
         cpu_relax();
 
 
-    dma_addr_t dma = (dma_addr_t)data;
-    pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
+   void *vaddr = data;
+   dma_addr_t dma = virt_to_phys(vaddr);
+   pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
 
     print_hex_dump(KERN_INFO, "mailbox msg: ", DUMP_PREFIX_OFFSET, 16, 4, (void *)phys_to_virt(dma), 32, true);
 
