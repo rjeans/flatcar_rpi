@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-
+extern struct mbox_chan *global_rpi_mbox_chan;
 
 struct rpi_firmware_power_msg {
 	u32 size;           // Total size of the buffer in bytes

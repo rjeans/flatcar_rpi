@@ -30,6 +30,8 @@ struct bcm2835_mbox {
     spinlock_t lock;
 };
 
+struct mbox_chan *global_rpi_mbox_chan;
+EXPORT_SYMBOL_GPL(global_rpi_mbox_chan);
 
 
 
@@ -168,8 +170,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.ops = &bcm2835_chan_ops;
    
 
-
-    mbox->chan.mbox = &mbox->controller;  
+    global_rpi_mbox_chan = &mbox->chan;
+    mbox->chan.mbox = &mbox->controller;
 
     if (!mbox->chan.mbox)
 	dev_err(&pdev->dev, "mbox->chan.mbox is NULL before registration!\n");
