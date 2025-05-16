@@ -10,9 +10,7 @@
 extern "C" {
 #endif
 
-extern int bcm2835_register_client(struct mbox_client *client);
-extern int bcm2835_unregister_client(struct mbox_client *client);
-extern struct mbox_chan *bcm2835_get_mbox_chan(struct mbox_client *client);
+
 
 struct rpi_firmware_power_msg {
 	u32 size;           // Total size of the buffer in bytes

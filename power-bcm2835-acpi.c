@@ -137,18 +137,14 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.knows_txdone = true;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	
-	rpd->chan = bcm2835_get_mbox_chan(&rpd->mbox_client);
+	rpd->chan = mbox_request_channel(&rpd->mbox_client, 0);
 	if (IS_ERR(rpd->chan)) {
-		dev_err(dev, "Failed to get mailbox channel\n");
+		dev_err(dev, "Failed to request mailbox channel\n");
 		return PTR_ERR(rpd->chan);
 	}
+
   
-	ret=bcm2835_register_client(&rpd->mbox_client);
-	if (ret) {
-		dev_err(dev, "Failed to register mailbox client: %d\n", ret);
-		return ret;
-	}
- 
+
 
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 

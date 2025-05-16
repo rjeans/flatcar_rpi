@@ -30,8 +30,7 @@ struct bcm2835_mbox {
     spinlock_t lock;
 };
 
-static struct bcm2835_mbox *global_mbox;
-struct mbox_chan *rpi_mbox_chan0;
+
 
 
 
@@ -57,7 +56,15 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
 static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
-    struct bcm2835_mbox *mbox = global_mbox;
+    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+    if (!mbox || !mbox->regs) {
+        pr_err("send_data: NULL mbox or regs\n");
+        return -ENODEV;
+    }
+    if (!data) {
+        pr_err("send_data: NULL data\n");
+        return -EINVAL;
+    }
 
     pr_info(">>> bcm2835_send_data called, chan=%p data=%p\n", chan, data);
 
@@ -87,7 +94,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
 static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 {
-    struct bcm2835_mbox *mbox = global_mbox;
+    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 
     /* Assuming IRQ signals completion */
     return completion_done(&mbox->tx_complete);
@@ -95,14 +102,17 @@ static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 
 static int bcm2835_startup(struct mbox_chan *chan)
 {
-    /* You could init per-channel state here if needed */
-    dev_info(global_mbox->dev, "Mailbox channel startup\n");
+    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+   /* You could init per-channel state here if needed */
+    dev_info(mbox->dev, "Mailbox channel startup\n");
     return 0;
 }
 
 static void bcm2835_shutdown(struct mbox_chan *chan)
 {
-    dev_info(global_mbox->dev, "Mailbox channel shutdown\n");
+    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+
+    dev_info(mbox->dev, "Mailbox channel shutdown\n");
     /* Clean up if needed */
 }
 
@@ -117,35 +127,7 @@ static const struct mbox_chan_ops bcm2835_chan_ops = {
 
 
 
-int bcm2835_register_client(struct mbox_client *client)
-{
-	if (!rpi_mbox_chan0 || !client)
-		return -ENODEV;
 
-	rpi_mbox_chan0->cl = client;
-
-    pr_info("Mailbox client registered: %p -> chan=%p\n", client, rpi_mbox_chan0);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(bcm2835_register_client);
-int bcm2835_unregister_client(struct mbox_client *client)
-{
-    if (!rpi_mbox_chan0 || !client)
-        return -ENODEV;
-
-   rpi_mbox_chan0->cl = client;
-   return 0;
-}
-EXPORT_SYMBOL_GPL(bcm2835_unregister_client);
-
-struct mbox_chan *bcm2835_get_mbox_chan(struct mbox_client *client)
-{
-    if (!rpi_mbox_chan0 || !client)
-        return ERR_PTR(-ENODEV);
-
-    return rpi_mbox_chan0;
-}
-EXPORT_SYMBOL_GPL(bcm2835_get_mbox_chan);
 
 
 static int bcm2835_mbox_probe(struct platform_device *pdev)
@@ -160,8 +142,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     platform_set_drvdata(pdev, mbox);
     mbox->dev = &pdev->dev;
-    global_mbox = mbox;
-    rpi_mbox_chan0 = &mbox->chan;
 
     
 
