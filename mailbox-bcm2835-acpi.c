@@ -5,7 +5,6 @@
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/mailbox_controller.h>
-#include <linux/of_device.h>
 #include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -16,7 +15,7 @@
 #define MAIL0_RD    0x00
 #define MAIL0_STA   0x18
 
-#define ARM_MS_FULL 0x80000000
+#define ARM_MS_FULL  0x80000000
 #define ARM_MS_EMPTY 0x40000000
 
 struct bcm2835_mbox {
@@ -25,7 +24,6 @@ struct bcm2835_mbox {
     struct device *dev;
     struct mbox_chan chan;
     struct completion tx_complete;
-    struct mbox_client *cl;
     spinlock_t lock;
     u32 last_msg;
 };
@@ -38,11 +36,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     u32 value;
 
     value = readl(mbox->regs + MAIL0_RD);
-
     dev_info(mbox->dev, "IRQ received: MAIL0_RD = 0x%08x\n", value);
-
-    if (mbox->cl && mbox->cl->tx_done)
-        mbox->cl->tx_done(mbox->chan.mbox, mbox->last_msg);
 
     complete(&mbox->tx_complete);
     return IRQ_HANDLED;
@@ -53,7 +47,6 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     struct bcm2835_mbox *mbox = global_mbox;
 
     reinit_completion(&mbox->tx_complete);
-
     dev_info(mbox->dev, "SEND_DATA called with 0x%08x\n", *(u32 *)data);
 
     mbox->last_msg = *(u32 *)data;
@@ -64,11 +57,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     writel(*(u32 *)data, mbox->regs + MAIL1_WRT);
     spin_unlock(&mbox->lock);
 
-    if (mbox->cl && mbox->cl->tx_block) {
-        if (!wait_for_completion_timeout(&mbox->tx_complete, msecs_to_jiffies(100))) {
-            dev_err(mbox->dev, "Timeout waiting for mailbox tx completion\n");
-            return -ETIMEDOUT;
-        }
+    if (!wait_for_completion_timeout(&mbox->tx_complete, msecs_to_jiffies(100))) {
+        dev_err(mbox->dev, "Timeout waiting for mailbox tx completion\n");
+        return -ETIMEDOUT;
     }
 
     return 0;
@@ -103,10 +94,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     ret = devm_request_irq(&pdev->dev, irq, bcm2835_mbox_irq, 0, dev_name(&pdev->dev), mbox);
     if (ret)
         return ret;
-
-    mbox->chan.tx_done = NULL;
-    mbox->chan.tx_prepare = NULL;
-    mbox->chan.tx_abort = NULL;
 
     mbox->controller.dev = &pdev->dev;
     mbox->controller.chans = &mbox->chan;
