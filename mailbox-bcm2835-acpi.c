@@ -169,6 +169,12 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     mbox->chan.mbox = &mbox->controller;  
 
+    if (!mbox->chan.mbox)
+	dev_err(&pdev->dev, "mbox->chan.mbox is NULL before registration!\n");
+      else
+	dev_info(&pdev->dev, "mbox->chan.mbox is OK\n");
+
+
     ret = devm_mbox_controller_register(&pdev->dev, &mbox->controller);
     if (ret) {
         dev_err(&pdev->dev, "Failed to register mailbox controller: %d\n", ret);
