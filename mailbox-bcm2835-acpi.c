@@ -62,83 +62,19 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
 static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
-    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-    if (!mbox || !mbox->regs) {
-        pr_err("send_data: NULL mbox or regs\n");
-        return -ENODEV;
-    }
-    if (!data) {
-        pr_err("send_data: NULL data\n");
-        return -EINVAL;
-    }
+	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+	dma_addr_t dma = virt_to_phys(data);
+	u32 msg = dma | 8;  // Channel 8 (property channel)
 
-    pr_info(">>> bcm2835_send_data called, chan=%p data=%p\n", chan, data);
+	dev_dbg(mbox->dev, "Sending mailbox message: 0x%08x\n", msg);
 
-   void *vaddr = data;
-   dma_addr_t dma = virt_to_phys(vaddr);
-   pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
+	// Wait until mailbox is ready
+	while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
+		cpu_relax();
 
+	// Write message to firmware
+	writel(msg, mbox->regs + MAIL1_WRT);
 
-    reinit_completion(&mbox->tx_complete);
- 
-  
-
-    spin_lock(&mbox->lock);
-    while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
-        cpu_relax();
-
-
-  
-
-    print_hex_dump(KERN_INFO, "mailbox msg: ", DUMP_PREFIX_OFFSET, 16, 4, vaddr, 32, true);
-
-
-
-    u32 msg_addr = dma | 8;  // Channel 8 = property channel
-    writel(msg_addr, mbox->regs + MAIL1_WRT);
-    spin_unlock(&mbox->lock);
-
-    dev_info(mbox->dev, "Sent message to mailbox: 0x%08x\n", msg_addr);
-
- // Always poll for now — firmware does not signal IRQ
-int timeout = 100000;
-while (--timeout) {
-	if (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-		u32 response = readl(mbox->regs + MAIL0_RD);
-		if ((response & 0xF) != 8) {
-			if (response == 0x00000100) {
-				pr_info("Mailbox replied with 0x100 (non-channel-specific reply)\n");
-			} else {
-				pr_warn("Mailbox reply on unexpected channel: 0x%08x\n", response);
-			}
-		} else {
-			pr_info("Mailbox polled response: 0x%08x\n", response);
-		}
-
-		// Complete safely
-		if (!completion_done(&mbox->tx_complete)) {
-            pr_info("Completing mailbox transaction\n");
-			complete(&mbox->tx_complete);
-            struct mbox_client *cl = mbox->controller.chans[0].cl;
-            if (cl && cl->tx_done)
-	            cl->tx_done(cl, data, 0);
-        }
-		break;
-	}
-	udelay(10);
-}
-if (timeout == 0) {
-	pr_err("Mailbox polling timed out\n");
-	// Defensive: complete anyway to unblock waiters
-	if (!completion_done(&mbox->tx_complete)) {
-        pr_info("Completing mailbox transaction after timeout\n");
-		complete(&mbox->tx_complete);
-                  
-        struct mbox_client *cl = mbox->controller.chans[0].cl;
-        if (cl && cl->tx_done)
-	        cl->tx_done(cl, data, 0);
-    }
-}
     dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
     return 0;
