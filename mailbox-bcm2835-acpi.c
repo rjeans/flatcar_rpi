@@ -10,6 +10,7 @@
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/dma-mapping.h>
 #include "mailbox-bcm2835-acpi.h"
 
 #define MAIL1_STA   0x18
