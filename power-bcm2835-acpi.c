@@ -54,9 +54,9 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	memset(rpd->msg, 0, sizeof(rpd->msg)); // Ensure it's clean
+	memset(rpd->msg, 0, sizeof(*rpd->msg)); // Ensure it's clean
 
-	rpd->msg->size = sizeof(rpd->msg);
+	rpd->msg->size = sizeof(*rpd->msg);
 	rpd->msg->code = 0;  // process request
 
 	rpd->msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
