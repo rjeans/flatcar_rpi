@@ -112,14 +112,7 @@ static int rpi_power_runtime_suspend(struct device *dev)
 	return rpi_power_send(rpd, false);
 }
 
-static void rpi_power_tx_done(struct mbox_client *cl, void *msg_ptr, int r)
-{
-	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-	u32 *msg = msg_ptr;
 
-	complete(&rpd->tx_done);
-	kfree(msg);
-}
 
 static int rpi_power_probe(struct platform_device *pdev)
 {
