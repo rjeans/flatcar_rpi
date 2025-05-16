@@ -32,6 +32,8 @@ struct rpi_power_domain {
 	const char *name;
 	struct completion tx_done;
 	u32 fw_domain_id;
+	struct rpi_firmware_power_msg *msg;
+	dma_addr_t dma_handle;
 };
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
@@ -40,10 +42,8 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct device *dev = rpd->mbox_client.dev;
 	int ret;
 
-	struct rpi_firmware_power_msg *msg;
-	dma_addr_t dma_handle;
 
-	msg = dma_alloc_coherent(dev, sizeof(*msg), &dma_handle, GFP_KERNEL);
+	rpd->msg = dma_alloc_coherent(dev, sizeof(*msg), &rpd->dma_handle, GFP_KERNEL);
     if (!msg) {
       dev_err(dev, "Failed to allocate coherent DMA memory\n");
       return -ENOMEM;
@@ -54,9 +54,9 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	memset(msg, 0, sizeof(msg)); // Ensure it's clean
+	memset(msg, 0, sizeof(rpd->msg)); // Ensure it's clean
 
-	msg->size = sizeof(msg);
+	msg->size = sizeof(rpd->msg);
 	msg->code = 0;  // process request
 
 	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
@@ -69,25 +69,26 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
-			dev_info(dev, "msg ptr: %p\n", msg);
-			dev_info(dev, "msg->size = 0x%08x", msg->size);
-			dev_info(dev, "msg->code = 0x%08x", msg->code);
-			dev_info(dev, "msg->body.tag = 0x%08x", msg->body.tag);
-			dev_info(dev, "msg->body.buf_size = 0x%08x", msg->body.buf_size);
-			dev_info(dev, "msg->body.val_len = 0x%08x", msg->body.val_len);
-			dev_info(dev, "msg->body.domain = 0x%08x", msg->body.domain);
-			dev_info(dev, "msg->body.state = 0x%08x", msg->body.state);
-			dev_info(dev, "msg->end_tag = 0x%08x", msg->end_tag);
+			dev_info(dev, "msg ptr: %p\n", rpd->msg);
+			dev_info(dev, "msg->size = 0x%08x", rpd->msg->size);
+			dev_info(dev, "msg->code = 0x%08x", rpd->msg->code);
+			dev_info(dev, "msg->body.tag = 0x%08x", rpd->msg->body.tag);
+			dev_info(dev, "msg->body.buf_size = 0x%08x", rpd->msg->body.buf_size);
+			dev_info(dev, "msg->body.val_len = 0x%08x", rpd->msg->body.val_len);
+			dev_info(dev, "msg->body.domain = 0x%08x", rpd->msg->body.domain);
+			dev_info(dev, "msg->body.state = 0x%08x", rpd->msg->body.state);
+			dev_info(dev, "msg->end_tag = 0x%08x", rpd->msg->end_tag);
 
 	reinit_completion(&rpd->tx_done);
 
-	ret = mbox_send_message(chan, msg);
+	ret = mbox_send_message(chan, (void*)rpd->dma_handle);
 	if (ret < 0) {
+		dma_free_coherent(dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
 		dev_err(dev, "Failed to send mailbox message: %d\n", ret);
 		return ret;
 	}
 
-    dma_free_coherent(dev, sizeof(*msg), msg, dma_handle);
+ 
 
 
 	dev_info(dev, "Firmware mailbox power message completed successfully\n");
@@ -110,6 +111,9 @@ static int rpi_power_runtime_suspend(struct device *dev)
 static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+	dma_free_coherent(dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+	dev_info(cl->dev, "Firmware power message completed successfully in tx_done\n");
+
     complete(&rpd->tx_done);
 }
 
