@@ -38,7 +38,12 @@ struct bcm2835_mbox {
 
 };
 
-
+// In bcm2835-mbox-acpi.c
+void rpi_mbox_set_client(struct mbox_client *client)
+{
+    rpi_mbox_chan0->cl = client;
+}
+EXPORT_SYMBOL_GPL(rpi_mbox_set_client);
 
 static struct bcm2835_mbox *bcm2835_link_mbox(struct mbox_chan *link)
 {
