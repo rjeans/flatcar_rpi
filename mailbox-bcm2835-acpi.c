@@ -39,6 +39,13 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     struct bcm2835_mbox *mbox = dev_id;
     u32 value;
 
+    pr_info(">>> IRQ handler entered: dev_id=%px\n", dev_id);
+
+    if (!mbox || !mbox->regs) {
+        pr_err("IRQ: NULL mbox or regs\n");
+        return IRQ_NONE;
+    }
+
     value = readl(mbox->regs + MAIL0_RD);
     dev_info(mbox->dev, "IRQ received: MAIL0_RD = 0x%08x\n", value);
 
