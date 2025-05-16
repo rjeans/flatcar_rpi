@@ -11,6 +11,8 @@
 #include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+
+
 #include "mailbox-bcm2835-acpi.h"
 
 
@@ -38,47 +40,54 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	struct device *dev = rpd->mbox_client.dev;
 	int ret;
 
-	struct rpi_firmware_power_msg msg;
+	struct rpi_firmware_power_msg *msg;
+	dma_addr_t dma_handle;
+
+	msg = dma_alloc_coherent(dev, sizeof(*msg), &dma_handle, GFP_KERNEL);
+    if (!msg) {
+      dev_err(dev, "Failed to allocate coherent DMA memory\n");
+      return -ENOMEM;
+}
 
 	if (!chan) {
 		dev_err(dev, "Cannot send message: mailbox channel is NULL\n");
 		return -ENODEV;
 	}
 
-	memset(&msg, 0, sizeof(msg)); // Ensure it's clean
+	memset(msg, 0, sizeof(msg)); // Ensure it's clean
 
-	msg.size = sizeof(msg);
-	msg.code = 0;  // process request
+	msg->size = sizeof(msg);
+	msg->code = 0;  // process request
 
-	msg.body.tag = RPI_FIRMWARE_SET_POWER_STATE;
-	msg.body.buf_size = 8;
-	msg.body.val_len = 8;
-	msg.body.domain = rpd->fw_domain_id;
-	msg.body.state = enable ? 3 : 0; // bit 0 = ON, bit 1 = WAIT
+	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	msg->body.buf_size = 8;
+	msg->body.val_len = 8;
+	msg->body.domain = rpd->fw_domain_id;
+	msg->body.state = enable ? 3 : 0; // bit 0 = ON, bit 1 = WAIT
 
-	msg.end_tag = 0;
+	msg->end_tag = 0;
 
 	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
-
-	dev_info(dev, "msg ptr: %p\n",  &msg);
-	dev_info(dev, "msg->size = 0x%08x", msg.size);
-	dev_info(dev, "msg->code = 0x%08x", msg.code);
-	dev_info(dev, "msg->body.tag = 0x%08x", msg.body.tag);
-	dev_info(dev, "msg->body.buf_size = 0x%08x", msg.body.buf_size);
-	dev_info(dev, "msg->body.val_len = 0x%08x", msg.body.val_len);
-	dev_info(dev, "msg->body.domain = 0x%08x", msg.body.domain);
-	dev_info(dev, "msg->body.state = 0x%08x", msg.body.state);
-	dev_info(dev, "msg->end_tag = 0x%08x", msg.end_tag);
+			dev_info(dev, "msg ptr: %p\n", msg);
+			dev_info(dev, "msg->size = 0x%08x", msg->size);
+			dev_info(dev, "msg->code = 0x%08x", msg->code);
+			dev_info(dev, "msg->body.tag = 0x%08x", msg->body.tag);
+			dev_info(dev, "msg->body.buf_size = 0x%08x", msg->body.buf_size);
+			dev_info(dev, "msg->body.val_len = 0x%08x", msg->body.val_len);
+			dev_info(dev, "msg->body.domain = 0x%08x", msg->body.domain);
+			dev_info(dev, "msg->body.state = 0x%08x", msg->body.state);
+			dev_info(dev, "msg->end_tag = 0x%08x", msg->end_tag);
 
 	reinit_completion(&rpd->tx_done);
 
-	ret = mbox_send_message(chan, &msg);
+	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
 		dev_err(dev, "Failed to send mailbox message: %d\n", ret);
 		return ret;
 	}
 
+    dma_free_coherent(dev, sizeof(*msg), msg, dma_handle);
 
 
 	dev_info(dev, "Firmware mailbox power message completed successfully\n");

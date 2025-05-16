@@ -71,11 +71,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
         cpu_relax();
 
 
-    dma_addr_t dma = dma_map_single(mbox->dev, data, sizeof(struct rpi_firmware_power_msg), DMA_TO_DEVICE);
-    if (dma_mapping_error(mbox->dev, dma)) {
-        dev_err(mbox->dev, "Failed to DMA map message buffer\n");
-        return -EFAULT;
-    }
+    dma_addr_t dma = (dma_addr_t)data;
     pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
 
 
