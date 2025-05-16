@@ -116,8 +116,13 @@ while (--timeout) {
 		}
 
 		// Complete safely
-		if (!completion_done(&mbox->tx_complete))
+		if (!completion_done(&mbox->tx_complete)) {
+            pr_info("Completing mailbox transaction\n");
 			complete(&mbox->tx_complete);
+            struct mbox_client *cl = mbox->controller.chans[0].cl;
+            if (cl && cl->tx_done)
+	            cl->tx_done(cl, data, 0);
+        }
 		break;
 	}
 	udelay(10);
@@ -125,8 +130,14 @@ while (--timeout) {
 if (timeout == 0) {
 	pr_err("Mailbox polling timed out\n");
 	// Defensive: complete anyway to unblock waiters
-	if (!completion_done(&mbox->tx_complete))
+	if (!completion_done(&mbox->tx_complete)) {
+        pr_info("Completing mailbox transaction after timeout\n");
 		complete(&mbox->tx_complete);
+                  
+        struct mbox_client *cl = mbox->controller.chans[0].cl;
+        if (cl && cl->tx_done)
+	        cl->tx_done(cl, data, 0);
+    }
 }
     dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
