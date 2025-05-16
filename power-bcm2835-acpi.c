@@ -11,6 +11,7 @@
 #include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+#include "mailbox-bcm2835-acpi.h"
 
 
 
@@ -30,7 +31,6 @@ struct rpi_firmware_power_msg {
 } __packed;
 
 
-extern struct mbox_chan *rpi_mbox_chan0;
 
 #define RPI_FIRMWARE_POWER_DOMAIN_PWM 0x000000008
 
@@ -146,9 +146,19 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = false;
 	rpd->mbox_client.knows_txdone = true;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
-
-	rpd->chan = rpi_mbox_chan0;
-   
+	
+	rpd->chan = bcm2835_get_mbox_chan(&rpd->mbox_client);
+	if (IS_ERR(rpd->chan)) {
+		dev_err(dev, "Failed to get mailbox channel\n");
+		return PTR_ERR(rpd->chan);
+	}
+  
+	ret=bcm2835_register_client(&rpd->mbox_client);
+	if (ret) {
+		dev_err(dev, "Failed to register mailbox client: %d\n", ret);
+		return ret;
+	}
+ 
 
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 

@@ -10,6 +10,7 @@
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include "mailbox-bcm2835-acpi.h"
 
 #define MAIL1_STA   0x18
 #define MAIL1_WRT   0x20
@@ -31,7 +32,7 @@ struct bcm2835_mbox {
 
 static struct bcm2835_mbox *global_mbox;
 struct mbox_chan *rpi_mbox_chan0;
-EXPORT_SYMBOL(rpi_mbox_chan0);
+
 
 
 static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
@@ -99,6 +100,38 @@ static const struct mbox_chan_ops bcm2835_chan_ops = {
 };
 
 
+
+
+
+int bcm2835_register_client(struct mbox_client *client)
+{
+	if (!rpi_mbox_chan0 || !client)
+		return -ENODEV;
+
+	rpi_mbox_chan0->cl = client;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(bcm2835_register_client);
+int bcm2835_unregister_client(struct mbox_client *client)
+{
+    if (!rpi_mbox_chan0 || !client)
+        return -ENODEV;
+
+   rpi_mbox_chan0->cl = client;
+   return 0;
+}
+EXPORT_SYMBOL_GPL(bcm2835_unregister_client);
+
+struct mbox_chan *bcm2835_get_mbox_chan(struct mbox_client *client)
+{
+    if (!rpi_mbox_chan0 || !client)
+        return -ENODEV;
+
+	return rpi_mbox_chan0;
+}
+EXPORT_SYMBOL_GPL(bcm2835_get_mbox_chan);
+
+
 static int bcm2835_mbox_probe(struct platform_device *pdev)
 {
     struct bcm2835_mbox *mbox;
@@ -113,6 +146,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->dev = &pdev->dev;
     global_mbox = mbox;
     rpi_mbox_chan0 = &mbox->chan;
+
+    
 
 
     spin_lock_init(&mbox->lock);
