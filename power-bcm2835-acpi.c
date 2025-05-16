@@ -138,7 +138,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
 
-	rpd->chan = mbox_request_channel(&rpd->mbox_client, 0);
+	rpd->chan = mbox_request_channel_byname(&rpd->mbox_client, "property");
+
 	if (IS_ERR(rpd->chan)) {
 		dev_err(dev, "Failed to request mailbox channel: %ld\n", PTR_ERR(rpd->chan));
 		return PTR_ERR(rpd->chan);
