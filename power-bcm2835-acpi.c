@@ -152,6 +152,13 @@ static int rpi_power_probe(struct platform_device *pdev)
   
 
 
+	ret = mbox_bind_client(rpd->chan, &rpd->mbox_client);
+	if (ret) {
+		dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
+		return ret;
+	}
+
+
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 
 
