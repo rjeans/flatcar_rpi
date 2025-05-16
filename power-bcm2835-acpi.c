@@ -44,7 +44,6 @@ struct rpi_power_domain {
 	const char *name;
 	struct completion tx_done;
 	u32 fw_domain_id;
-	dma_addr_t dma_handle;
 };
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
@@ -60,7 +59,8 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	msg = dma_alloc_coherent(dev, sizeof(*msg), &rpd->dma_handle, GFP_KERNEL);
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+
 	if (!msg)
 		return -ENOMEM;
 
@@ -108,7 +108,8 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	ret=0;
 
 	out:
-	dma_free_coherent(dev, sizeof(*msg), msg, rpd->dma_handle);
+	kfree(msg);
+
 
 	return ret;
 }
