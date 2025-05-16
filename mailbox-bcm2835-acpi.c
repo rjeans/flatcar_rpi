@@ -130,9 +130,9 @@ EXPORT_SYMBOL_GPL(bcm2835_unregister_client);
 struct mbox_chan *bcm2835_get_mbox_chan(struct mbox_client *client)
 {
     if (!rpi_mbox_chan0 || !client)
-        return -ENODEV;
+        return ERR_PTR(-ENODEV);
 
-	return rpi_mbox_chan0;
+    return rpi_mbox_chan0;
 }
 EXPORT_SYMBOL_GPL(bcm2835_get_mbox_chan);
 
