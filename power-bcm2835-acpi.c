@@ -59,8 +59,13 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return -ENODEV;
 	}
 
-	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
-
+	// Allocate controller-safe message buffer
+	msg_ptr = mbox_alloc_message(rpd->chan, sizeof(*msg));
+	if (!msg_ptr) {
+		dev_err(dev, "Failed to allocate mailbox message buffer\n");
+		return -ENOMEM;
+	}
+	msg = (struct rpi_firmware_power_msg *)msg_ptr;
 	if (!msg)
 		return -ENOMEM;
 
@@ -108,7 +113,8 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	ret=0;
 
 	out:
-	kfree(msg);
+	mbox_free_message(chan, msg);
+
 
 
 	return ret;

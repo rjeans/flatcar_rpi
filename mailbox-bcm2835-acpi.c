@@ -70,6 +70,35 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     return 0;
 }
 
+static bool bcm2835_last_tx_done(struct mbox_chan *chan)
+{
+    struct bcm2835_mbox *mbox = global_mbox;
+
+    /* Assuming IRQ signals completion */
+    return completion_done(&mbox->tx_complete);
+}
+
+static int bcm2835_startup(struct mbox_chan *chan)
+{
+    /* You could init per-channel state here if needed */
+    dev_info(global_mbox->dev, "Mailbox channel startup\n");
+    return 0;
+}
+
+static void bcm2835_shutdown(struct mbox_chan *chan)
+{
+    dev_info(global_mbox->dev, "Mailbox channel shutdown\n");
+    /* Clean up if needed */
+}
+
+static const struct mbox_chan_ops bcm2835_chan_ops = {
+    .send_data     = bcm2835_send_data,
+    .startup       = bcm2835_startup,
+    .shutdown      = bcm2835_shutdown,
+    .last_tx_done  = bcm2835_last_tx_done,
+};
+
+
 static int bcm2835_mbox_probe(struct platform_device *pdev)
 {
     struct bcm2835_mbox *mbox;
@@ -105,9 +134,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.dev = &pdev->dev;
     mbox->controller.chans = &mbox->chan;
     mbox->controller.num_chans = 1;
-    mbox->controller.ops = &(struct mbox_chan_ops){
-        .send_data = bcm2835_send_data,
-    };
+    mbox->controller.ops = &bcm2835_chan_ops
 
     ret = devm_mbox_controller_register(&pdev->dev, &mbox->controller);
     if (ret) {
