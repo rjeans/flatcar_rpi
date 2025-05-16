@@ -125,7 +125,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	if (!rate)
 		return -EINVAL;
 
-	ret = 
+	
 	/* Defensive: Force PWM mode bit on at start */
 	u32 ctrl = readl(pc->base + PWM_CONTROL);
 	ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
@@ -134,7 +134,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	udelay(10);
 	dev_info(pc->dev, "Forced PWM_MODE bit at apply start, CONTROL=0x%08x", ctrl);
 
-	pm_runtime_get_sync(pc->dev);
+	ret = pm_runtime_get_sync(pc->dev);
 	if (ret < 0) {
 		dev_warn(pc->dev, "Failed to power up device: %d", ret);
 		pm_runtime_put_noidle(pc->dev);
