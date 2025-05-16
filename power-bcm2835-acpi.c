@@ -122,6 +122,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct rpi_power_domain *rpd;
+	int ret;
 	
 
 	dev_info(dev, "Probing raspberrypi-power ACPI runtime-PM driver\n");
