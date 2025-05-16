@@ -100,25 +100,34 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
     dev_info(mbox->dev, "Sent message to mailbox: 0x%08x\n", msg_addr);
 
-    // Always poll for now — firmware does not signal IRQ
-    int timeout = 100000;
-    while (--timeout) {
-        if (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-            u32 response = readl(mbox->regs + MAIL0_RD);
-            if ((response & 0xF) != 8)
-                pr_warn("Mailbox reply on unexpected channel: 0x%08x\n", response);
-            else
-                pr_info("Mailbox polled response: 0x%08x\n", response);
+ // Always poll for now — firmware does not signal IRQ
+int timeout = 100000;
+while (--timeout) {
+	if (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+		u32 response = readl(mbox->regs + MAIL0_RD);
+		if ((response & 0xF) != 8) {
+			if (response == 0x00000100) {
+				pr_info("Mailbox replied with 0x100 (non-channel-specific reply)\n");
+			} else {
+				pr_warn("Mailbox reply on unexpected channel: 0x%08x\n", response);
+			}
+		} else {
+			pr_info("Mailbox polled response: 0x%08x\n", response);
+		}
 
-            complete(&mbox->tx_complete);
-            break;
-        }
-        udelay(10);
-    }
-    if (timeout == 0)
-        pr_err("Mailbox polling timed out\n");
-
-
+		// Complete safely
+		if (!completion_done(&mbox->tx_complete))
+			complete(&mbox->tx_complete);
+		break;
+	}
+	udelay(10);
+}
+if (timeout == 0) {
+	pr_err("Mailbox polling timed out\n");
+	// Defensive: complete anyway to unblock waiters
+	if (!completion_done(&mbox->tx_complete))
+		complete(&mbox->tx_complete);
+}
 
     return 0;
 }

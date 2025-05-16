@@ -88,7 +88,12 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return ret;
 	}
 
- 
+	// Wait with timeout to avoid hang if IRQ is not triggered
+	if (!wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100))) {
+		dma_free_coherent(dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+		dev_err(dev, "Timeout waiting for mailbox firmware response\n");
+		return -ETIMEDOUT;
+	}
 
 
 	dev_info(dev, "Firmware mailbox power message completed successfully\n");
