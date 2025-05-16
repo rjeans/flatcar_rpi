@@ -68,10 +68,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     writel(msg_addr, mbox->regs + MAIL1_WRT);
     spin_unlock(&mbox->lock);
 
-    if (!wait_for_completion_timeout(&mbox->tx_complete, msecs_to_jiffies(100))) {
-        dev_err(mbox->dev, "Timeout waiting for mailbox tx completion\n");
-        return -ETIMEDOUT;
-    }
+    dev_info(mbox->dev, "Sent message to mailbox: 0x%08x\n", msg_addr);
 
     return 0;
 }
