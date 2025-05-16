@@ -128,6 +128,7 @@ if (timeout == 0) {
 	if (!completion_done(&mbox->tx_complete))
 		complete(&mbox->tx_complete);
 }
+    dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
     return 0;
 }
