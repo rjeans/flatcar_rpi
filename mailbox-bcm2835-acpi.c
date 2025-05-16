@@ -174,6 +174,12 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
         dev_err(&pdev->dev, "Failed to register mailbox controller: %d\n", ret);
         return ret;
     }
+ 
+    pr_info("Mailbox controller registered: chans=%d\n", mbox->controller.num_chans);
+    if (!mbox->chan.mbox)
+	   pr_err("ERROR: mbox->chan.mbox is NULL!\n");
+
+    
 
     dev_info(&pdev->dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
     return 0;
