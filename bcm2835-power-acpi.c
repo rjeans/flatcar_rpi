@@ -35,27 +35,23 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 	*msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
 
-	dev_info(dev, "Sending firmware power %s for domain '%s'
-",
+	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
 	         enable ? "ON" : "OFF", rpd->name);
 
 	reinit_completion(&rpd->tx_done);
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
-		dev_err(dev, "Failed to send message: %d
-", ret);
+		dev_err(dev, "Failed to send message: %d\n", ret);
 		return ret;
 	}
 
 	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
 	if (ret == 0) {
-		dev_err(dev, "Timeout waiting for mailbox tx completion
-");
+		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
 		return -ETIMEDOUT;
 	}
 
-	dev_info(dev, "Firmware mailbox transaction complete
-");
+	dev_info(dev, "Firmware mailbox transaction complete\n");
 	return 0;
 }
 
@@ -85,20 +81,17 @@ static int rpi_power_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rpi_power_domain *rpd;
 
-	dev_info(dev, "Probing raspberrypi-power ACPI runtime-PM driver
-");
+	dev_info(dev, "Probing raspberrypi-power ACPI runtime-PM driver\n");
 
 	rpd = devm_kzalloc(dev, sizeof(*rpd), GFP_KERNEL);
 	if (!rpd)
 		return -ENOMEM;
 
 	if (device_property_read_string(dev, "rpi,devicename", &rpd->name)) {
-		dev_err(dev, "Missing property 'rpi,devicename'
-");
+		dev_err(dev, "Missing property 'rpi,devicename'\n");
 		return -EINVAL;
 	}
-	dev_info(dev, "Power domain name: %s
-", rpd->name);
+	dev_info(dev, "Power domain name: %s\n", rpd->name);
 
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = false;
@@ -107,8 +100,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	rpd->chan = rpi_mbox_chan0;
 	if (IS_ERR(rpd->chan)) {
-		dev_err(dev, "Failed to acquire mailbox channel
-");
+		dev_err(dev, "Failed to acquire mailbox channel\n");
 		return PTR_ERR(rpd->chan);
 	}
 
@@ -124,8 +116,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_enable(dev);
 	pm_runtime_resume(dev);
 
-	dev_info(dev, "Power domain '%s' runtime PM ready
-", rpd->name);
+	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
 	return 0;
 }
 
