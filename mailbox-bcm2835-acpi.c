@@ -52,6 +52,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
     struct bcm2835_mbox *mbox = global_mbox;
 
+    pr_info(">>> bcm2835_send_data called, chan=%p data=%p\n", chan, data);
+
+
     reinit_completion(&mbox->tx_complete);
     dev_info(mbox->dev, "SEND_DATA called with 0x%08x\n", *(u32 *)data);
 
@@ -109,6 +112,8 @@ int bcm2835_register_client(struct mbox_client *client)
 		return -ENODEV;
 
 	rpi_mbox_chan0->cl = client;
+
+    pr_info("Mailbox client registered: %p -> chan=%p\n", client, rpi_mbox_chan0);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(bcm2835_register_client);
