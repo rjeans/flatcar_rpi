@@ -19,7 +19,7 @@
 #define MAIL0_STA   0x18
 #define MAIL0_IRQ_EN   0x0C  // per BCM2835 spec, IRQ 0 control
 #define MAIL0_CFG      0x10  // sometimes needed to route
-#define MAIL0_IRQ_ENABLE_PROPERTY (1<<8)) // Enable IRQ for property channel
+#define MAIL0_IRQ_ENABLE_PROPERTY (1<<8) // Enable IRQ for property channel
 
 #define ARM_MS_FULL  0x80000000
 #define ARM_MS_EMPTY 0x40000000
