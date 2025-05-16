@@ -100,19 +100,24 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
     dev_info(mbox->dev, "Sent message to mailbox: 0x%08x\n", msg_addr);
 
+    // Always poll for now — firmware does not signal IRQ
     int timeout = 100000;
     while (--timeout) {
         if (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
             u32 response = readl(mbox->regs + MAIL0_RD);
-            pr_info(">>> mailbox polled response: 0x%08x\n", response);
+            if ((response & 0xF) != 8)
+                pr_warn("Mailbox reply on unexpected channel: 0x%08x\n", response);
+            else
+                pr_info("Mailbox polled response: 0x%08x\n", response);
+
             complete(&mbox->tx_complete);
             break;
         }
         udelay(10);
     }
-
     if (timeout == 0)
-        pr_err(">>> mailbox polling timed out\n");
+        pr_err("Mailbox polling timed out\n");
+
 
 
     return 0;
