@@ -19,7 +19,8 @@
 #define MAIL0_STA   0x18
 #define MAIL0_IRQ_EN   0x0C  // per BCM2835 spec, IRQ 0 control
 #define MAIL0_CFG      0x10  // sometimes needed to route
-#define MAIL0_IRQ_ENABLE_PROPERTY (1<<8) // Enable IRQ for property channel
+
+#define PROPERTY_CHANNEL_IRQ (1 << 8)
 
 #define ARM_MS_FULL  0x80000000
 #define ARM_MS_EMPTY 0x40000000
@@ -205,6 +206,22 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "mbox->chan.mbox is OK\n");
 
 
+    // Step 1: Drain stale responses
+    (void)readl(mbox->regs + MAIL0_RD);
+
+    // Step 2: Reset IRQ enable to known state
+    writel(0x00000000, mbox->regs + MAIL0_IRQ_EN);
+
+    // Step 3: Enable property channel interrupt (channel 8)
+    
+    writel(PROPERTY_CHANNEL_IRQ, mbox->regs + MAIL0_IRQ_EN);
+
+    u32 val = readl(mbox->regs + MAIL0_IRQ_EN);
+    dev_info(&pdev->dev, "Mailbox IRQ enable register now: 0x%08x\n", val);
+
+
+
+
     ret = devm_mbox_controller_register(&pdev->dev, &mbox->controller);
     if (ret) {
         dev_err(&pdev->dev, "Failed to register mailbox controller: %d\n", ret);
@@ -215,12 +232,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (!mbox->chan.mbox)
 	   pr_err("ERROR: mbox->chan.mbox is NULL!\n");
 
-    // Enable interrupt for MAIL0 (channel 8 is property channel)
-    writel(MAIL0_IRQ_ENABLE_PROPERTY, mbox->regs + MAIL0_IRQ_EN);
-    dev_info(&pdev->dev, "Mailbox IRQs enabled via 0x%X\n", MAIL0_IRQ_EN);
-
-    val = readl(mbox->regs + MAIL0_IRQ_EN);
-    dev_info(&pdev->dev, "Mailbox IRQ enable register now: 0x%08x\n", val);
+    
+    
+ 
     dev_info(&pdev->dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
     return 0;
 }
