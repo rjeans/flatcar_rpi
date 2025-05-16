@@ -134,6 +134,16 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	dev_info(pc->dev, "Configuring PWM at %lu Hz", rate);
 
+	/* Ensure PWM_MODE is set before register writes */
+	ctrl = readl(pc->base + PWM_CONTROL);
+	if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm)))) {
+		ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
+		ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+		writel(ctrl, pc->base + PWM_CONTROL);
+		dev_info(pc->dev, "PWM_MODE bit forced on for channel %u", pwm->hwpwm);
+	}
+
+	/* Setup clock */
 	writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
 	udelay(10);
 	writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
@@ -167,7 +177,6 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	ctrl = readl(pc->base + PWM_CONTROL);
 	ctrl &= ~(PWM_ENABLE | PWM_POLARITY) << PWM_CONTROL_SHIFT(pwm->hwpwm);
-	ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm); // Ensure mode
 
 	if (state->enabled)
 		ctrl |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
