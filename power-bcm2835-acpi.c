@@ -7,11 +7,30 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
-
+#include <soc/bcm2835/raspberrypi-firmware.h>
 #include <linux/property.h>
 #include <linux/slab.h>
 
+
+struct rpi_firmware_power_msg {
+	u32 size;           // Total size of the buffer in bytes
+	u32 code;           // Request code (0 = process request)
+
+	struct {
+		u32 tag;        // Tag ID (0x00028001 = set power state)
+		u32 buf_size;   // Size of the value buffer (8)
+		u32 val_len;    // Length of the actual value data (8)
+		u32 domain;     // Power domain ID (e.g., 0x00000000 = SD card)
+		u32 state;      // Bit 0: 1 = ON, Bit 1: 1 = WAIT
+	} __packed body;
+
+	u32 end_tag;        // 0
+} __packed;
+
+
 extern struct mbox_chan *rpi_mbox_chan0;
+
+#define RPI_FIRMWARE_POWER_DOMAIN_PWM 0x000000000
 
 
 #define POWER_DOMAIN_ON     0x03
@@ -22,39 +41,57 @@ struct rpi_power_domain {
 	struct mbox_client mbox_client;
 	const char *name;
 	struct completion tx_done;
+	u32 fw_domain_id;
 };
-
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
 	struct mbox_chan *chan = rpd->chan;
 	struct device *dev = rpd->mbox_client.dev;
 	int ret;
-	u32 *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
-	if (!chan ) {
-		dev_err(dev, "Cannot send message: NULL chan or client\n");
+	struct rpi_firmware_power_msg *msg;
+
+	if (!chan) {
+		dev_err(dev, "Cannot send message: mailbox channel is NULL\n");
 		return -ENODEV;
 	}
 
-	*msg = (enable ? POWER_DOMAIN_ON : POWER_DOMAIN_OFF);
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
 
-	dev_info(dev, "Sending firmware power %s for domain '%s'\n",
-	         enable ? "ON" : "OFF", rpd->name);
+	msg->size = sizeof(*msg);
+	msg->code = 0;  // process request
+
+	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	msg->body.buf_size = 8;
+	msg->body.val_len = 8;
+	msg->body.domain = rpd->fw_domain_id;
+	msg->body.state = enable ? 3 : 0; // bit 0 = ON, bit 1 = WAIT
+
+	msg->end_tag = 0;
+
+	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
+	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
 
 	reinit_completion(&rpd->tx_done);
+
 	ret = mbox_send_message(chan, msg);
 	if (ret < 0) {
-		dev_err(dev, "Failed to send message: %d\n", ret);
+		dev_err(dev, "Failed to send mailbox message: %d\n", ret);
+		kfree(msg);
 		return ret;
 	}
 
 	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
 	if (ret == 0) {
 		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
+		kfree(msg);
 		return -ETIMEDOUT;
 	}
 
-	dev_info(dev, "Firmware mailbox transaction complete\n");
+	dev_info(dev, "Firmware mailbox power message completed successfully\n");
+	kfree(msg);
 	return 0;
 }
 
@@ -95,7 +132,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
-
+    rmd->fw_domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = false;
 	rpd->mbox_client.knows_txdone = true;
