@@ -6,7 +6,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/mailbox_controller.h>  
+
 
 #include <linux/property.h>
 #include <linux/slab.h>
@@ -102,9 +102,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 
 	rpd->chan = rpi_mbox_chan0;
-    rpd->chan->cl = &rpd->mbox_client;
+   
 
-	dev_info(dev, "Mailbox channel client set: cl = %px\n", rpd->chan->cl);
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 
 

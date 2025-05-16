@@ -43,6 +43,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     dev_info(mbox->dev, "IRQ received: MAIL0_RD = 0x%08x\n", value);
 
     complete(&mbox->tx_complete);
+    dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
     return IRQ_HANDLED;
 }
 
