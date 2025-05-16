@@ -73,8 +73,8 @@ static const struct pinctrl_map bcm2835_pwm_map[] = {
         .type = PIN_MAP_TYPE_MUX_GROUP,
         .ctrl_dev_name = "BCM2845:00",      // ACPI _HID of your pinctrl (GPIO) device
         .data.mux = {
-            .group = "gpio12",
-            .function = "alt0",            
+            .group = "gpio18",
+            .function = "alt5",            
         },
     },
 };
@@ -119,134 +119,124 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
     unsigned long rate = pc->clk_rate;
     u64 period_cycles, duty_cycles;
-    u32 ctrl_val,value;
-    int retries = 5;
+    u32 ctrl;
+    int retries;
 
-	pm_runtime_get_sync(pc->dev);
-
-
-    dev_info(pc->dev, "Clock rate: %lu Hz", rate);
     if (!rate)
         return -EINVAL;
 
-    // Convert period/duty from ns to cycles
+    pm_runtime_get_sync(pc->dev);
+    dev_info(pc->dev, "Configuring PWM: rate=%lu Hz", rate);
+
     period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
     duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
-	// Reset PWM block
-	dev_info(pc->dev, "Resetting PWM peripheral before applying settings");
-    writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
-    udelay(10);
-    writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
-    writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
-    udelay(10);
-    dev_info(pc->dev, "Post-reset CM_PWMCTL = 0x%08x", readl(pc->cm_base + CM_PWMCTL));
-    dev_info(pc->dev, "Post-reset CM_PWMDIV = 0x%08x", readl(pc->cm_base + CM_PWMDIV));
-
-
-    // Warn about small period
     if (period_cycles < PERIOD_MIN) {
-        dev_warn(pc->dev, "Period too small (%llu cycles), skipping hardware write\n", period_cycles);
-        return 0;
+        dev_warn(pc->dev, "Period too small (%llu cycles), skipping configuration\n", period_cycles);
+        goto out;
     }
 
-	value = readl(pc->base + PWM_CONTROL);
-    dev_info(pc->dev, "Pre-write CONTROL = 0x%08x", value);
-    dev_info(pc->dev, "CM_PWMCTL = 0x%08x", readl(pc->cm_base + CM_PWMCTL));
-    dev_info(pc->dev, "CM_PWMDIV = 0x%08x", readl(pc->cm_base + CM_PWMDIV));
-
-    writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
+    writel(CM_PASSWD | 0, pc->cm_base + CM_PWMCTL);
     udelay(10);
     writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
     writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
-    // Retry loop for PERIOD
-    while (retries--) {
+    udelay(10);
+
+    for (retries = 5; retries; retries--) {
         writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
         udelay(100);
         if (readl(pc->base + PERIOD(pwm->hwpwm)) == period_cycles)
             break;
-        dev_warn(pc->dev, "PERIOD write verify failed (retry %d)", 5 - retries);
+        dev_warn(pc->dev, "PERIOD write verify failed, retrying (%d left)\n", retries - 1);
     }
-    if (retries <= 0) {
-        dev_err(pc->dev, "PERIOD register stuck - wrote %llu, read back %u",
+
+    if (!retries)
+        dev_err(pc->dev, "PERIOD register stuck: wrote %llu, read %u\n",
                 period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
-    }
 
     writel(duty_cycles, pc->base + DUTY(pwm->hwpwm));
     udelay(100);
-    if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles) {
-        dev_warn(pc->dev, "DUTY write verify failed: wrote %llu, read back %u",
+    if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles)
+        dev_warn(pc->dev, "DUTY write mismatch: wrote %llu, read %u\n",
                  duty_cycles, readl(pc->base + DUTY(pwm->hwpwm)));
-    }
 
-    // Compose control value
-    ctrl_val = readl(pc->base + PWM_CONTROL);
-    ctrl_val &= ~(PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm));
-    ctrl_val &= ~(PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm));
+    ctrl = readl(pc->base + PWM_CONTROL);
+    ctrl &= ~(PWM_ENABLE | PWM_POLARITY) << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
     if (state->enabled)
-        ctrl_val |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+        ctrl |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
     if (state->polarity == PWM_POLARITY_INVERSED)
-        ctrl_val |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
+        ctrl |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
-    writel(ctrl_val, pc->base + PWM_CONTROL);
+    writel(ctrl, pc->base + PWM_CONTROL);
     udelay(100);
 
-    dev_info(pc->dev, "APPLY: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
-             pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
+    dev_info(pc->dev, "APPLY: hwpwm=%d period=%llu duty=%llu polarity=%s",
+             pwm->hwpwm, period_cycles, duty_cycles,
              state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
-	pm_runtime_put(pc->dev);
-
-
+out:
+    pm_runtime_put(pc->dev);
     return 0;
 }
-
-
 
 static int bcm2835_pwm_get_state(struct pwm_chip *chip,
                                  struct pwm_device *pwm,
                                  struct pwm_state *state)
 {
-	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-	pm_runtime_get_sync(pc->dev);
+    struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+    u32 ctrl, period, duty;
+    int ret;
 
-	u32 ctrl = readl(pc->base + PWM_CONTROL);
-	u32 period = readl(pc->base + PERIOD(pwm->hwpwm));
-	u32 duty = readl(pc->base + DUTY(pwm->hwpwm));
+    ret = pm_runtime_get_sync(pc->dev);
+    if (ret < 0) {
+        dev_warn(pc->dev, "Failed to resume device for get_state: %d\n", ret);
+        pm_runtime_put_noidle(pc->dev);
+        return ret;
+    }
 
-	dev_info(pc->dev, "GET_STATE: CONTROL = 0x%08x", ctrl);
-	dev_info(pc->dev, "GET_STATE: hwpwm = %u", pwm->hwpwm);
-	dev_info(pc->dev, "GET_STATE: PERIOD reg = %u", period);
-	dev_info(pc->dev, "GET_STATE: DUTY reg   = %u", duty);
+    ctrl = readl(pc->base + PWM_CONTROL);
+    period = readl(pc->base + PERIOD(pwm->hwpwm));
+    duty = readl(pc->base + DUTY(pwm->hwpwm));
 
-	state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
-	state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm))) ?
-	                  PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
+    state->enabled = !!(ctrl & (PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm)));
+    state->polarity = (ctrl & (PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm)))
+                      ? PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
 
-	if (period != 0) {
-		state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
-		dev_info(pc->dev, "GET_STATE: Converted period = %llu ns", state->period);
-	} else {
-		dev_warn(pc->dev, "GET_STATE: PERIOD is zero - fallback period used (1 ms)");
-		state->period = 1000000;
-	}
+    if (period) {
+        state->period = (u64)period * NSEC_PER_SEC / pc->clk_rate;
+    } else {
+        state->period = 1000000; // default to 1ms
+        dev_warn(pc->dev, "PERIOD is zero; using fallback value: 1ms\n");
+    }
 
-	if (duty != 0) {
-		state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
-		dev_info(pc->dev, "GET_STATE: Converted duty   = %llu ns", state->duty_cycle);
-	} else {
-		state->duty_cycle = 0;
-		dev_info(pc->dev, "GET_STATE: DUTY is zero -> duty_cycle = 0");
-	}
+    if (duty) {
+        state->duty_cycle = (u64)duty * NSEC_PER_SEC / pc->clk_rate;
+    } else {
+        state->duty_cycle = 0;
+    }
 
-	dev_info(pc->dev, "GET_STATE: polarity = %s, enabled = %d",
-	         state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal",
-	         state->enabled);
+    dev_info(pc->dev, "PWM GET_STATE: hwpwm=%u ctrl=0x%08x period=%u duty=%u -> enabled=%d polarity=%s",
+             pwm->hwpwm, ctrl, period, duty,
+             state->enabled,
+             state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
-	pm_runtime_put(pc->dev);
+    pm_runtime_put(pc->dev);
+    return 0;
+}
+
+static int bcm2835_pwm_suspend(struct device *dev)
+{
+	pm_runtime_put_sync_suspend(dev);
 	return 0;
 }
+
+static int bcm2835_pwm_resume(struct device *dev)
+{
+	pm_runtime_get_sync(dev);
+	return 0;
+}
+
 
 
 static const struct pwm_ops bcm2835_pwm_ops = {
@@ -404,21 +394,7 @@ dev_info(&pdev->dev, "PWM clock rate used: %lu Hz\n", pc->clk_rate);
 
 }
 
-static int bcm2835_pwm_suspend(struct device *dev)
-{
-	
 
-	
-
-	return 0;
-}
-
-static int bcm2835_pwm_resume(struct device *dev)
-{
-	
-
-	return 0;
-}
 
 static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
@@ -434,6 +410,8 @@ if (pc->cm_base) {
 } else {
 	dev_warn(&pdev->dev, "Base was NULL\n");
 }
+
+pm_runtime_disable(&pc->chip.dev->dev);
 
 
 
