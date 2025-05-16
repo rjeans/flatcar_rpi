@@ -10,6 +10,8 @@
 #include <soc/bcm2835/raspberrypi-firmware.h>
 #include <linux/property.h>
 #include <linux/slab.h>
+#include <linux/dma-mapping.h>
+
 
 
 struct rpi_firmware_power_msg {
