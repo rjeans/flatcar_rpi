@@ -28,7 +28,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	int ret;
 	u32 *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
-	if (!chan ||) {
+	if (!chan ) {
 		dev_err(dev, "Cannot send message: NULL chan or client\n");
 		return -ENODEV;
 	}
