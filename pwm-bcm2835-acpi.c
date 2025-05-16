@@ -116,92 +116,76 @@ static void bcm2835_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                              const struct pwm_state *state)
 {
-	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-	unsigned long rate = pc->clk_rate;
-	u64 period_cycles, duty_cycles;
-	u32 ctrl;
-	int retries, ret;
+    struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+    unsigned long rate = pc->clk_rate;
+    u64 period_cycles, duty_cycles;
+    u32 ctrl;
+    int retries, ret;
 
-	if (!rate)
-		return -EINVAL;
+    if (!rate)
+        return -EINVAL;
 
-	
-	/* Defensive: Force PWM mode bit on at start */
-	ctrl = readl(pc->base + PWM_CONTROL);
-	ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
-	ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
-	writel(ctrl, pc->base + PWM_CONTROL);
-	udelay(10);
-	dev_info(pc->dev, "Forced PWM_MODE bit at apply start, CONTROL=0x%08x", ctrl);
+    ret = pm_runtime_get_sync(pc->dev);
+    if (ret < 0) {
+        dev_warn(pc->dev, "Failed to power up device: %d", ret);
+        pm_runtime_put_noidle(pc->dev);
+        return ret;
+    }
 
-	ret = pm_runtime_get_sync(pc->dev);
-	if (ret < 0) {
-		dev_warn(pc->dev, "Failed to power up device: %d", ret);
-		pm_runtime_put_noidle(pc->dev);
-		return ret;
-	}
+    udelay(50); // Allow power domain to stabilize
 
-	dev_info(pc->dev, "Configuring PWM at %lu Hz", rate);
+    dev_info(pc->dev, "Configuring PWM at %lu Hz", rate);
 
-	/* Ensure PWM_MODE is set before register writes */
-	ctrl = readl(pc->base + PWM_CONTROL);
-	if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm)))) {
-		ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
-		ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
-		writel(ctrl, pc->base + PWM_CONTROL);
-		dev_info(pc->dev, "PWM_MODE bit forced on for channel %u", pwm->hwpwm);
-	}
+    /* Force PWM mode bit */
+    ctrl = readl(pc->base + PWM_CONTROL);
+    ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
+    ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+    writel(ctrl, pc->base + PWM_CONTROL);
+    udelay(10);
 
-	/* Setup clock */
-	writel(CM_PASSWD | 0x0, pc->cm_base + CM_PWMCTL);
-	udelay(10);
-	writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
-	writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
-	udelay(10);
+    period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
+    duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
-	period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
-	duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
+    if (period_cycles < PERIOD_MIN) {
+        dev_warn(pc->dev, "Period too small (%llu cycles), skipping configuration", period_cycles);
+        goto out;
+    }
 
-	if (period_cycles < PERIOD_MIN) {
-		dev_warn(pc->dev, "Period too small (%llu cycles), skipping configuration", period_cycles);
-		goto out;
-	}
+    for (retries = 5; retries; retries--) {
+        writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
+        udelay(100);
+        if (readl(pc->base + PERIOD(pwm->hwpwm)) == period_cycles)
+            break;
+        dev_warn(pc->dev, "PERIOD write verify failed, retrying (%d left)", retries - 1);
+    }
+    if (!retries)
+        dev_err(pc->dev, "PERIOD register stuck: wrote %llu, read %u",
+                period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
 
-	for (retries = 5; retries; retries--) {
-		writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
-		udelay(100);
-		if (readl(pc->base + PERIOD(pwm->hwpwm)) == period_cycles)
-			break;
-		dev_warn(pc->dev, "PERIOD write verify failed, retrying (%d left)", retries - 1);
-	}
-	if (!retries)
-		dev_err(pc->dev, "PERIOD register stuck: wrote %llu, read %u",
-		        period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
+    writel(duty_cycles, pc->base + DUTY(pwm->hwpwm));
+    udelay(100);
+    if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles)
+        dev_warn(pc->dev, "DUTY write mismatch: wrote %llu, read %u",
+                 duty_cycles, readl(pc->base + DUTY(pwm->hwpwm)));
 
-	writel(duty_cycles, pc->base + DUTY(pwm->hwpwm));
-	udelay(100);
-	if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles)
-		dev_warn(pc->dev, "DUTY write mismatch: wrote %llu, read %u",
-		         duty_cycles, readl(pc->base + DUTY(pwm->hwpwm)));
+    ctrl = readl(pc->base + PWM_CONTROL);
+    ctrl &= ~(PWM_ENABLE | PWM_POLARITY) << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
-	ctrl = readl(pc->base + PWM_CONTROL);
-	ctrl &= ~(PWM_ENABLE | PWM_POLARITY) << PWM_CONTROL_SHIFT(pwm->hwpwm);
+    if (state->enabled)
+        ctrl |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
+    if (state->polarity == PWM_POLARITY_INVERSED)
+        ctrl |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
-	if (state->enabled)
-		ctrl |= PWM_ENABLE << PWM_CONTROL_SHIFT(pwm->hwpwm);
-	if (state->polarity == PWM_POLARITY_INVERSED)
-		ctrl |= PWM_POLARITY << PWM_CONTROL_SHIFT(pwm->hwpwm);
+    writel(ctrl, pc->base + PWM_CONTROL);
+    udelay(100);
 
-	writel(ctrl, pc->base + PWM_CONTROL);
-	udelay(100);
-
-	dev_info(pc->dev, "Applied PWM config: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
-	         pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
-	         state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
+    dev_info(pc->dev, "Applied PWM config: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
+             pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
+             state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
 out:
-	pm_runtime_put(pc->dev);
-	return 0;
+    pm_runtime_put(pc->dev);
+    return 0;
 }
 
 static int bcm2835_pwm_get_state(struct pwm_chip *chip,
@@ -211,16 +195,7 @@ static int bcm2835_pwm_get_state(struct pwm_chip *chip,
     struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
     u32 ctrl, period, duty;
 
-    
-	/* Defensive: Force PWM mode bit on at start */
-	ctrl = readl(pc->base + PWM_CONTROL);
-	ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
-	ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
-	writel(ctrl, pc->base + PWM_CONTROL);
-	udelay(10);
-	dev_info(pc->dev, "Forced PWM_MODE bit at apply start, CONTROL=0x%08x", ctrl);
-
-	pm_runtime_get_sync(pc->dev);
+    pm_runtime_get_sync(pc->dev);
 
     ctrl = readl(pc->base + PWM_CONTROL);
     period = readl(pc->base + PERIOD(pwm->hwpwm));
