@@ -78,7 +78,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	dev_info(dev, "Sending firmware power %s for domain '%s' (domain_id=0x%08x)\n",
 	         enable ? "ON" : "OFF", rpd->name, rpd->fw_domain_id);
 
-	dev_info(dev, "DMA handle: 0x%pad, msg ptr: %p\n", &rpd->dma_handle, msg);
+	dev_info(dev, "msg ptr: %p\n",  msg);
 	dev_info(dev, "msg->size = 0x%08x", msg->size);
 	dev_info(dev, "msg->code = 0x%08x", msg->code);
 	dev_info(dev, "msg->body.tag = 0x%08x", msg->body.tag);
