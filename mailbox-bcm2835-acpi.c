@@ -86,6 +86,8 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     dma_addr_t dma = (dma_addr_t)data;
     pr_info("Mailbox message DMA address: 0x%llx (before write)\n", dma | 8);
 
+    print_hex_dump(KERN_INFO, "mailbox msg: ", DUMP_PREFIX_OFFSET, 16, 4, (void *)phys_to_virt(dma), 32, true);
+
 
 
     u32 msg_addr = dma | 8;  // Channel 8 = property channel
@@ -93,6 +95,21 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
     spin_unlock(&mbox->lock);
 
     dev_info(mbox->dev, "Sent message to mailbox: 0x%08x\n", msg_addr);
+
+    int timeout = 100000;
+    while (--timeout) {
+        if (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+            u32 response = readl(mbox->regs + MAIL0_RD);
+            pr_info(">>> mailbox polled response: 0x%08x\n", response);
+            complete(&mbox->tx_complete);
+            break;
+        }
+        udelay(10);
+    }
+
+    if (timeout == 0)
+        pr_err(">>> mailbox polling timed out\n");
+
 
     return 0;
 }
