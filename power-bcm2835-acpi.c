@@ -44,8 +44,9 @@ struct rpi_power_domain {
 	const char *name;
 	struct completion tx_done;
 	u32 fw_domain_id;
-	dma_addr_t dma_handle
+	dma_addr_t dma_handle;
 };
+
 static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 {
 	struct mbox_chan *chan = rpd->chan;
