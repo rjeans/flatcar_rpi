@@ -43,7 +43,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 	int ret;
 
 
-	rpd->msg = dma_alloc_coherent(dev, sizeof(*msg), &rpd->dma_handle, GFP_KERNEL);
+	rpd->msg = dma_alloc_coherent(dev, sizeof(*rpd->msg), &rpd->dma_handle, GFP_KERNEL);
     if (!msg) {
       dev_err(dev, "Failed to allocate coherent DMA memory\n");
       return -ENOMEM;
@@ -111,7 +111,7 @@ static int rpi_power_runtime_suspend(struct device *dev)
 static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-	dma_free_coherent(dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+	dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
 	dev_info(cl->dev, "Firmware power message completed successfully in tx_done\n");
 
     complete(&rpd->tx_done);
