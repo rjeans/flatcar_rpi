@@ -411,7 +411,7 @@ if (pc->cm_base) {
 	dev_warn(&pdev->dev, "Base was NULL\n");
 }
 
-pm_runtime_disable(&pc->chip.dev);
+pm_runtime_disable(pc->chip.dev);
 
 
 
