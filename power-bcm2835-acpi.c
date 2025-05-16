@@ -44,7 +44,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 
 
 	rpd->msg = dma_alloc_coherent(dev, sizeof(*rpd->msg), &rpd->dma_handle, GFP_KERNEL);
-    if (!msg) {
+    if (!rpd->msg) {
       dev_err(dev, "Failed to allocate coherent DMA memory\n");
       return -ENOMEM;
 }
