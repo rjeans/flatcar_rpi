@@ -89,7 +89,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
   
 
-    print_hex_dump(KERN_INFO, "mailbox msg: ", DUMP_PREFIX_OFFSET, 16, 4, (void *)phys_to_virt(dma), 32, true);
+    print_hex_dump(KERN_INFO, "mailbox msg: ", DUMP_PREFIX_OFFSET, 16, 4, vaddr, 32, true);
 
 
 
