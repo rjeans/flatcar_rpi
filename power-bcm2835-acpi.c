@@ -6,6 +6,8 @@
 #include <linux/mailbox_client.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/mailbox_controller.h>  
+
 #include <linux/property.h>
 #include <linux/slab.h>
 
