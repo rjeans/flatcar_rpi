@@ -93,11 +93,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool enable)
 		return ret;
 	}
 
-	ret = wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100));
-	if (ret == 0) {
-		dev_err(dev, "Timeout waiting for mailbox tx completion\n");
-		return -ETIMEDOUT;
-	}
+
 
 	dev_info(dev, "Firmware mailbox power message completed successfully\n");
 	return 0;
@@ -144,7 +140,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
     rpd->fw_domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
-	rpd->mbox_client.tx_block = false;
+	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	
