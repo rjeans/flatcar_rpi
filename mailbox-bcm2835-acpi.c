@@ -90,7 +90,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
     dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
-    return 0;
+    return msg_submit(chan, msg);
 }
 
 static bool bcm2835_last_tx_done(struct mbox_chan *chan)
