@@ -68,12 +68,15 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
-		dev_info(dev, "Reply 0x%08X\n", msg);
-		if (chan->cl && chan->cl->rx_callback)
-			mbox_chan_received_data(chan, &msg);  // for RX-capable clients
-		else
-			mbox_chan_txdone(chan, 0);             // for TX-only clients
-	}
+        pr_info(">>> IRQ: Received message 0x%08X on mailbox\n", msg);
+        dev_info(dev, "Reply 0x%08X\n", msg);
+        if (chan->cl && chan->cl->rx_callback) {
+            pr_info(">>> IRQ: RX-capable client, calling mbox_chan_received_data\n");
+            mbox_chan_received_data(chan, &msg);  // for RX-capable clients
+        } else {
+            pr_info(">>> IRQ: TX-only client, calling mbox_chan_txdone\n");
+            mbox_chan_txdone(chan, 0);             // for TX-only clients
+        }
 	
 
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
