@@ -81,7 +81,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     writel(0, mbox->regs + MAIL0_CNF);
     writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
     dev_info(mbox->dev, "MAIL0_CNF (IRQ enable register) = 0x%08X\n", readl(mbox->regs + MAIL0_CNF));
-    mbox_chan_txdone(link, 0);
+  
 
     return IRQ_HANDLED;
 }
