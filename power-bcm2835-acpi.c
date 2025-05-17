@@ -36,36 +36,35 @@ struct rpi_power_domain {
 	bool completed;
 	u32 domain_id;
 	struct rpi_firmware_power_msg *msg;
-	dma_addr_t dma_handle;
 };
 
 static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 {
 	struct device *dev = rpd->mbox_client.dev;
-	struct rpi_firmware_power_msg *msg;
 	int ret;
 
 	// Allocate DMA-coherent buffer
-	msg = dma_alloc_coherent(dev, sizeof(*msg), &rpd->dma_handle, GFP_KERNEL);
-	if (!msg)
+	rpd->msg = kzalloc(sizeof(*rpd->msg), GFP_KERNEL);
+
+	if (!rpd->msg)
 		return -ENOMEM;
 
-	rpd->msg = msg;
+	
     dev_info(dev,"Sending power message to firmware: %s\n", on ? "ON" : "OFF");
-	dev_info(dev, "power_send: DMA buffer: msg=%px (handle=0x%llx)\n",
-                 rpd->msg, (unsigned long long)rpd->dma_handle);
+	dev_info(dev, "power_send: DMA buffer: msg=%px \n",
+                 rpd->msg);
 
-	memset(msg, 0, sizeof(*msg));
+	memset(msg, 0, sizeof(*rpd->msg));
 
 	// Construct mailbox firmware message
-	msg->size = sizeof(*msg);
-	msg->code = 0;
-	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
-	msg->body.buf_size = 8;
-	msg->body.val_len = 8;
-	msg->body.domain = rpd->domain_id;
-	msg->body.state = on ? RPI_POWER_ON | RPI_WAIT : 0;
-	msg->end_tag = 0;
+	rpd->msg->size = sizeof(*msg);
+	rpd->msg->code = 0;
+	rpd->msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	rpd->msg->body.buf_size = 8;
+	rpd->msg->body.val_len = 8;
+	rpd->msg->body.domain = rpd->domain_id;
+	rpd->msg->body.state = on ? RPI_POWER_ON | RPI_WAIT : 0;
+	rpd->msg->end_tag = 0;
 
 	// Reset state
 	dev_info(dev, "Resetting tx_done completion\n");
@@ -77,7 +76,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 	ret = mbox_send_message(rpd->chan, rpd->msg);
 	dev_info(dev, "mbox_send_message() returned %d\n", ret);
 	if (ret < 0) {
-		dma_free_coherent(dev, sizeof(*msg), msg, rpd->dma_handle);
+		kfree(rpd->msg);
 		rpd->msg = NULL;
 		return ret;
 	}
@@ -112,8 +111,8 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
     pr_info("rpi_power_tx_done: Received firmware power message response: %d completed: %u\n", r, rpd->completed);
-    dev_info(cl->dev, "tx_done: DMA buffer: msg=%px (handle=0x%llx)\n",
-                 rpd->msg, (unsigned long long)rpd->dma_handle);
+    dev_info(cl->dev, "tx_done: DMA buffer: msg=%px\n",
+                 rpd->msg);
  
 
     if (rpd->completed) {
@@ -128,39 +127,23 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
     complete(&rpd->tx_done);  
 
     if (rpd->msg) {
-		dev_info(cl->dev, "tx_done: freeing DMA buffer: msg=%px (handle=0x%llx)\n",
-                 rpd->msg, (unsigned long long)rpd->dma_handle);
+		dev_info(cl->dev, "tx_done: freeing DMA buffer: msg=%px\n",
+                 rpd->msg);
 
-        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+        kfree(rpd->msg);
         rpd->msg = NULL;
     }
 }
 
-static void rpi_power_tx_prepare(struct mbox_client *cl, void *data)
-{
-	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-	struct rpi_firmware_power_msg *msg = data;
 
-	dev_info(cl->dev, "Preparing firmware power message for transmission\n");
-	msg->size = sizeof(*msg);
-	msg->code = 0;
-	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
-	msg->body.buf_size = 8;
-	msg->body.val_len = 8;
-	msg->body.domain = rpd->domain_id;
-	msg->body.state = POWER_DOMAIN_ON | RPI_WAIT;
-	msg->end_tag = 0;
-
-	
-}
 
 static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 
     dev_info(cl->dev, "rx_callback: received response, rpd=%px msg=%px\n", rpd, msg);
-	dev_info(cl->dev, "rx_callback: DMA buffer: msg=%px (handle=0x%llx)\n",
-                 rpd->msg, (unsigned long long)rpd->dma_handle);
+	dev_info(cl->dev, "rx_callback: DMA buffer: msg=%px\n",
+                 rpd->msg);
 
 
     if (!rpd) {
@@ -200,7 +183,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = false;
-    rpd->mbox_client.tx_prepare = rpi_power_tx_prepare;
     rpd->mbox_client.rx_callback=rpi_power_rx_callback;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
