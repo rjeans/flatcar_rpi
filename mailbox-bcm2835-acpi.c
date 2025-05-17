@@ -177,7 +177,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 {
     struct bcm2835_mbox *mbox;
     struct resource *res;
-    int irq, ret;
+    int ret;
     
 
     mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
@@ -206,14 +206,15 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (ret)
         return ret;
 
-    dev_info(&pdev->dev, "Requesting IRQ %d for mailbox\n", irq);
+    dev_info(&pdev->dev, "Requesting IRQ %d for mailbox\n", mbox->irq);
     dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
     mbox->controller.dev = &pdev->dev;
     mbox->controller.chans = &mbox->chan;
     mbox->controller.num_chans = 1;
     mbox->controller.ops = &bcm2835_chan_ops;
-    mbox->controller.txdone_irq = true;
-    mbox->controller.txdone_poll = false;
+    mbox->controller.txdone_irq = false;
+    mbox->controller.txdone_poll = true;
+    mbox->controller.txpoll_period = 1;
 
 
     
