@@ -156,6 +156,22 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *data)
 	} else {
 		dev_info(cl->dev, "Power domain is OFF\n");
 	}
+	if (!rpd->completed) {
+        rpd->completed = true;
+
+        // Signal the power domain transaction is complete
+        complete(&rpd->tx_done);
+
+        // Free DMA buffer if used
+        if (rpd->msg) {
+            dma_free_coherent(client->dev, sizeof(*rpd->msg),
+                              rpd->msg, rpd->dma_handle);
+            rpd->msg = NULL;
+        }
+    }
+
+
+    mbox_chan_txdone(rpd->chan, 0);
 }
 
 
