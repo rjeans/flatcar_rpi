@@ -55,7 +55,8 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     value = readl(mbox->regs + MAIL0_RD);
     dev_info(mbox->dev, "IRQ received: MAIL0_RD = 0x%08x\n", value);
 
-    complete(&mbox->tx_complete);
+    mbox_chan_received_data(&mbox->chan, &value);
+
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
     return IRQ_HANDLED;
 }
@@ -174,9 +175,12 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     // Step 2: Reset IRQ enable to known state
     writel(0x00000000, mbox->regs + MAIL0_IRQ_EN);
 
+
     // Step 3: Enable property channel interrupt (channel 8)
     
-    writel(PROPERTY_CHANNEL_IRQ, mbox->regs + MAIL0_IRQ_EN);
+  
+    writel(1, mbox->regs + MAIL0_CFG);
+
 
     val = readl(mbox->regs + MAIL0_IRQ_EN);
     dev_info(&pdev->dev, "Mailbox IRQ enable register now: 0x%08x\n", val);

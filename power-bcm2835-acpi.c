@@ -136,6 +136,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
+	mbox->controller.txdone_irq = true;
+
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
 
@@ -145,6 +147,10 @@ static int rpi_power_probe(struct platform_device *pdev)
 	}
 
 	rpd->chan = global_rpi_mbox_chan;
+    if (IS_ERR(rpd->chan)) {
+		dev_err(dev, "Failed to acquire mailbox channel\n");
+		return PTR_ERR(rpd->chan);
+	}
 
   
 
@@ -159,11 +165,7 @@ static int rpi_power_probe(struct platform_device *pdev)
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 
 
-	if (IS_ERR(rpd->chan)) {
-		dev_err(dev, "Failed to acquire mailbox channel\n");
-		return PTR_ERR(rpd->chan);
-	}
-
+	
 	
 
 	init_completion(&rpd->tx_done);
