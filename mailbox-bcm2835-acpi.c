@@ -84,7 +84,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
 
-    dev_info(mbox->controller.dev, "SEND DATA: IRQ: link->cl=%px\n", link->cl);
+    dev_info(mbox->controller.dev, "SEND DATA: IRQ: chan->cl=%px\n", chan->cl);
 
 
 	spin_lock(&mbox->lock);
