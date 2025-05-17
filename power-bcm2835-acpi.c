@@ -32,7 +32,7 @@ struct rpi_power_domain {
 	const char *name;
 	struct completion tx_done;
 	bool completed;
-	u32 fw_domain_id;
+	u32 domain_id;
 	struct rpi_firmware_power_msg *msg;
 	dma_addr_t dma_handle;
 };
@@ -132,7 +132,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
-    rpd->fw_domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
+    rpd->domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
