@@ -16,6 +16,8 @@
 #include "mailbox-bcm2835-acpi.h"
 
 
+#define RPI_POWER_ON    0x00000001
+#define RPI_WAIT        0x00000002
 
 
 
