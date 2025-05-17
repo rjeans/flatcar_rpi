@@ -156,7 +156,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	if (device_property_read_string(dev, "rpi,devicename", &rpd->name)) {
-		dev_err(dev, "Missing property 'rpi,devicename'  --> %s\n",&rpd->name);
+		dev_err(dev, "Missing property 'rpi,devicename'\n");
 		return -EINVAL;
 	}
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
