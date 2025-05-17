@@ -116,9 +116,12 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
                  rpd->msg, (unsigned long long)rpd->dma_handle);
  
 
-    if (rpd->completed)
+    if (rpd->completed) {
+		dev_warn(cl->dev, "tx_done: already completed, skipping\n");
         return;
-    rpd->completed = true;
+	}
+		
+	rpd->completed = true;
 
     dev_info(cl->dev, "Firmware power message completed successfully in tx_done");
 
