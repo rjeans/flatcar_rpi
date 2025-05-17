@@ -57,7 +57,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 	memset(rpd->msg, 0, sizeof(*rpd->msg));
 
 	// Construct mailbox firmware message
-	rpd->msg->size = sizeof(*msg);
+	rpd->msg->size = sizeof(*rpd->msg);
 	rpd->msg->code = 0;
 	rpd->msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
 	rpd->msg->body.buf_size = 8;
