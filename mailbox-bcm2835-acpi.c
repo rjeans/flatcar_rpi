@@ -178,6 +178,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.num_chans = 1;
     mbox->controller.ops = &bcm2835_chan_ops;
     mbox->controller.txdone_irq = true;
+    mbox->controller.txdone_poll = true;
+    mbox->controller.txpoll_period = 5;
+
 
     
 

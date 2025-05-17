@@ -72,6 +72,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 
 	// Send mailbox message
 	ret = mbox_send_message(rpd->chan, rpd->msg);
+	dev_info(dev, "mbox_send_message() returned %d\n", ret);
 	if (ret < 0) {
 		dma_free_coherent(dev, sizeof(*msg), msg, rpd->dma_handle);
 		rpd->msg = NULL;
