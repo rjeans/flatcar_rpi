@@ -70,12 +70,12 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 		u32 msg = readl(mbox->regs + MAIL0_RD);
         pr_info(">>> IRQ: Received message 0x%08X on mailbox\n", msg);
         dev_info(dev, "Reply 0x%08X\n", msg);
-        if (chan->cl && chan->cl->rx_callback) {
+        if (link->cl && link->cl->rx_callback) {
             pr_info(">>> IRQ: RX-capable client, calling mbox_chan_received_data\n");
-            mbox_chan_received_data(chan, &msg);  // for RX-capable clients
+            mbox_chan_received_data(link, &msg);  // for RX-capable clients
         } else {
             pr_info(">>> IRQ: TX-only client, calling mbox_chan_txdone\n");
-            mbox_chan_txdone(chan, 0);             // for TX-only clients
+            mbox_chan_txdone(link, 0);             // for TX-only clients
         }
 	
 
