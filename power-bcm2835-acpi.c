@@ -91,7 +91,6 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 static int rpi_power_runtime_resume(struct device *dev)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
-	struct device *dev = &pdev->dev;
 	dev_info(dev, "Resuming power domain '%s'\n", rpd->name);
 
 	return rpi_power_send(rpd, true);
@@ -100,7 +99,6 @@ static int rpi_power_runtime_resume(struct device *dev)
 static int rpi_power_runtime_suspend(struct device *dev)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
-	struct device *dev = &pdev->dev;
 	dev_info(dev, "Suspending power domain '%s'\n", rpd->name);
 
 	return rpi_power_send(rpd, false);
