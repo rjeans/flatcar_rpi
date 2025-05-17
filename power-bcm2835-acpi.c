@@ -91,12 +91,18 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 static int rpi_power_runtime_resume(struct device *dev)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
+	struct device *dev = &pdev->dev;
+	dev_info(dev, "Resuming power domain '%s'\n", rpd->name);
+
 	return rpi_power_send(rpd, true);
 }
 
 static int rpi_power_runtime_suspend(struct device *dev)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(dev);
+	struct device *dev = &pdev->dev;
+	dev_info(dev, "Suspending power domain '%s'\n", rpd->name);
+
 	return rpi_power_send(rpd, false);
 }
 
@@ -194,6 +200,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 static int rpi_power_remove(struct platform_device *pdev)
 {
 	struct rpi_power_domain *rpd = platform_get_drvdata(pdev);
+	struct device *dev = &pdev->dev;
+	dev_info(dev, "Removing power domain '%s'\n", rpd->name);
 	pm_runtime_disable(&pdev->dev);
 	if (rpd->chan)
 		mbox_free_channel(rpd->chan);
