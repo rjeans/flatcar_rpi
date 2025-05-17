@@ -202,9 +202,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (mbox->irq < 0)
         return mbox->irq;
 
-    ret = devm_request_irq(&pdev->dev, mbox->irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
-    if (ret)
-        return ret;
 
     dev_info(&pdev->dev, "Requesting IRQ %d for mailbox\n", mbox->irq);
     dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
@@ -216,6 +213,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.txdone_poll = true;
     mbox->controller.txpoll_period = 1;
 
+//    ret = devm_request_irq(&pdev->dev, mbox->irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
+//    if (ret)
+//        return ret;
 
     
 
