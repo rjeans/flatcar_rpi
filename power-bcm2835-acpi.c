@@ -51,6 +51,9 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 		return -ENOMEM;
 
 	rpd->msg = msg;
+
+	dev_info(dev, "DMA alloc: msg=%px dma_handle=0x%pad\n", msg, &rpd->dma_handle);
+
 	memset(msg, 0, sizeof(*msg));
 
 	// Construct mailbox firmware message
@@ -101,6 +104,8 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
     pr_info("Received firmware power message response: %d completed: %u\n", r, rpd->completed);
+	dev_info(cl->dev, "DMA free:  msg=%px dma_handle=0x%pad\n", rpd->msg, &rpd->dma_handle);
+
     if (rpd->completed)
         return;
     rpd->completed = true;
