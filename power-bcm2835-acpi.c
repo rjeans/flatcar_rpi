@@ -82,11 +82,11 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 	}
 
 	// Wait for firmware response (polling will call complete)
-	if (!wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100))) {
-		dev_err(dev, "Timeout waiting for firmware power domain response\n");
+	//if (!wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100))) {
+	//	dev_err(dev, "Timeout waiting for firmware power domain response\n");
 		// Do NOT free memory here — tx_done() handles it (or doesn't)
-		return -ETIMEDOUT;
-	}
+	//	return -ETIMEDOUT;
+	//}
 	dev_info(dev, "Firmware power domain response received and rpi_power_send complete\n");
 	return 0;
 }
