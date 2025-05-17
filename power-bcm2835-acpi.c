@@ -169,7 +169,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
         dev_info(cl->dev, "rx_callback: freeing DMA buffer: %px (handle=0x%llx)\n",
                  rpd->msg, (unsigned long long)rpd->dma_handle);
 
-        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+  //      dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
         rpd->msg = NULL;
     } else {
         dev_warn(cl->dev, "rx_callback: msg was NULL, nothing to free\n");
