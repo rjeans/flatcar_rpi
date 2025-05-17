@@ -127,7 +127,7 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
     }
 }
 
-static void *rpi_power_tx_prepare(struct mbox_client *cl, void *data)
+static void rpi_power_tx_prepare(struct mbox_client *cl, void *data)
 {
 	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 	struct rpi_firmware_power_msg *msg = data;
@@ -142,7 +142,7 @@ static void *rpi_power_tx_prepare(struct mbox_client *cl, void *data)
 	msg->body.state = POWER_DOMAIN_ON | RPI_WAIT;
 	msg->end_tag = 0;
 
-	return msg;
+	
 }
 
 static void rpi_power_rx_callback(struct mbox_client *cl, void *data)
