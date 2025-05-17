@@ -48,7 +48,6 @@ struct bcm2835_mbox {
     struct device *dev;
     struct mbox_chan chan;
     struct completion tx_complete;
-    int irq;
     spinlock_t lock;
 };
 
@@ -58,33 +57,7 @@ EXPORT_SYMBOL_GPL(global_rpi_mbox_chan);
 
 
 
-static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
-{
- 
-    pr_info(">>> IRQ handler entered: dev_id=%px\n", dev_id);
- 	struct bcm2835_mbox *mbox = dev_id;
-	struct device *dev = mbox->controller.dev;
-	struct mbox_chan *link = &mbox->controller.chans[0];
 
-     dev_info(mbox->controller.dev, "MBOX IRQ: IRQ: link->cl=%px\n", link->cl);
-
-
-	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-		u32 msg = readl(mbox->regs + MAIL0_RD);
-        pr_info(">>> IRQ: Received message 0x%08X on mailbox\n", msg);
-        dev_info(dev, "Reply 0x%08X\n", msg);
- 	    mbox_chan_received_data(link, &msg);       
-	
-    }
-    dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
-    // Clear any sticky IRQ status — write 0 first
-    writel(0, mbox->regs + MAIL0_CNF);
-    writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
-    dev_info(mbox->dev, "MAIL0_CNF (IRQ enable register) = 0x%08X\n", readl(mbox->regs + MAIL0_CNF));
-  
-
-    return IRQ_HANDLED;
-}
 
 static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
@@ -94,11 +67,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
  
 
 
-    dev_info(mbox->controller.dev, "SEND DATA: IRQ: chan->cl=%px\n", chan->cl);
+    dev_info(mbox->controller.dev, "SEND DATA: chan->cl=%px\n", chan->cl);
 
-    u32 irq_enable = readl(mbox->regs + MAIL0_CNF);
-    dev_info(mbox->dev, "MAIL0_CNF (IRQ enable register) = 0x%08X\n", irq_enable);
-
+ 
 
 	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
@@ -132,9 +103,7 @@ static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 static int bcm2835_startup(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-   /* You could init per-channel state here if needed */
-	/* Enable the interrupt on data reception */
-	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+ 
 
     dev_info(mbox->dev, "Mailbox channel startup\n");
     return 0;
@@ -144,18 +113,11 @@ static void bcm2835_shutdown(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox;
 
-    if (!chan || !chan->mbox)
-        return;
-
+ 
     mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 
-    if (!mbox || !mbox->regs) {
-        pr_warn("bcm2835_shutdown called with invalid context\n");
-        return;
-    }
-
-    writel(0, mbox->regs + MAIL0_CNF);
-    synchronize_irq(mbox->irq);   
+ 
+ 
     dev_info(mbox->dev, "Mailbox channel shutdown\n");
 }
 
@@ -198,12 +160,9 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (IS_ERR(mbox->regs))
         return PTR_ERR(mbox->regs);
 
-    mbox->irq = platform_get_irq(pdev, 0);
-    if (mbox->irq < 0)
-        return mbox->irq;
 
 
-    dev_info(&pdev->dev, "Requesting IRQ %d for mailbox\n", mbox->irq);
+
     dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
     mbox->controller.dev = &pdev->dev;
     mbox->controller.chans = &mbox->chan;
@@ -213,9 +172,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.txdone_poll = true;
     mbox->controller.txpoll_period = 1;
 
-//    ret = devm_request_irq(&pdev->dev, mbox->irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
-//    if (ret)
-//        return ret;
 
     
 

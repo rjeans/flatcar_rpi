@@ -81,12 +81,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 		return ret;
 	}
 
-	// Wait for firmware response (polling will call complete)
-	//if (!wait_for_completion_timeout(&rpd->tx_done, msecs_to_jiffies(100))) {
-	//	dev_err(dev, "Timeout waiting for firmware power domain response\n");
-		// Do NOT free memory here — tx_done() handles it (or doesn't)
-	//	return -ETIMEDOUT;
-	//}
+
 	dev_info(dev, "Firmware power domain response received and rpi_power_send complete\n");
 	return 0;
 }
@@ -111,36 +106,7 @@ static int rpi_power_runtime_suspend(struct device *dev)
 
 
 
-static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
-{
-    struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 
-    dev_info(cl->dev, "rx_callback: received response, rpd=%px msg=%px\n", rpd, msg);
-    dev_info(cl->dev, "rx_callback: buffer: msg=%px\n", rpd->msg);
-
-    if (!rpd) {
-        dev_err(cl->dev, "rx_callback: rpd is NULL\n");
-        return;
-    }
-
-    if (rpd->completed) {
-        dev_warn(cl->dev, "rx_callback: already completed, skipping\n");
-        return;
-    }
-
-    rpd->completed = true;
-
-    dev_info(cl->dev, "rx_callback: signaling completion\n");
-    complete(&rpd->tx_done); 
-
-    if (rpd->msg) {
-        dev_info(cl->dev, "rx_callback: freeing buffer: msg=%px\n", rpd->msg);
-        kfree(rpd->msg);
-        rpd->msg = NULL;
-    }
-
-  
-}
 
 static int rpi_power_probe(struct platform_device *pdev)
 {
@@ -164,7 +130,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = true;        // Wait for completion inside mbox_send_message()
 	rpd->mbox_client.knows_txdone = false;   // Let the controller (IRQ) notify tx completion
 	rpd->mbox_client.tx_tout = 500;          // Timeout if IRQ doesn't arrive
-	rpd->mbox_client.rx_callback = rpi_power_rx_callback;  // Optional if you process response
+	rpd->mbox_client.rx_callback = NULL;  // Optional if you process response
 	rpd->mbox_client.tx_done = NULL;         // Optional if you don’t need extra tx-done logic
 
 	pr_info("Requesting mailbox channel...\n");
