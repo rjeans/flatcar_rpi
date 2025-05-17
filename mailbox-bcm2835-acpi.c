@@ -194,6 +194,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.txdone_irq = true;
     mbox->controller.txdone_poll = true;
     mbox->controller.txpoll_period = 5;
+    mbox->controller.txpoll_period = 500;
 
 
     
