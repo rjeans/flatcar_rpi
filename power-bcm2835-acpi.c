@@ -173,20 +173,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
         return;
     }
 
-    rpd->completed = true;
-
-    complete(&rpd->tx_done);
-
-    if (rpd->msg) {
-        dev_info(cl->dev, "rx_callback: Freeing DMA buffer: msg=%px (handle=0x%llx)\n",
-                 rpd->msg, (unsigned long long)rpd->dma_handle);
-
-        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
-        rpd->msg = NULL;
-    } else {
-        dev_warn(cl->dev, "rx_callback: msg was NULL, nothing to free\n");
-    }
-
+ 
     
     mbox_chan_txdone(rpd->chan, 0);
 }
