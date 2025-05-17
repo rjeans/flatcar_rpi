@@ -145,6 +145,7 @@ static void bcm2835_shutdown(struct mbox_chan *chan)
     }
 
     writel(0, mbox->regs + MAIL0_CNF);
+    synchronize_irq(mbox->irq);   
     dev_info(mbox->dev, "Mailbox channel shutdown\n");
 }
 
@@ -191,7 +192,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (irq < 0)
         return irq;
 
-    ret = devm_request_irq(&pdev->dev, irq, bcm2835_mbox_irq, 0, dev_name(&pdev->dev), mbox);
+    ret = devm_request_irq(&pdev->dev, irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
     if (ret)
         return ret;
 
