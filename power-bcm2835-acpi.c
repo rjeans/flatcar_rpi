@@ -162,7 +162,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
     rpd->domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
-	rpd->mbox_client.tx_block = true;
+	rpd->mbox_client.tx_block = false;
 	rpd->mbox_client.knows_txdone = false;
     rpd->mbox_client.rx_callback=rpi_power_rx_callback;
 	pr_info("Requesting mailbox channel...\n");

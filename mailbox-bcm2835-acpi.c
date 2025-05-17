@@ -61,10 +61,12 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 {
  
     pr_info(">>> IRQ handler entered: dev_id=%px\n", dev_id);
-
-	struct bcm2835_mbox *mbox = dev_id;
+ 	struct bcm2835_mbox *mbox = dev_id;
 	struct device *dev = mbox->controller.dev;
 	struct mbox_chan *link = &mbox->controller.chans[0];
+
+     dev_info(mbox->controller.dev, "MBOX IRQ: IRQ: link->cl=%px\n", link->cl);
+
 
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
@@ -81,6 +83,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
 	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
+
+    dev_info(mbox->controller.dev, "SEND DATA: IRQ: link->cl=%px\n", link->cl);
+
 
 	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
