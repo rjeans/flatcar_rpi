@@ -145,35 +145,39 @@ static void rpi_power_tx_prepare(struct mbox_client *cl, void *data)
 	
 }
 
-static void rpi_power_rx_callback(struct mbox_client *cl, void *data)
+static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
 {
-	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-	struct rpi_firmware_power_msg *msg = data;
+    struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 
-	dev_info(cl->dev, "Received firmware power message: %s\n", msg->body.state ? "ON" : "OFF");
-	if (msg->body.state == POWER_DOMAIN_ON) {
-		dev_info(cl->dev, "Power domain is ON\n");
-	} else {
-		dev_info(cl->dev, "Power domain is OFF\n");
-	}
-	if (!rpd->completed) {
-        rpd->completed = true;
+    dev_info(cl->dev, "rx_callback: received response, rpd=%px msg=%px\n", rpd, msg);
 
-        // Signal the power domain transaction is complete
-        complete(&rpd->tx_done);
-
-        // Free DMA buffer if used
-        if (rpd->msg) {
-            dma_free_coherent(cl->dev, sizeof(*rpd->msg),
-                              rpd->msg, rpd->dma_handle);
-            rpd->msg = NULL;
-        }
+    if (!rpd) {
+        dev_err(cl->dev, "rx_callback: rpd is NULL\n");
+        return;
     }
 
+    if (rpd->completed) {
+        dev_warn(cl->dev, "rx_callback: already completed, skipping\n");
+        return;
+    }
 
+    rpd->completed = true;
+
+    complete(&rpd->tx_done);
+
+    if (rpd->msg) {
+        dev_info(cl->dev, "rx_callback: freeing DMA buffer: %px (handle=0x%llx)\n",
+                 rpd->msg, (unsigned long long)rpd->dma_handle);
+
+        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+        rpd->msg = NULL;
+    } else {
+        dev_warn(cl->dev, "rx_callback: msg was NULL, nothing to free\n");
+    }
+
+    
     mbox_chan_txdone(rpd->chan, 0);
 }
-
 
 static int rpi_power_probe(struct platform_device *pdev)
 {
