@@ -142,7 +142,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     struct bcm2835_mbox *mbox;
     struct resource *res;
     int irq, ret;
-    u32 val;
+    
 
     mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
     if (!mbox)
