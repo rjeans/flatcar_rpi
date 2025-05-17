@@ -98,10 +98,17 @@ static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	bool ret;
+    dev_info(mbox->dev, "Checking if last transmission is done\n");
 
 	spin_lock(&mbox->lock);
 	ret = !(readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL);
 	spin_unlock(&mbox->lock);
+    dev_info(mbox->dev, "Last transmission done: %s\n", ret ? "Yes" : "No");
+    if (ret) {
+        dev_info(mbox->dev, "Last transmission completed successfully\n");
+    } else {
+        dev_info(mbox->dev, "Last transmission not completed yet\n");
+    }
 	return ret;
 }
 
