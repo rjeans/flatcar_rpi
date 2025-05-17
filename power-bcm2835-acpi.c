@@ -139,7 +139,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
         rpd->msg = NULL;
     }
 
-    mbox_chan_txdone(rpd->chan, 0);  
+  
 }
 
 static int rpi_power_probe(struct platform_device *pdev)
