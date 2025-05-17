@@ -99,20 +99,22 @@ static int rpi_power_runtime_suspend(struct device *dev)
 
 static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
-	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+    struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+    pr_info("Received firmware power message response: %d completed: %u\n", r, rpd->completed);
+    if (rpd->completed)
+        return;
+    rpd->completed = true;
 
-	// Prevent multiple invocations
-	if (rpd->completed)
-		return;
-	rpd->completed = true;
+    dev_info(cl->dev, "Firmware power message completed successfully in tx_done");
 
-	dev_info(cl->dev, "Firmware power message completed successfully in tx_done");
+    complete(&rpd->tx_done);  
 
-	if (rpd->msg) {
-		dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
-		rpd->msg = NULL;
-	}
+    if (rpd->msg) {
+        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+        rpd->msg = NULL;
+    }
 }
+
 
 
 
