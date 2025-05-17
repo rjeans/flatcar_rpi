@@ -69,7 +69,9 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
 		dev_info(dev, "Reply 0x%08X\n", msg);
-		mbox_chan_received_data(link, &msg);
+		//mbox_chan_received_data(link, &msg);
+        mbox_chan_txdone(chan, 0);
+
 	}
 	
 
@@ -90,7 +92,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
     dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
-    return msg_submit(chan, msg);
+    return 0;
 }
 
 static bool bcm2835_last_tx_done(struct mbox_chan *chan)
