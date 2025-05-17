@@ -69,9 +69,10 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
 		dev_info(dev, "Reply 0x%08X\n", msg);
-		//mbox_chan_received_data(link, &msg);
-        mbox_chan_txdone(chan, 0);
-
+		if (chan->cl && chan->cl->rx_callback)
+			mbox_chan_received_data(chan, &msg);  // for RX-capable clients
+		else
+			mbox_chan_txdone(chan, 0);             // for TX-only clients
 	}
 	
 
