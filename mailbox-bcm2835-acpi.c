@@ -70,8 +70,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 		u32 msg = readl(mbox->regs + MAIL0_RD);
         pr_info(">>> IRQ: Received message 0x%08X on mailbox\n", msg);
         dev_info(dev, "Reply 0x%08X\n", msg);
-        mbox_chan_txdone(link,0);
-        
+ 	    mbox_chan_received_data(link, &msg);       
 	
     }
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
