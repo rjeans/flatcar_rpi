@@ -48,6 +48,7 @@ struct bcm2835_mbox {
     struct device *dev;
     struct mbox_chan chan;
     struct completion tx_complete;
+    int irq;
     spinlock_t lock;
 };
 
@@ -76,6 +77,8 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	
     }
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
+    writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+    dev_info(mbox->dev, "MAIL0_CNF (IRQ enable register) = 0x%08X\n", readl(mbox->regs + MAIL0_CNF));
     return IRQ_HANDLED;
 }
 
@@ -188,11 +191,11 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     if (IS_ERR(mbox->regs))
         return PTR_ERR(mbox->regs);
 
-    irq = platform_get_irq(pdev, 0);
-    if (irq < 0)
-        return irq;
+    mbox->irq = platform_get_irq(pdev, 0);
+    if (mbox->irq < 0)
+        return mbox->irq;
 
-    ret = devm_request_irq(&pdev->dev, irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
+    ret = devm_request_irq(&pdev->dev, mbox->irq, bcm2835_mbox_irq, IRQF_NO_SUSPEND, dev_name(&pdev->dev), mbox);
     if (ret)
         return ret;
 
