@@ -54,7 +54,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 	dev_info(dev, "power_send: DMA buffer: msg=%px \n",
                  rpd->msg);
 
-	memset(msg, 0, sizeof(*rpd->msg));
+	memset(rpd->msg, 0, sizeof(*rpd->msg));
 
 	// Construct mailbox firmware message
 	rpd->msg->size = sizeof(*msg);
