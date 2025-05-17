@@ -70,7 +70,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 		u32 msg = readl(mbox->regs + MAIL0_RD);
         pr_info(">>> IRQ: Received message 0x%08X on mailbox\n", msg);
         dev_info(dev, "Reply 0x%08X\n", msg);
-        mbox_chan_received_data(link, &msg);  
+        mbox_chan_txndone(link,0);
         
 	
     }
@@ -177,12 +177,10 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.chans = &mbox->chan;
     mbox->controller.num_chans = 1;
     mbox->controller.ops = &bcm2835_chan_ops;
-    mbox->controller.txdone_poll = true;
-    mbox->controller.txpoll_period = 5;
     mbox->controller.txdone_irq = true;
 
     
-;
+
    
    
 
