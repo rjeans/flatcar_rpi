@@ -91,9 +91,7 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
 
-    if (!mbox_chan_is_ready(chan)) {
-    dev_warn(mbox->dev, "Mailbox channel not ready!\n");
-}
+ 
 
 
     dev_info(mbox->controller.dev, "SEND DATA: IRQ: chan->cl=%px\n", chan->cl);
