@@ -132,10 +132,20 @@ static int bcm2835_startup(struct mbox_chan *chan)
 
 static void bcm2835_shutdown(struct mbox_chan *chan)
 {
-    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-	writel(0, mbox->regs + MAIL0_CNF);
+    struct bcm2835_mbox *mbox;
+
+    if (!chan || !chan->mbox)
+        return;
+
+    mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+
+    if (!mbox || !mbox->regs) {
+        pr_warn("bcm2835_shutdown called with invalid context\n");
+        return;
+    }
+
+    writel(0, mbox->regs + MAIL0_CNF);
     dev_info(mbox->dev, "Mailbox channel shutdown\n");
-    /* Clean up if needed */
 }
 
 static const struct mbox_chan_ops bcm2835_chan_ops = {
