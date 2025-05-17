@@ -84,7 +84,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 		// Do NOT free memory here — tx_done() handles it (or doesn't)
 		return -ETIMEDOUT;
 	}
-
+	dev_info(dev, "Firmware power domain response received and rpi_power_send complete\n");
 	return 0;
 }
 
