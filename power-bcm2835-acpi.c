@@ -115,7 +115,7 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
     complete(&rpd->tx_done);  
 
     if (rpd->msg) {
-        dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
+ //       dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
         rpd->msg = NULL;
     }
 }
