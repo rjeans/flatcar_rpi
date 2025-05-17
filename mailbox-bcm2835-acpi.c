@@ -13,12 +13,25 @@
 #include <linux/dma-mapping.h>
 #include "mailbox-bcm2835-acpi.h"
 
-#define MAIL1_STA   0x18
-#define MAIL1_WRT   0x20
-#define MAIL0_RD    0x00
-#define MAIL0_STA   0x18
-#define MAIL0_IRQ_EN   0x0C  // per BCM2835 spec, IRQ 0 control
-#define MAIL0_CFG      0x10  // sometimes needed to route
+
+
+/* Mailboxes */
+#define ARM_0_MAIL0	0x00
+#define ARM_0_MAIL1	0x20
+
+/*
+ * Mailbox registers. We basically only support mailbox 0 & 1. We
+ * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
+ * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
+ * the placement of memory barriers.
+ */
+#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
+#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
+#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
+#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
+#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
+#define MAIL1_STA	(ARM_0_MAIL1 + 0x18)
+
 
 #define PROPERTY_CHANNEL_IRQ (1 << 8)
 
@@ -47,15 +60,16 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 
     pr_info(">>> IRQ handler entered: dev_id=%px\n", dev_id);
 
-    if (!mbox || !mbox->regs) {
-        pr_err("IRQ: NULL mbox or regs\n");
-        return IRQ_NONE;
-    }
+	struct bcm2835_mbox *mbox = dev_id;
+	struct device *dev = mbox->controller.dev;
+	struct mbox_chan *link = &mbox->controller.chans[0];
 
-    value = readl(mbox->regs + MAIL0_RD);
-    dev_info(mbox->dev, "IRQ received: MAIL0_RD = 0x%08x\n", value);
-
-    mbox_chan_received_data(&mbox->chan, &value);
+	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+		u32 msg = readl(mbox->regs + MAIL0_RD);
+		dev_info(dev, "Reply 0x%08X\n", msg);
+		mbox_chan_received_data(link, &msg);
+	}
+	
 
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
     return IRQ_HANDLED;
@@ -64,17 +78,13 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
 	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-	dma_addr_t dma = virt_to_phys(data);
-	u32 msg = dma | 8;  // Channel 8 (property channel)
+	u32 msg = *(u32 *)data;
 
-	dev_dbg(mbox->dev, "Sending mailbox message: 0x%08x\n", msg);
-
-	// Wait until mailbox is ready
-	while (readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL)
-		cpu_relax();
-
-	// Write message to firmware
+	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
+	dev_info(mbox->controller.dev, "Request 0x%08X\n", msg);
+	spin_unlock(&mbox->lock);
+	
 
     dev_info(mbox->dev, "Mailbox message sent successfully\n");
 
@@ -84,15 +94,21 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+	bool ret;
 
-    /* Assuming IRQ signals completion */
-    return completion_done(&mbox->tx_complete);
+	spin_lock(&mbox->lock);
+	ret = !(readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL);
+	spin_unlock(&mbox->lock);
+	return ret;
 }
 
 static int bcm2835_startup(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
    /* You could init per-channel state here if needed */
+	/* Enable the interrupt on data reception */
+	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+
     dev_info(mbox->dev, "Mailbox channel startup\n");
     return 0;
 }
@@ -100,7 +116,7 @@ static int bcm2835_startup(struct mbox_chan *chan)
 static void bcm2835_shutdown(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-
+	writel(0, mbox->regs + MAIL0_CNF);
     dev_info(mbox->dev, "Mailbox channel shutdown\n");
     /* Clean up if needed */
 }
@@ -169,21 +185,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "mbox->chan.mbox is OK\n");
 
 
-    // Step 1: Drain stale responses
-    (void)readl(mbox->regs + MAIL0_RD);
-
-    // Step 2: Reset IRQ enable to known state
-    writel(0x00000000, mbox->regs + MAIL0_IRQ_EN);
-
-
-    // Step 3: Enable property channel interrupt (channel 8)
-    
-  
-    writel(1, mbox->regs + MAIL0_CFG);
-
-
-    val = readl(mbox->regs + MAIL0_IRQ_EN);
-    dev_info(&pdev->dev, "Mailbox IRQ enable register now: 0x%08x\n", val);
 
 
 
@@ -194,11 +195,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
         return ret;
     }
  
-    pr_info("Mailbox controller registered: chans=%d\n", mbox->controller.num_chans);
-    if (!mbox->chan.mbox)
-	   pr_err("ERROR: mbox->chan.mbox is NULL!\n");
-
-    
+   
     
  
     dev_info(&pdev->dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
