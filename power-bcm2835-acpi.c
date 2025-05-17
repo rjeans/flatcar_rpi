@@ -107,33 +107,7 @@ static int rpi_power_runtime_suspend(struct device *dev)
 	return rpi_power_send(rpd, false);
 }
 
-static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
-{
-    struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-    pr_info("rpi_power_tx_done: Received firmware power message response: %d completed: %u\n", r, rpd->completed);
-    dev_info(cl->dev, "tx_done: DMA buffer: msg=%px\n",
-                 rpd->msg);
- 
 
-    if (rpd->completed) {
-		dev_warn(cl->dev, "tx_done: already completed, skipping\n");
-        return;
-	}
-		
-	rpd->completed = true;
-
-    dev_info(cl->dev, "Firmware power message completed successfully in tx_done");
-
-    complete(&rpd->tx_done);  
-
-    if (rpd->msg) {
-		dev_info(cl->dev, "tx_done: freeing DMA buffer: msg=%px\n",
-                 rpd->msg);
-
-        kfree(rpd->msg);
-        rpd->msg = NULL;
-    }
-}
 
 
 
@@ -142,9 +116,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 
     dev_info(cl->dev, "rx_callback: received response, rpd=%px msg=%px\n", rpd, msg);
-	dev_info(cl->dev, "rx_callback: DMA buffer: msg=%px\n",
-                 rpd->msg);
-
+    dev_info(cl->dev, "rx_callback: buffer: msg=%px\n", rpd->msg);
 
     if (!rpd) {
         dev_err(cl->dev, "rx_callback: rpd is NULL\n");
@@ -156,9 +128,18 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
         return;
     }
 
- 
-    
-    mbox_chan_txdone(rpd->chan, 0);
+    rpd->completed = true;
+
+    dev_info(cl->dev, "rx_callback: signaling completion\n");
+    complete(&rpd->tx_done); 
+
+    if (rpd->msg) {
+        dev_info(cl->dev, "rx_callback: freeing buffer: msg=%px\n", rpd->msg);
+        kfree(rpd->msg);
+        rpd->msg = NULL;
+    }
+
+    mbox_chan_txdone(rpd->chan, 0);  
 }
 
 static int rpi_power_probe(struct platform_device *pdev)
@@ -184,7 +165,6 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = false;
     rpd->mbox_client.rx_callback=rpi_power_rx_callback;
-	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
 
 	if (!global_rpi_mbox_chan) {
