@@ -140,6 +140,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
 	rpd->mbox_client.knows_txdone = true;
+	rpd->mbox->controller.txdone_by_ack = true;
+
 
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
