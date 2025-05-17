@@ -52,7 +52,8 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 
 	rpd->msg = msg;
     dev_info(dev,"Sending power message to firmware: %s\n", on ? "ON" : "OFF");
-	dev_info(dev, "DMA alloc: msg=%px dma_handle=0x%pad\n", msg, &rpd->dma_handle);
+	dev_info(dev, "power_send: DMA buffer: msg=%px (handle=0x%llx)\n",
+                 rpd->msg, (unsigned long long)rpd->dma_handle);
 
 	memset(msg, 0, sizeof(*msg));
 
@@ -110,8 +111,10 @@ static int rpi_power_runtime_suspend(struct device *dev)
 static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
 {
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
-    pr_info("Received firmware power message response: %d completed: %u\n", r, rpd->completed);
-	dev_info(cl->dev, "DMA free:  msg=%px dma_handle=0x%pad\n", rpd->msg, &rpd->dma_handle);
+    pr_info("rpi_power_tx_done: Received firmware power message response: %d completed: %u\n", r, rpd->completed);
+    dev_info(cl->dev, "tx_done: DMA buffer: msg=%px (handle=0x%llx)\n",
+                 rpd->msg, (unsigned long long)rpd->dma_handle);
+ 
 
     if (rpd->completed)
         return;
@@ -122,6 +125,9 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
     complete(&rpd->tx_done);  
 
     if (rpd->msg) {
+		dev_info(cl->dev, "tx_done: freeing DMA buffer: msg=%px (handle=0x%llx)\n",
+                 rpd->msg, (unsigned long long)rpd->dma_handle);
+
  //       dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
         rpd->msg = NULL;
     }
@@ -150,6 +156,9 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
     struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
 
     dev_info(cl->dev, "rx_callback: received response, rpd=%px msg=%px\n", rpd, msg);
+	dev_info(cl->dev, "rx_callback: DMA buffer: msg=%px (handle=0x%llx)\n",
+                 rpd->msg, (unsigned long long)rpd->dma_handle);
+
 
     if (!rpd) {
         dev_err(cl->dev, "rx_callback: rpd is NULL\n");
@@ -166,7 +175,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *msg)
     complete(&rpd->tx_done);
 
     if (rpd->msg) {
-        dev_info(cl->dev, "rx_callback: freeing DMA buffer: %px (handle=0x%llx)\n",
+        dev_info(cl->dev, "rx_callback: Freeing DMA buffer: msg=%px (handle=0x%llx)\n",
                  rpd->msg, (unsigned long long)rpd->dma_handle);
 
   //      dma_free_coherent(cl->dev, sizeof(*rpd->msg), rpd->msg, rpd->dma_handle);
