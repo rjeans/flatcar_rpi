@@ -127,7 +127,36 @@ static void rpi_power_tx_done(struct mbox_client *cl, void *msg, int r)
     }
 }
 
+static void *rpi_power_tx_prepare(struct mbox_client *cl, void *data)
+{
+	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+	struct rpi_firmware_power_msg *msg = data;
 
+	dev_info(cl->dev, "Preparing firmware power message for transmission\n");
+	msg->size = sizeof(*msg);
+	msg->code = 0;
+	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	msg->body.buf_size = 8;
+	msg->body.val_len = 8;
+	msg->body.domain = rpd->domain_id;
+	msg->body.state = POWER_DOMAIN_ON | RPI_WAIT;
+	msg->end_tag = 0;
+
+	return msg;
+}
+
+static void rpi_power_rx_callback(struct mbox_client *cl, void *data)
+{
+	struct rpi_power_domain *rpd = dev_get_drvdata(cl->dev);
+	struct rpi_firmware_power_msg *msg = data;
+
+	dev_info(cl->dev, "Received firmware power message: %s\n", msg->body.state ? "ON" : "OFF");
+	if (msg->body.state == POWER_DOMAIN_ON) {
+		dev_info(cl->dev, "Power domain is ON\n");
+	} else {
+		dev_info(cl->dev, "Power domain is OFF\n");
+	}
+}
 
 
 static int rpi_power_probe(struct platform_device *pdev)
@@ -151,9 +180,9 @@ static int rpi_power_probe(struct platform_device *pdev)
     rpd->domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
 	rpd->mbox_client.tx_block = true;
-	rpd->mbox_client.knows_txdone = true;
-
-
+	rpd->mbox_client.knows_txdone = false;
+    rpd->mbox_client->tx_prepare = rpi_power_tx_prepare;
+    rpd->mbox_client.rx_callback=rpi_power_rx_callback;
 	rpd->mbox_client.tx_done = rpi_power_tx_done;
 	pr_info("Requesting mailbox channel...\n");
 
