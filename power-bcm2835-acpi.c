@@ -160,12 +160,13 @@ static int rpi_power_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	dev_info(dev, "Power domain name: %s\n", rpd->name);
-    rpd->domain_id = RPI_FIRMWARE_POWER_DOMAIN_PWM;
 	rpd->mbox_client.dev = dev;
-	rpd->mbox_client.tx_block = true;
-	rpd->mbox_client.knows_txdone = false;
-	rpd->mbox_client.tx_tout = 500;
-    rpd->mbox_client.rx_callback=rpi_power_rx_callback;
+	rpd->mbox_client.tx_block = true;        // Wait for completion inside mbox_send_message()
+	rpd->mbox_client.knows_txdone = false;   // Let the controller (IRQ) notify tx completion
+	rpd->mbox_client.tx_tout = 500;          // Timeout if IRQ doesn't arrive
+	rpd->mbox_client.rx_callback = rpi_power_rx_callback;  // Optional if you process response
+	rpd->mbox_client.tx_done = NULL;         // Optional if you don’t need extra tx-done logic
+
 	pr_info("Requesting mailbox channel...\n");
 
 	if (!global_rpi_mbox_chan) {
