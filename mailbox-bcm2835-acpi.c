@@ -86,6 +86,9 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 
     dev_info(mbox->controller.dev, "SEND DATA: IRQ: chan->cl=%px\n", chan->cl);
 
+    u32 irq_enable = readl(mbox->regs + MAIL0_CNF);
+    dev_info(mbox->dev, "MAIL0_CNF (IRQ enable register) = 0x%08X\n", irq_enable);
+
 
 	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
