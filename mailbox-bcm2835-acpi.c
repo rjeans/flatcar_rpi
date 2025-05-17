@@ -78,7 +78,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
             mbox_chan_txdone(link, 0);             // for TX-only clients
         }
 	
-
+    }
     dev_info(mbox->dev, "Completion signaled for mailbox transaction\n");
     return IRQ_HANDLED;
 }
