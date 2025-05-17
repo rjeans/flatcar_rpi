@@ -51,7 +51,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 		return -ENOMEM;
 
 	rpd->msg = msg;
-
+    dev_info(dev,"Sending power message to firmware: %s\n", on ? "ON" : "OFF");
 	dev_info(dev, "DMA alloc: msg=%px dma_handle=0x%pad\n", msg, &rpd->dma_handle);
 
 	memset(msg, 0, sizeof(*msg));
