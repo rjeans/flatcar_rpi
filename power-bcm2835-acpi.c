@@ -164,7 +164,7 @@ static void rpi_power_rx_callback(struct mbox_client *cl, void *data)
 
         // Free DMA buffer if used
         if (rpd->msg) {
-            dma_free_coherent(client->dev, sizeof(*rpd->msg),
+            dma_free_coherent(cl->dev, sizeof(*rpd->msg),
                               rpd->msg, rpd->dma_handle);
             rpd->msg = NULL;
         }
