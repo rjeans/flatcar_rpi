@@ -67,10 +67,12 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 	msg->end_tag = 0;
 
 	// Reset state
+	dev_info(dev, "Resetting tx_done completion\n");
 	reinit_completion(&rpd->tx_done);
 	rpd->completed = false;
 
 	// Send mailbox message
+	dev_info(dev, "Sending firmware power domain message: %s\n", on ? "ON" : "OFF");
 	ret = mbox_send_message(rpd->chan, rpd->msg);
 	dev_info(dev, "mbox_send_message() returned %d\n", ret);
 	if (ret < 0) {
