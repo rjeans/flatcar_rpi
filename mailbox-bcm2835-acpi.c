@@ -38,6 +38,10 @@
 #define ARM_MS_FULL  0x80000000
 #define ARM_MS_EMPTY 0x40000000
 
+/* Configuration register: Enable interrupts. */
+#define ARM_MC_IHAVEDATAIRQEN	BIT(0)
+
+
 struct bcm2835_mbox {
     void __iomem *regs;
     struct mbox_controller controller;
@@ -55,9 +59,7 @@ EXPORT_SYMBOL_GPL(global_rpi_mbox_chan);
 
 static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 {
-    struct bcm2835_mbox *mbox = dev_id;
-    u32 value;
-
+ 
     pr_info(">>> IRQ handler entered: dev_id=%px\n", dev_id);
 
 	struct bcm2835_mbox *mbox = dev_id;
