@@ -279,6 +279,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
         dev_warn(&pdev->dev, "Power domain NOT linked: pm_domain is NULL");
     
 
+
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base))
 		return dev_err_probe(&pdev->dev, PTR_ERR(pc->base), "Failed to map PWM I/O");
