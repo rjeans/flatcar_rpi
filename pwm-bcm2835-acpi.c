@@ -129,7 +129,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                              const struct pwm_state *state)
 {
     struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
-    unsigned long rate = pc->clk_rate;
+    unsigned long rate;
     u64 period_cycles, duty_cycles;
     u32 ctrl;
     int retries, ret;
@@ -139,9 +139,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
              pwm->hwpwm, state->period, state->duty_cycle, state->enabled,
              state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
-    // Check for valid clock rate
-    if (!rate)
-        return -EINVAL;
+   
 
     // Power up the device (runtime PM)
     ret = pm_runtime_get_sync(pc->dev);
@@ -156,6 +154,24 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     usleep_range(1000000, 2000000);  // Sleep 1–2 ms
     dev_info(pc->dev, "Power domain stable?? - proceeding with PWM configuration");
 
+    if (pc->clk && !pc->clk_enabled) {
+    ret = clk_prepare_enable(pc->clk);
+    if (ret) {
+        dev_warn(pc->dev, "clk_prepare_enable failed: %d\n", ret);
+    } else {
+        pc->clk_enabled = true;
+        pc->clk_rate = clk_get_rate(pc->clk);
+        dev_info(pc->dev, "PWM clock enabled, rate=%lu Hz", pc->clk_rate);
+    }
+}
+
+if (!state->enabled && pc->clk && pc->clk_enabled) {
+    clk_disable_unprepare(pc->clk);
+    pc->clk_enabled = false;
+    dev_info(pc->dev, "PWM clock disabled");
+}
+
+   rate = pc->clk ? pc->clk_rate : FALLBACK_PWM_CLK_HZ;
 
     // Warn if not in PWM mode
     ctrl = readl(pc->base + PWM_CONTROL);
@@ -320,24 +336,12 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->clk = devm_clk_get(&pdev->dev, "pwm");
 
     pc->clk_enabled = false;
-if (IS_ERR(pc->clk)) {
-	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
-	         PTR_ERR(pc->clk));
-	pc->clk_rate = FALLBACK_PWM_CLK_HZ;
+    if (IS_ERR(pc->clk)) {
+        dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
+                PTR_ERR(pc->clk));
 
-} else {
-	ret = clk_prepare_enable(pc->clk);
-    
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to enable PWM clock: %d\n", ret);
-		return ret;
-	} else {
-        dev_info(&pdev->dev, "Enabled PWM clock\n");
-        pc->clk_enabled = true;
-    }
-	pc->clk_rate = clk_get_rate(pc->clk);
-	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
-}
+
+    } 
 
     dev_info(&pdev->dev, "PWM base mapped at %p\n", pc->base);
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
@@ -407,7 +411,7 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
     } else {
         dev_warn(dev, "PWM clock was NULL or not enabled\n");
     }
-	   clk_disable_unprepare(pc->clk);
+	
 
 	dev_info(dev, "Removed BCM2835 PWM driver\n");
 	return 0;

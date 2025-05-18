@@ -59,18 +59,28 @@ static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
 
 
 
+int ret;
 
-	reinit_completion(&clk->tx_done);
-	int ret = mbox_send_message(clk->chan, msg);
-	if (ret < 0) {
-		dev_err(clk->mbox_client.dev, "Failed to send message: %d\n", ret);
-	    kfree(msg);
-		return ret;
-   }
+reinit_completion(&clk->tx_done);
+ret = mbox_send_message(clk->chan, msg);
+if (ret < 0) {
+	dev_err(clk->mbox_client.dev, "Failed to send message: %d\n", ret);
+	kfree(msg);
+	return ret;
+}
 
-    kfree(msg);
-	dev_info(clk->mbox_client.dev, "Message sent successfully\n");
-    return 0;
+WARN_ON_ONCE(in_atomic());
+
+ret = wait_for_completion_timeout(&clk->tx_done, msecs_to_jiffies(100));
+if (ret == 0) {
+	dev_err(clk->mbox_client.dev, "Timeout waiting for clock firmware response\n");
+	kfree(msg);
+	return -ETIMEDOUT;
+}
+
+kfree(msg);
+dev_info(clk->mbox_client.dev, "Clock firmware command completed\n");
+return 0;
 }
 
 
@@ -124,6 +134,12 @@ static const struct clk_ops bcm2835_clk_ops = {
 	.recalc_rate = bcm2835_clk_recalc_rate,
 };
 
+static void bcm2835_clk_tx_done(struct mbox_client *cl, void *msg, int r)
+{
+	struct bcm2835_clk *clk = container_of(cl, struct bcm2835_clk, mbox_client);
+	complete(&clk->tx_done);
+}
+
 static int bcm2835_clk_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -147,8 +163,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	dev_info(dev, "Clock domain name: %s\n", clk->name);
 
 	clk->mbox_client.dev = dev;
-	clk->mbox_client.tx_done = NULL;
-	clk->mbox_client.tx_block = true;
+	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
+	clk->mbox_client.tx_block = false;
 	clk->mbox_client.knows_txdone = false;
 	clk->mbox_client.rx_callback = NULL;
 	clk->mbox_client.tx_tout = 500; // Timeout in ms
