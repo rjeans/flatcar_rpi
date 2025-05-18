@@ -34,19 +34,37 @@ struct bcm2835_clk {
 
 static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
 {
-	u32 *msg = kzalloc(sizeof(u32), GFP_KERNEL);
+	struct rpi_firmware_clock_msg *msg;
+
+	umsg = kzalloc(sizeof(*msg), GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
-	*msg = enable ? CLOCK_ON : CLOCK_OFF;
+	msg->size         = sizeof(*msg);
+	msg->code         = 0;  // process request
+
+	msg->body.tag      = 0x00038001; // SET_CLOCK_STATE
+	msg->body.buf_size = 8;
+	msg->body.val_len  = 8;
+	msg->body.clock_id = clk->firmware_id;  // e.g. 4 for PWM
+	msg->body.state    = enable ? CLOCK_ON : CLOCK_OFF;
+
+	msg->end_tag = 0;
+
+
+
 
 	reinit_completion(&clk->tx_done);
 	int ret = mbox_send_message(clk->chan, msg);
-	if (ret < 0)
+	if (ret < 0) {
+		dev_err(clk->mbox_client.dev, "Failed to send message: %d\n", ret);
+	    kfree(msg);
 		return ret;
+   }
 
-	ret = wait_for_completion_timeout(&clk->tx_done, msecs_to_jiffies(100));
-	return (ret == 0) ? -ETIMEDOUT : 0;
+    kfree(msg);
+	dev_info(clk->mbox_client.dev, "Message sent successfully\n");
+    return 0;
 }
 
 static void bcm2835_clk_tx_done(struct mbox_client *cl, void *msg, int r)

@@ -27,6 +27,22 @@ struct rpi_firmware_power_msg {
 	u32 end_tag;        // 0
 } __packed;
 
+struct rpi_firmware_clock_msg {
+	u32 size;      // Total size of the message in bytes
+	u32 code;      // Request code: 0 = request
+
+	struct {
+		u32 tag;        // 0x00038001 = set clock state
+		u32 buf_size;   // Size of the value buffer: 8
+		u32 val_len;    // Length of value data: 8
+		u32 clock_id;   // ID of the clock (e.g. 4 = PWM)
+		u32 state;      // Bit 0: 1=enable, Bit 1: 1=wait
+	} __packed body;
+
+	u32 end_tag;   // Always 0
+} __packed;
+
+
 
 #ifdef __cplusplus
 }

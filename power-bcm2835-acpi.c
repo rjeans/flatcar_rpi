@@ -37,7 +37,6 @@ struct rpi_power_domain {
 	bool completed;
 	u32 domain_id;
 	struct generic_pm_domain genpd;
-	struct rpi_firmware_power_msg *msg;
 };
 
 
@@ -48,29 +47,27 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 {
 	struct device *dev = rpd->mbox_client.dev;
 	int ret;
-
+	struct rpi_firmware_power_msg *msg;
 	// Allocate DMA-coherent buffer
-	rpd->msg = kzalloc(sizeof(*rpd->msg), GFP_KERNEL);
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 
-	if (!rpd->msg)
+	if (!msg)
 		return -ENOMEM;
 
-	
-    dev_info(dev,"Sending power message to firmware: %s\n", on ? "ON" : "OFF");
-	dev_info(dev, "power_send: DMA buffer: msg=%px \n",
-                 rpd->msg);
+	dev_info(dev,"Sending power message to firmware: %s\n", on ? "ON" : "OFF");
+	dev_info(dev, "power_send: DMA buffer: msg=%px \n", msg);
 
-	memset(rpd->msg, 0, sizeof(*rpd->msg));
+	memset(msg, 0, sizeof(*msg));
 
 	// Construct mailbox firmware message
-	rpd->msg->size = sizeof(*rpd->msg);
-	rpd->msg->code = 0;
-	rpd->msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
-	rpd->msg->body.buf_size = 8;
-	rpd->msg->body.val_len = 8;
-	rpd->msg->body.domain = rpd->domain_id;
-	rpd->msg->body.state = on ? RPI_POWER_ON | RPI_WAIT : 0;
-	rpd->msg->end_tag = 0;
+	msg->size = sizeof(*msg);
+	msg->code = 0;
+	msg->body.tag = RPI_FIRMWARE_SET_POWER_STATE;
+	msg->body.buf_size = 8;
+	msg->body.val_len = 8;
+	msg->body.domain = rpd->domain_id;
+	msg->body.state = on ? RPI_POWER_ON | RPI_WAIT : 0;
+	msg->end_tag = 0;
 
 	// Reset state
 	dev_info(dev, "Resetting tx_done completion\n");
@@ -79,17 +76,16 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 
 	// Send mailbox message
 	dev_info(dev, "Sending firmware power domain message: %s\n", on ? "ON" : "OFF");
-	dev_info(dev, "msg->size = 0x%08x\n", rpd->msg->size);
-	ret = mbox_send_message(rpd->chan, rpd->msg);
+	dev_info(dev, "msg->size = 0x%08x\n", msg->size);
+	ret = mbox_send_message(rpd->chan, msg);
 	dev_info(dev, "mbox_send_message() returned %d\n", ret);
 	if (ret < 0) {
-		kfree(rpd->msg);
-		rpd->msg = NULL;
+		kfree(msg);
 		return ret;
 	}
 
-
 	dev_info(dev, "Firmware power domain response received and rpi_power_send complete\n");
+	kfree(msg);
 	return 0;
 }
 
