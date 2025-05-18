@@ -168,7 +168,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	}
 	dev_info(dev, "clk_hw registered\n");
 
-	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get, &clk->hw);
+	ret = devm_clk_hw_register_clkdev(dev, &clk->hw, clk->name, NULL);
 	if (ret) {
 		dev_err(dev, "Failed to register clk provider: %d\n", ret);
 	}
