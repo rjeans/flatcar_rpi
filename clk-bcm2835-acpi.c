@@ -106,6 +106,14 @@ static long bcm2835_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 static int bcm2835_clk_enable(struct clk_hw *hw)
 {
 	struct bcm2835_clk *clk = to_bcm2835_clk(hw);
+
+	dev_info(clk->mbox_client.dev, "XXXXXXXX Enabling clock: %s XXXXXXXXXXXXX\n", clk->name);
+
+	if (in_atomic() || irqs_disabled()) {
+		dev_emerg(clk->mbox_client.dev, "clk_enable called in atomic context!\n");
+		dump_stack(); // log exact context
+	}
+
 	if (clk->enabled)
 		return 0;
 	int ret = bcm2835_clk_send(clk, true);
