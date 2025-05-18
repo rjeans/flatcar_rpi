@@ -73,6 +73,7 @@ static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 
 	// Send mailbox message
 	dev_info(dev, "Sending firmware power domain message: %s\n", on ? "ON" : "OFF");
+	dev_info(dev, "msg->size = 0x%08x\n", rpd->msg->size);
 	ret = mbox_send_message(rpd->chan, rpd->msg);
 	dev_info(dev, "mbox_send_message() returned %d\n", ret);
 	if (ret < 0) {
