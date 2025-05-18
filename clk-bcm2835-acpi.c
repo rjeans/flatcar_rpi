@@ -157,7 +157,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk->mbox_client.tx_block = false;
 	clk->mbox_client.knows_txdone = true;
 
-	clk->clock_id = RPI_FIRMWARE_PWM_ID
+	clk->clock_id = RPI_FIRMWARE_PWM_ID;
 
 	/* Optional: set rate from property, or use fixed default */
 	device_property_read_u32(dev, "clock-frequency", (u32 *)&clk->rate);
