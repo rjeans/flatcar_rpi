@@ -17,6 +17,8 @@
 #include <linux/delay.h>
 #include <soc/bcm2835/raspberrypi-firmware.h>
 #include <linux/platform_device.h>
+#include <linux/slab.h>
+#include <linux/clk.h>
 
 
 #define RPI_FIRMWARE_DOMAIN_PWM 2
@@ -55,6 +57,7 @@ struct bcm2835_pwm {
 	void __iomem *base;
 	void __iomem *cm_base;
 	unsigned long clk_rate;
+    struct clk *clk;
 	
 
 };
@@ -290,7 +293,21 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	if (!pc->cm_base)
 		return dev_err_probe(&pdev->dev, -ENOMEM, "Failed to ioremap Clock Manager");
 
+	pc->clk = devm_clk_get(&pdev->dev, NULL);
+if (IS_ERR(pc->clk)) {
+	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
+	         PTR_ERR(pc->clk));
 	pc->clk_rate = FALLBACK_PWM_CLK_HZ;
+} else {
+	ret = clk_prepare_enable(pc->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to enable PWM clock: %d\n", ret);
+		return ret;
+	}
+	pc->clk_rate = clk_get_rate(pc->clk);
+	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
+}
+
 
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
 	if (ret)
@@ -353,6 +370,8 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 	} else {
 		dev_warn(dev, "Base was NULL\n");
 	}
+    if (!IS_ERR_OR_NULL(pc->clk))
+	   clk_disable_unprepare(pc->clk);
 
 	dev_info(dev, "Removed BCM2835 PWM driver\n");
 	return 0;
