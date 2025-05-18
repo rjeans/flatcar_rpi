@@ -62,7 +62,7 @@ static int __init pwm_test_init(void)
 
 	// Match by ACPI HID (e.g. "BCM2851")
 	for_each_acpi_dev_match(adev, "BCM2851", NULL, -1) {
-		pwr_dev = get_device(&adev_dev); // Take ref
+		pwr_dev = get_device(&adev->dev); // Take ref
 		break;
 	}
 
