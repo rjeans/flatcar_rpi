@@ -76,7 +76,7 @@ struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *cl)
             }
 
             init_completion(&bcm2835_mbox_global->tx_completions[i]);
-            chan.mbox = &bcm2835_mbox_global->controller;
+            chan->mbox = &bcm2835_mbox_global->controller;
             return chan;
         }
     }
@@ -206,8 +206,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
     mbox->controller.dev = &pdev->dev;
-    mbox->controller.chans = &mbox->chan;
-    mbox->controller.num_chans = 1;
+    mbox->controller.chans = &mbox->chans;
+    mbox->controller.num_chans = BCM2835_MAX_CHANNELS;
     mbox->controller.ops = &bcm2835_chan_ops;
     mbox->controller.txdone_irq = false;
     mbox->controller.txdone_poll = true;
