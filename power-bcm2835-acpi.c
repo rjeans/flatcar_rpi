@@ -124,6 +124,11 @@ static int rpi_power_domain_power_off(struct generic_pm_domain *genpd)
     return rpi_power_send(rpd, false);
 }
 
+static void rpi_power_domain_release(struct device *dev)
+{
+    pr_info("Raspberry Pi power domain release called\n");
+    // Nothing to free since rpd->genpd is embedded
+}
 
 struct generic_pm_domain *rpi_power_get_domain(void)
 {
@@ -196,6 +201,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.power_on  = rpi_power_domain_power_on;
     rpd->genpd.power_off = rpi_power_domain_power_off;
+	rpd->genpd.release = rpi_power_domain_release;
 
 	rpi_pwm_genpd = &rpd->genpd;
 	
