@@ -301,11 +301,13 @@ if (IS_ERR(pc->clk)) {
 	         PTR_ERR(pc->clk));
 	pc->clk_rate = FALLBACK_PWM_CLK_HZ;
 } else {
-	ret = clk_prepare_enable(pc->clk);
+	ret = clk_prepare(pc->clk);
+    
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to enable PWM clock: %d\n", ret);
 		return ret;
 	}
+    log_warn(&pdev->dev, "Skipping clock enablement for now\n");
 	pc->clk_rate = clk_get_rate(pc->clk);
 	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
 }
