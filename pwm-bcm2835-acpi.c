@@ -165,11 +165,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     }
 }
 
-if (!state->enabled && pc->clk && pc->clk_enabled) {
-    clk_disable_unprepare(pc->clk);
-    pc->clk_enabled = false;
-    dev_info(pc->dev, "PWM clock disabled");
-}
+
 
    rate = pc->clk ? pc->clk_rate : FALLBACK_PWM_CLK_HZ;
 
