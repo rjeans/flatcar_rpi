@@ -163,12 +163,6 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	init.flags = 0; /* No CLK_IS_BASIC; use appropriate CLK_ flags if needed */
 
 	clk->hw.init = &init;
-	struct clk *c = clk_hw_get_clk(&clk->hw, NULL);
-	if (IS_ERR(c)) {
-		dev_err(dev, "Failed to get clk from clk_hw: %ld\n", PTR_ERR(c));
-		return PTR_ERR(c);
-	}
-	dev_info(dev, "Got clk from clk_hw: %p\n", c);
 
 	ret = devm_clk_hw_register(dev, &clk->hw);
 	if (ret) {
@@ -176,6 +170,14 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 		return ret;
 	}
 	dev_info(dev, "clk_hw registered\n");
+
+	struct clk *c = clk_hw_get_clk(&clk->hw, NULL);
+	if (IS_ERR(c)) {
+		dev_err(dev, "Failed to get clk from clk_hw: %ld\n", PTR_ERR(c));
+		return PTR_ERR(c);
+	}
+	dev_info(dev, "Got clk from clk_hw: %p\n", c);
+
 
 	ret = clk_register_clkdev(c, clk->name, dev_name(dev));
 	if (ret) {
