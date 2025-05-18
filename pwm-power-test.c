@@ -49,7 +49,7 @@ static struct kobj_attribute trigger_attr = __ATTR_RO(trigger);
 
 static int __init pwm_test_init(void)
 {
-	struct device *acpi_dev;
+	struct acpi_device *dev;
 
 	pwm_kobj = kobject_create_and_add("pwm_power_test", kernel_kobj);
 	if (!pwm_kobj)
