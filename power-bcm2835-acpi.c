@@ -213,6 +213,8 @@ static int rpi_power_remove(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	dev_info(dev, "Removing power domain '%s'\n", rpd->name);
 	pm_runtime_disable(&pdev->dev);
+	pm_genpd_remove(&rpd->genpd);
+    rpi_pwm_genpd = NULL;
 	if (rpd->chan)
 		mbox_free_channel(rpd->chan);
 	return 0;
