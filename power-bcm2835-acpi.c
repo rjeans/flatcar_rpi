@@ -11,6 +11,7 @@
 #include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
+#include <linux/pm_domain.h>
 
 
 #include "mailbox-bcm2835-acpi.h"
@@ -171,6 +172,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 	
+	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
+	
+
+    rpd->genpd.name = rpd->name;
+
+    dev_set_genpd_dev(&pdev->dev, &rpd->genpd);  // <-- key ACPI-safe registration
 	
 
 	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
