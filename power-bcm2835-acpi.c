@@ -178,7 +178,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
     rpd->genpd.name = rpd->name;
 
-    dev_set_genpd_dev(&pdev->dev, &rpd->genpd);  // <-- key ACPI-safe registration
+    dev_set_genpd_add(&pdev->dev, &rpd->genpd);  // <-- key ACPI-safe registration
 	
 
 	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
