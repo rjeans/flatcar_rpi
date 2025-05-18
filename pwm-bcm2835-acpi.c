@@ -272,7 +272,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 	pc->dev = &pdev->dev;
 
-
+    dev_info(&pdev->dev, "Adding device to power domain");
     ret = pm_genpd_add_device(rpi_power_get_domain(), &pdev->dev);
     if (ret) {
         dev_err(&pdev->dev, "Failed to add device to power domain: %d\n", ret);
@@ -293,6 +293,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	if (!pc->cm_base)
 		return dev_err_probe(&pdev->dev, -ENOMEM, "Failed to ioremap Clock Manager");
 
+    dev_info(&pdev->dev, "Clock Manager base mapped at %p\n", pc->cm_base);
+
 	pc->clk = devm_clk_get(&pdev->dev, "pwm");
 if (IS_ERR(pc->clk)) {
 	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
@@ -308,7 +310,7 @@ if (IS_ERR(pc->clk)) {
 	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
 }
 
-
+    dev_info(&pdev->dev, "PWM base mapped at %p\n", pc->base);
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d", ret);
