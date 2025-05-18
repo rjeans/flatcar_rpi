@@ -98,10 +98,7 @@ static int bcm2835_clk_enable(struct clk_hw *hw)
 
 	dev_info(clk->mbox_client.dev, "XXXXXXXX Enabling clock: %s XXXXXXXXXXXXX\n", clk->name);
 
-	if (in_atomic() || irqs_disabled()) {
-		dev_emerg(clk->mbox_client.dev, "clk_enable called in atomic context!\n");
-		dump_stack(); // log exact context
-	}
+
 
 	if (clk->enabled)
 		return 0;
