@@ -59,6 +59,7 @@ struct bcm2835_pwm {
 	unsigned long clk_rate;
     struct clk *clk;
     bool clk_enabled;
+    struct pinctrl *pctl;
 	
 
 };
@@ -298,7 +299,6 @@ extern struct generic_pm_domain *rpi_power_get_domain(void);
 static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
 	struct bcm2835_pwm *pc;
-	struct pinctrl *pinctrl;
 	struct pinctrl_state *state;
 	int ret;
 
@@ -350,11 +350,11 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	if (ret)
 		dev_warn(&pdev->dev, "Failed to register pinctrl mappings: %d", ret);
 
-	pinctrl = devm_pinctrl_get(&pdev->dev);
-	if (!IS_ERR(pinctrl)) {
-		state = pinctrl_lookup_state(pinctrl, "default");
+	pc->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (!IS_ERR(pc->pinctrl)) {
+		state = pinctrl_lookup_state(pc->pinctrl, "default");
 		if (!IS_ERR(state)) {
-			ret = pinctrl_select_state(pinctrl, state);
+			ret = pinctrl_select_state(pc->pinctrl, state);
 			if (!ret)
 				dev_info(&pdev->dev, "Applied default pinctrl state explicitly");
 			else
