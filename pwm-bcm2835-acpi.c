@@ -116,6 +116,14 @@ static void bcm2835_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 	writel(value, pc->base + PWM_CONTROL);
 }
 
+/**
+ * bcm2835_pwm_apply - Apply a new PWM configuration to the hardware
+ * @chip: PWM chip structure
+ * @pwm: PWM device
+ * @state: Desired PWM state (period, duty, enable, polarity)
+ *
+ * Programs the hardware registers to match the requested PWM state.
+ */
 static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                              const struct pwm_state *state)
 {
@@ -125,13 +133,16 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     u32 ctrl;
     int retries, ret;
 
+    // Log the requested configuration
     dev_info(pc->dev, "Applying PWM configuration: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
              pwm->hwpwm, state->period, state->duty_cycle, state->enabled,
              state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
 
+    // Check for valid clock rate
     if (!rate)
         return -EINVAL;
 
+    // Power up the device (runtime PM)
     ret = pm_runtime_get_sync(pc->dev);
     if (ret < 0) {
         dev_warn(pc->dev, "Failed to power up device: %d", ret);
@@ -139,48 +150,53 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return ret;
     }
 
+    // Wait for power domain to stabilize
     dev_info(pc->dev, "Power domain enabled - waiting for stability");
-    usleep_range(1000000, 2000000);  // Sleep 100–200 microseconds
+    usleep_range(1000000, 2000000);  // Sleep 1–2 ms
     dev_info(pc->dev, "Power domain stable?? - proceeding with PWM configuration");
 
+    // Enable and get the PWM clock rate if available
     if (pc->clk) {
-    ret = clk_prepare_enable(pc->clk);
-    if (ret) {
-        dev_warn(dev, "clk_prepare_enable failed: %d\n", ret);
-    }
+        ret = clk_prepare_enable(pc->clk);
+        if (ret) {
+            dev_warn(pc->dev, "clk_prepare_enable failed: %d\n", ret);
+        }
         rate = clk_get_rate(pc->clk);
         if (rate == 0) {
             dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
             rate = FALLBACK_PWM_CLK_HZ;
         }
         dev_info(pc->dev, "PWM clock rate: %lu Hz\n", rate);
-    dev_info(pc->dev, "PWM clock enabled");
+        dev_info(pc->dev, "PWM clock enabled");
     } else {
         dev_warn(pc->dev, "No PWM clock available, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
         rate = FALLBACK_PWM_CLK_HZ;
     }
 
+    // Warn if not in PWM mode
+    ctrl = readl(pc->base + PWM_CONTROL);
     if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm))))
         dev_warn(pc->dev, "PWM channel %u not in PWM mode!", pwm->hwpwm);
 
-
     dev_info(pc->dev, "Configuring PWM at %lu Hz", rate);
 
-    /* Force PWM mode bit */
-    ctrl = readl(pc->base + PWM_CONTROL);
+    // Force PWM mode bit for this channel
     ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
     ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
     writel(ctrl, pc->base + PWM_CONTROL);
     udelay(10);
 
+    // Convert period/duty from ns to cycles
     period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
     duty_cycles   = DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * rate, NSEC_PER_SEC);
 
+    // Check for minimum period
     if (period_cycles < PERIOD_MIN) {
         dev_warn(pc->dev, "Period too small (%llu cycles), skipping configuration", period_cycles);
         goto out;
     }
 
+    // Write period register with verification and retries
     for (retries = 5; retries; retries--) {
         writel(period_cycles, pc->base + PERIOD(pwm->hwpwm));
         udelay(100);
@@ -192,12 +208,14 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         dev_err(pc->dev, "PERIOD register stuck: wrote %llu, read %u",
                 period_cycles, readl(pc->base + PERIOD(pwm->hwpwm)));
 
+    // Write duty register and verify
     writel(duty_cycles, pc->base + DUTY(pwm->hwpwm));
     udelay(100);
     if (readl(pc->base + DUTY(pwm->hwpwm)) != duty_cycles)
         dev_warn(pc->dev, "DUTY write mismatch: wrote %llu, read %u",
                  duty_cycles, readl(pc->base + DUTY(pwm->hwpwm)));
 
+    // Update enable and polarity bits
     ctrl = readl(pc->base + PWM_CONTROL);
     ctrl &= ~(PWM_ENABLE | PWM_POLARITY) << PWM_CONTROL_SHIFT(pwm->hwpwm);
 
@@ -209,6 +227,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     writel(ctrl, pc->base + PWM_CONTROL);
     udelay(100);
 
+    // Log the applied configuration
     dev_info(pc->dev, "Applied PWM config: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
              pwm->hwpwm, period_cycles, duty_cycles, state->enabled,
              state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
