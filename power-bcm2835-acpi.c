@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_domain.h>
-#include <linux/pm_genpd.h>
+
 
 #include "mailbox-bcm2835-acpi.h"
 
@@ -172,14 +172,15 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
+	rpd->genpd.name = rpd->name;
+
 	
 	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
 
 
-    rpd->genpd.name = rpd->name;
-
+ 
    //  This registers the genpd globally under the name (needed for ACPI match)
-    ret = genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
+    ret = dev_pm_genpd_set_provider(&pdev->dev, &rpd->genpd);
     if (ret) {
         dev_warn(dev, "Failed to register GENPD provider: %d\n", ret);
 	} else {
