@@ -307,7 +307,7 @@ if (IS_ERR(pc->clk)) {
 		dev_err(&pdev->dev, "Failed to enable PWM clock: %d\n", ret);
 		return ret;
 	}
-    log_warn(&pdev->dev, "Skipping clock enablement for now\n");
+    dev_warn(&pdev->dev, "Skipping clock enablement for now\n");
 	pc->clk_rate = clk_get_rate(pc->clk);
 	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
 }
