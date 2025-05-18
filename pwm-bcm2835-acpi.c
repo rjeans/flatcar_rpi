@@ -169,7 +169,11 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     }
 }
 
-
+writel(CM_PASSWD | (32 << 12), pc->cm_base + CM_PWMDIV);
+udelay(10);
+writel(CM_PASSWD | CM_SRC_PLLD | CM_ENABLE, pc->cm_base + CM_PWMCTL);
+udelay(10);
+dev_info(pc->dev, "Clock divider and source set via CM registers");
 
    rate = pc->clk ? pc->clk_rate : FALLBACK_PWM_CLK_HZ;
 
@@ -186,6 +190,16 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     writel(ctrl, pc->base + PWM_CONTROL);
     mb();
     udelay(10);
+
+    int mode_retries = 10;
+    while (mode_retries--) {
+        u32 check = readl(pc->base + PWM_CONTROL);
+        if (check & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm)))
+             break;
+         udelay(10);
+     }
+if (mode_retries <= 0)
+    dev_err(pc->dev, "Failed to latch PWM mode bit for channel %u", pwm->hwpwm);
     ctrl = readl(pc->base + PWM_CONTROL);
     dev_info(pc->dev, "CONTROL after setting PWM mode: 0x%08x", ctrl);
 
@@ -344,6 +358,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
 
     } 
+
+    ret = devm_gpio_request_one(&pdev->dev, 18, GPIOF_OUT_INIT_LOW, "pwm-gpio18");
+    if (ret)
+        dev_warn(&pdev->dev, "Failed to request GPIO18: %d\n", ret);
 
     dev_info(&pdev->dev, "PWM base mapped at %p\n", pc->base);
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
