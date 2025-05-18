@@ -40,6 +40,10 @@ struct rpi_power_domain {
 	struct rpi_firmware_power_msg *msg;
 };
 
+
+
+
+
 static int rpi_power_send(struct rpi_power_domain *rpd, bool on)
 {
 	struct device *dev = rpd->mbox_client.dev;
@@ -105,9 +109,13 @@ static int rpi_power_runtime_suspend(struct device *dev)
 	return rpi_power_send(rpd, false);
 }
 
+static struct generic_pm_domain rpi_pwm_genpd;
 
-
-
+struct generic_pm_domain *rpi_power_get_domain(void)
+{
+    return &rpi_pwm_genpd;
+}
+EXPORT_SYMBOL_GPL(rpi_power_get_domain);
 
 
 
@@ -177,15 +185,14 @@ static int rpi_power_probe(struct platform_device *pdev)
 	
 	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
 
-
- 
-   //  This registers the genpd globally under the name (needed for ACPI match)
- 	ret = of_genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
-	if (ret)
-		dev_warn(dev, "GENPD provider registration failed: %d\n", ret);
-	else
-		dev_info(dev, "GENPD provider registered for %s\n", rpd->name);
-
+	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
+		ret = pm_genpd_attach_device(&pdev->dev, rpi_power_get_domain());
+		if (ret)
+			dev_warn(&pdev->dev, "Failed to manually bind to power domain: %d\n", ret);
+		else
+			dev_info(&pdev->dev, "Manually bound to Raspberry Pi power domain");
+	}
+   
 	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
 	return 0;
 }
