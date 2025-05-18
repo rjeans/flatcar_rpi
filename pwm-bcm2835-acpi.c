@@ -270,12 +270,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pm_runtime_set_active(&pdev->dev);
     pm_runtime_enable(&pdev->dev);
 
-    struct generic_pm_domain *genpd = dev_to_genpd(&pdev->dev);
-    if (!genpd)
-        dev_warn(&pdev->dev, "GENPD is NULL – power domain not linked!");
-    else
-        dev_info(&pdev->dev, "GENPD attached: %s", genpd->name);
-
+    
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base))
