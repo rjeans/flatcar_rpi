@@ -8,7 +8,16 @@
 
 #define PWM_BASE_PHYS  0xfe20c000
 #define PWM_REG_SIZE   0x28
+
+#define PWM_CTL        0x00
+#define PWM_STA        0x04
 #define PWM_RNG1       0x10
+#define PWM_DAT1       0x14
+
+#define PWM_CTL_PWEN1  (1 << 0)
+
+#define PERIOD_VALUE   15625
+#define DUTY_VALUE     (PERIOD_VALUE / 4)
 
 static void __iomem *pwm_base;
 static struct device *pwr_dev;
@@ -17,7 +26,7 @@ static struct kobject *pwm_kobj;
 static ssize_t trigger_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	int ret;
-	u32 val = 0;
+	u32 val_ctl = 0, val_rng = 0, val_dat = 0;
 
 	if (!pwr_dev)
 		return sprintf(buf, "Power device not bound\n");
@@ -34,12 +43,24 @@ static ssize_t trigger_show(struct kobject *kobj, struct kobj_attribute *attr, c
 		return sprintf(buf, "Failed to ioremap PWM base\n");
 	}
 
-	writel(0x1234, pwm_base + PWM_RNG1);
-	val = readl(pwm_base + PWM_RNG1);
+	// Configure PWM channel 1
+	writel(0, pwm_base + PWM_CTL);                 // Disable before config
+	writel(PERIOD_VALUE, pwm_base + PWM_RNG1);     // Period
+	writel(DUTY_VALUE, pwm_base + PWM_DAT1);       // Duty cycle
+	writel(PWM_CTL_PWEN1, pwm_base + PWM_CTL);     // Enable
+
+	// Read back values
+	val_ctl = readl(pwm_base + PWM_CTL);
+	val_rng = readl(pwm_base + PWM_RNG1);
+	val_dat = readl(pwm_base + PWM_DAT1);
 
 	pm_runtime_put(pwr_dev);
 
-	return sprintf(buf, "PWM RNG1 (with power ON) = 0x%08x\n", val);
+	return sprintf(buf,
+		"PWM RNG1 (period) = %u\n"
+		"PWM DAT1 (duty)   = %u\n"
+		"PWM CTL           = 0x%08x\n",
+		val_rng, val_dat, val_ctl);
 }
 
 static ssize_t negative_test_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
@@ -71,7 +92,6 @@ static struct attribute_group attr_group = {
 	.attrs = attrs,
 };
 
-// Match function to find platform device BCM2851:00
 static int match_bcm2851(struct device *dev, void *data)
 {
 	if (strcmp(dev_name(dev), "BCM2851:00") == 0) {
@@ -85,7 +105,6 @@ static int __init pwm_test_init(void)
 {
 	int ret;
 
-	// Find the real platform device created by ACPI
 	ret = bus_for_each_dev(&platform_bus_type, NULL, &pwr_dev, match_bcm2851);
 	if (!pwr_dev) {
 		pr_err("pwm_power_test: Could not find platform device 'BCM2851:00'\n");
@@ -94,7 +113,6 @@ static int __init pwm_test_init(void)
 
 	pr_info("pwm_power_test: Found power device: %s\n", dev_name(pwr_dev));
 
-	// Create sysfs
 	pwm_kobj = kobject_create_and_add("pwm_power_test", kernel_kobj);
 	if (!pwm_kobj) {
 		put_device(pwr_dev);
@@ -128,4 +146,4 @@ module_exit(pwm_test_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("ACPI for Pi");
-MODULE_DESCRIPTION("Test module for Raspberry Pi power domain with PWM MMIO validation");
+MODULE_DESCRIPTION("PWM power test module with period and duty write support");
