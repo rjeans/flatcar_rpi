@@ -2,6 +2,7 @@
 #include <linux/acpi.h>
 #include <linux/clk-provider.h>
 #include <linux/clk.h>
+#include <linux/export.h>
 #include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/module.h>
