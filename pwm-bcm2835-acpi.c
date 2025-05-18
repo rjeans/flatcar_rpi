@@ -137,7 +137,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     }
 
     dev_info(pc->dev, "Power domain enabled - waiting for stability");
-    udelay(50000); // Allow power domain to stabilize
+    usleep_range(10000, 20000);  // Sleep 100–200 microseconds
     dev_info(pc->dev, "Power domain stable?? - proceeding with PWM configuration");
 
     if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm))))
