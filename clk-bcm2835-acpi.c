@@ -73,13 +73,7 @@ static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
     return 0;
 }
 
-static void bcm2835_clk_tx_done(struct mbox_client *cl, void *msg, int r)
-{
-	struct device *dev = cl->dev;
-	struct bcm2835_clk *clk = dev_get_drvdata(dev);
-	complete(&clk->tx_done);
-	kfree(msg);
-}
+
 
 
 static int bcm2835_clk_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -153,9 +147,11 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	dev_info(dev, "Clock domain name: %s\n", clk->name);
 
 	clk->mbox_client.dev = dev;
-	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
-	clk->mbox_client.tx_block = false;
-	clk->mbox_client.knows_txdone = true;
+	clk->mbox_client.tx_done = NULL;
+	clk->mbox_client.tx_block = true;
+	clk->mbox_client.knows_txdone = false;
+	clk->mbox_client.rx_callback = NULL;
+	clk->mbox_client.tx_tout = 500; // Timeout in ms
 
 	clk->clock_id = RPI_FIRMWARE_PWM_ID;
 
