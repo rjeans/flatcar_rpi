@@ -201,7 +201,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	rpd->genpd.name = rpd->name;
 	rpd->genpd.power_on  = rpi_power_domain_power_on;
     rpd->genpd.power_off = rpi_power_domain_power_off;
-	rpd->genpd.release = rpi_power_domain_release;
+	rpd->genpd.dev.release = rpi_power_domain_release;
 
 	rpi_pwm_genpd = &rpd->genpd;
 	
