@@ -293,7 +293,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	if (!pc->cm_base)
 		return dev_err_probe(&pdev->dev, -ENOMEM, "Failed to ioremap Clock Manager");
 
-	pc->clk = devm_clk_get(&pdev->dev, NULL);
+	pc->clk = devm_clk_get(&pdev->dev, "pwm");
 if (IS_ERR(pc->clk)) {
 	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
 	         PTR_ERR(pc->clk));
