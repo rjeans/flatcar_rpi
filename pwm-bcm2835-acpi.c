@@ -19,6 +19,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
+#include <linux/gpio/consumer.h>
+
 
 
 #define RPI_FIRMWARE_DOMAIN_PWM 2
@@ -198,8 +200,8 @@ dev_info(pc->dev, "Clock divider and source set via CM registers");
              break;
          udelay(10);
      }
-if (mode_retries <= 0)
-    dev_err(pc->dev, "Failed to latch PWM mode bit for channel %u", pwm->hwpwm);
+    if (mode_retries <= 0)
+         dev_err(pc->dev, "Failed to latch PWM mode bit for channel %u", pwm->hwpwm);
     ctrl = readl(pc->base + PWM_CONTROL);
     dev_info(pc->dev, "CONTROL after setting PWM mode: 0x%08x", ctrl);
 
