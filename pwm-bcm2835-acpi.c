@@ -143,6 +143,23 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     usleep_range(1000000, 2000000);  // Sleep 100–200 microseconds
     dev_info(pc->dev, "Power domain stable?? - proceeding with PWM configuration");
 
+    if (pc->clk) {
+    ret = clk_prepare_enable(pc->clk);
+    if (ret) {
+        dev_warn(dev, "clk_prepare_enable failed: %d\n", ret);
+    }
+        rate = clk_get_rate(pc->clk);
+        if (rate == 0) {
+            dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
+            rate = FALLBACK_PWM_CLK_HZ;
+        }
+        dev_info(pc->dev, "PWM clock rate: %lu Hz\n", rate);
+    dev_info(pc->dev, "PWM clock enabled");
+    } else {
+        dev_warn(pc->dev, "No PWM clock available, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
+        rate = FALLBACK_PWM_CLK_HZ;
+    }
+
     if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm))))
         dev_warn(pc->dev, "PWM channel %u not in PWM mode!", pwm->hwpwm);
 
