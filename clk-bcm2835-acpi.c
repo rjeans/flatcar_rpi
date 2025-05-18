@@ -36,7 +36,7 @@ static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
 {
 	struct rpi_firmware_clock_msg *msg;
 
-	umsg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
