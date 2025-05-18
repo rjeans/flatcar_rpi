@@ -206,7 +206,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
     mbox->controller.dev = &pdev->dev;
-    mbox->controller.chans = &mbox->chans;
+    mbox->controller.chans = mbox->chans;
     mbox->controller.num_chans = BCM2835_MAX_CHANNELS;
     mbox->controller.ops = &bcm2835_chan_ops;
     mbox->controller.txdone_irq = false;
