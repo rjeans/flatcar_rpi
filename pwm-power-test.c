@@ -49,7 +49,7 @@ static struct kobj_attribute trigger_attr = __ATTR_RO(trigger);
 
 static int __init pwm_test_init(void)
 {
-	struct acpi_device *dev;
+	struct acpi_device *adev;
 
 	pwm_kobj = kobject_create_and_add("pwm_power_test", kernel_kobj);
 	if (!pwm_kobj)
@@ -61,8 +61,8 @@ static int __init pwm_test_init(void)
 	}
 
 	// Match by ACPI HID (e.g. "BCM2851")
-	for_each_acpi_dev_match(dev, "BCM2851", NULL, -1) {
-		pwr_dev = get_device(dev); // Take ref
+	for_each_acpi_dev_match(adev, "BCM2851", NULL, -1) {
+		pwr_dev = get_device(&adev_dev); // Take ref
 		break;
 	}
 
