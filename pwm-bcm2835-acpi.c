@@ -136,7 +136,7 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return ret;
     }
 
-    udelay(100); // Allow power domain to stabilize
+    udelay(5000); // Allow power domain to stabilize
 
     if (!(ctrl & (PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm))))
         dev_warn(pc->dev, "PWM channel %u not in PWM mode!", pwm->hwpwm);
