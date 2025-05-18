@@ -268,16 +268,16 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
     pm_runtime_enable(&pdev->dev);
 
     ret = dev_pm_domain_attach(&pdev->dev, true);
-	if (ret)
+	if (ret) {
 		dev_warn(&pdev->dev, "Failed to attach power domain: %d", ret);
-	else
+    } else {
 		dev_info(&pdev->dev, "Power domain attached successfully");
-
-    if (pdev->dev.pm_domain)
+    }
+    if (pdev->dev.pm_domain) {
         dev_info(&pdev->dev, "Power domain linked: pm_domain pointer is set");
-    else
+    } else {
         dev_warn(&pdev->dev, "Power domain NOT linked: pm_domain is NULL");
-    
+    }
 
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
