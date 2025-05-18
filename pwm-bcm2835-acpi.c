@@ -122,6 +122,10 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     u32 ctrl;
     int retries, ret;
 
+    dev_info(pc->dev, "Applying PWM configuration: hwpwm=%d period=%llu duty=%llu enabled=%d polarity=%s",
+             pwm->hwpwm, state->period, state->duty_cycle, state->enabled,
+             state->polarity == PWM_POLARITY_INVERSED ? "inversed" : "normal");
+
     if (!rate)
         return -EINVAL;
 
