@@ -36,6 +36,7 @@ struct rpi_power_domain {
 	struct completion tx_done;
 	bool completed;
 	u32 domain_id;
+	struct generic_pm_domain genpd;
 	struct rpi_firmware_power_msg *msg;
 };
 
@@ -173,7 +174,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_enable(dev);
 	
 	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
-	
+
 
     rpd->genpd.name = rpd->name;
 
