@@ -156,6 +156,9 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
     if (pc->clk && !pc->clk_enabled) {
     ret = clk_prepare_enable(pc->clk);
+    dev_info(pc->dev, "Clock enabled - waiting for stability");
+    usleep_range(1000000, 2000000);  // Sleep 1–2 ms
+    dev_info(pc->dev, "Clock stable?? - proceeding with PWM configuration");
     if (ret) {
         dev_warn(pc->dev, "clk_prepare_enable failed: %d\n", ret);
     } else {
@@ -180,7 +183,10 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     ctrl &= ~(PWM_CONTROL_MASK << PWM_CONTROL_SHIFT(pwm->hwpwm));
     ctrl |= PWM_MODE << PWM_CONTROL_SHIFT(pwm->hwpwm);
     writel(ctrl, pc->base + PWM_CONTROL);
+    mb();
     udelay(10);
+    ctrl = readl(pc->base + PWM_CONTROL);
+    dev_info(pc->dev, "CONTROL after setting PWM mode: 0x%08x", ctrl);
 
     // Convert period/duty from ns to cycles
     period_cycles = DIV_ROUND_CLOSEST_ULL((u64)state->period * rate, NSEC_PER_SEC);
