@@ -315,31 +315,26 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Clock Manager base mapped at %p\n", pc->cm_base);
 
-  pc->clk_enabled = false;
-    ret = clk_prepare_enable(pc->clk);
-if (ret) {
-    dev_warn(&pdev->dev, "Failed to enable PWM clock in probe: %d", ret);
-} else {
-    pc->clk_enabled = true;
-    dev_info(&pdev->dev, "PWM clock enabled in probe");
-
-}
-
+ 
 
 	pc->clk = devm_clk_get(&pdev->dev, "pwm");
 
+    pc->clk_enabled = false;
 if (IS_ERR(pc->clk)) {
 	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
 	         PTR_ERR(pc->clk));
 	pc->clk_rate = FALLBACK_PWM_CLK_HZ;
+
 } else {
-	ret = clk_prepare(pc->clk);
+	ret = clk_prepare_enable(pc->clk);
     
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to enable PWM clock: %d\n", ret);
 		return ret;
-	}
-    dev_warn(&pdev->dev, "Skipping clock enablement for now\n");
+	} else {
+        dev_info(&pdev->dev, "Enabled PWM clock\n");
+        pc->clk_enabled = true;
+    }
 	pc->clk_rate = clk_get_rate(pc->clk);
 	dev_info(&pdev->dev, "PWM clock rate: %lu Hz\n", pc->clk_rate);
 }
