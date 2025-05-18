@@ -318,10 +318,10 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
   pc->clk_enabled = false;
     ret = clk_prepare_enable(pc->clk);
 if (ret) {
-    dev_warn(dev, "Failed to enable PWM clock in probe: %d", ret);
+    dev_warn(&pdev->dev, "Failed to enable PWM clock in probe: %d", ret);
 } else {
     pc->clk_enabled = true;
-    dev_info(dev, "PWM clock enabled in probe");
+    dev_info(&pdev->dev, "PWM clock enabled in probe");
 
 }
 
