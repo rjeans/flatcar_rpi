@@ -110,7 +110,13 @@ static int rpi_power_runtime_suspend(struct device *dev)
 }
 
 
+static struct generic_pm_domain *rpi_pwm_genpd;
 
+struct generic_pm_domain *rpi_power_get_domain(void)
+{
+    return rpi_pwm_genpd;
+}
+EXPORT_SYMBOL_GPL(rpi_power_get_domain);
 
 
 static int rpi_power_probe(struct platform_device *pdev)
@@ -176,6 +182,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_enable(dev);
 	rpd->genpd.name = rpd->name;
 
+	rpi_pwm_genpd = &rpd->genpd;
 	
 	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
 
