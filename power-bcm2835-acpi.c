@@ -186,7 +186,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_genpd_init(&rpd->genpd, NULL, false);  // ← generic_pm_domain structure in your rpd struct
 
 	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
-		ret = pm_genpd_add_device(&pdev->dev, rpi_power_get_domain());
+		ret = pm_genpd_add_device(rpi_power_get_domain(), &pdev->dev);
 		if (ret)
 			dev_warn(&pdev->dev, "Failed to manually bind to power domain: %d\n", ret);
 		else
