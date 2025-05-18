@@ -246,6 +246,8 @@ static const struct pwm_ops bcm2835_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
+extern struct generic_pm_domain *rpi_power_get_domain(void);
+
 static int bcm2835_pwm_probe(struct platform_device *pdev)
 {
 	struct bcm2835_pwm *pc;
@@ -262,22 +264,16 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	pc->dev = &pdev->dev;
 
 
-    
+    ret = pm_genpd_add_device(rpi_power_get_domain(), &pdev->dev);
+    if (ret) {
+        dev_err(&pdev->dev, "Failed to add device to power domain: %d\n", ret);
+        return ret;
+    }
 
 	pm_runtime_set_active(&pdev->dev);
     pm_runtime_enable(&pdev->dev);
 
-    ret = dev_pm_domain_attach(&pdev->dev, true);
-	if (ret) {
-		dev_warn(&pdev->dev, "Failed to attach power domain: %d", ret);
-    } else {
-		dev_info(&pdev->dev, "Power domain attached successfully");
-    }
-    if (pdev->dev.pm_domain) {
-        dev_info(&pdev->dev, "Power domain linked: pm_domain pointer is set");
-    } else {
-        dev_warn(&pdev->dev, "Power domain NOT linked: pm_domain is NULL");
-    }
+ 
 
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
