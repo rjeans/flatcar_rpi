@@ -267,7 +267,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 	else
 		dev_info(&pdev->dev, "Power domain attached successfully");
 
-	pm_runtime_enable(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+    pm_runtime_enable(&pdev->dev);
 
 	pc->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pc->base))
