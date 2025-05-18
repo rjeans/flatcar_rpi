@@ -160,12 +160,9 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	pr_info("Requesting mailbox channel...\n");
 
-	if (!global_rpi_mbox_chan) {
-		dev_err(dev, "Mailbox channel not available\n");
-		return -ENODEV;
-	}
+	
 
-	rpd->chan = global_rpi_mbox_chan;
+	rpd->chan = bcm2835_mbox_request_channel(&rpd->mbox_client);
     if (IS_ERR(rpd->chan)) {
 		dev_err(dev, "Failed to acquire mailbox channel\n");
 		return PTR_ERR(rpd->chan);
@@ -174,12 +171,7 @@ static int rpi_power_probe(struct platform_device *pdev)
   
 
 
-	ret = mbox_bind_client(rpd->chan, &rpd->mbox_client);
-	if (ret) {
-		dev_err(dev, "Failed to bind mailbox client: %d\n", ret);
-		return ret;
-	}
-
+	
 
     dev_info(dev, "Mailbox channel address: %px\n", rpd->chan);
 
@@ -217,8 +209,13 @@ static int rpi_power_remove(struct platform_device *pdev)
 	pm_runtime_disable(&pdev->dev);
 	pm_genpd_remove(&rpd->genpd);
     rpi_pwm_genpd = NULL;
-	if (rpd->chan)
-		mbox_free_channel(rpd->chan);
+	int ret = bcm2835_mbox_free_channel(rpd->chan);
+	if (ret) {
+		dev_err(dev, "Failed to free mailbox channel: %d\n", ret);
+	} else {
+		dev_info(dev, "Mailbox channel freed successfully\n");
+	}
+	kfree(rpd);
 	return 0;
 }
 

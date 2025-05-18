@@ -69,18 +69,7 @@ if (ret < 0) {
 	return ret;
 }
 
-if (WARN_ON_ONCE(in_atomic() || irqs_disabled())) {
-    dev_warn(clk->mbox_client.dev, "Skipping firmware wait in atomic context\n");
-    kfree(msg);
-    return -EAGAIN;  // Upstream safe failure code
-}
 
-ret = wait_for_completion_timeout(&clk->tx_done, msecs_to_jiffies(100));
-if (ret == 0) {
-    dev_err(clk->mbox_client.dev, "Timeout waiting for clock firmware response\n");
-    kfree(msg);
-    return -ETIMEDOUT;
-}
 
 kfree(msg);
 dev_info(clk->mbox_client.dev, "Clock firmware command completed\n");
@@ -192,7 +181,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 		dev_info(dev, "Clock frequency set from property: %lu\n", clk->rate);
 	}
 
-	clk->chan = global_rpi_mbox_chan;
+	clk->chan = bcm2835_mbox_request_channel(&clk->mbox_client);
 	if (IS_ERR(clk->chan)) {
 		dev_err(dev, "Failed to acquire mailbox channel: %ld\n", PTR_ERR(clk->chan));
 		return PTR_ERR(clk->chan);
@@ -201,12 +190,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 
 	init_completion(&clk->tx_done);
 
-	if (!clk->chan->cl) {
-	clk->chan->cl = &clk->mbox_client;
-	   dev_info(dev, "Mailbox client assigned (without bind)\n");
-    } else {
-	   dev_warn(dev, "Mailbox channel already in use — assuming shared access\n");
-    }
+	
 
 	init.name = clk->name;
 	init.ops = &bcm2835_clk_ops;
@@ -239,6 +223,19 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	return ret;
 }
 
+static int bcm2835_clk_remove(struct platform_device *pdev)
+{
+	struct bcm2835_clk *clk = platform_get_drvdata(pdev);
+	if (clk) {
+		bcm2835_mbox_free_channel(clk->chan);
+		dev_info(&pdev->dev, "Mailbox channel freed\n");
+	}
+	kfree(clk);
+	dev_info(&pdev->dev, "bcm2835-clk-acpi removed\n");
+	
+	return 0;
+}
+
 static const struct acpi_device_id bcm2835_clk_acpi_ids[] = {
 	{ "BCM2852", 0 }, // adjust this ID to match your SSDT
 	{ }
@@ -247,6 +244,7 @@ MODULE_DEVICE_TABLE(acpi, bcm2835_clk_acpi_ids);
 
 static struct platform_driver bcm2835_clk_driver = {
 	.probe = bcm2835_clk_probe,
+	.remove = bcm2835_clk_remove,
 	.driver = {
 		.name = "bcm2835-clk-acpi",
 		.acpi_match_table = bcm2835_clk_acpi_ids,

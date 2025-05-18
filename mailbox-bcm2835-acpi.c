@@ -41,23 +41,62 @@
 /* Configuration register: Enable interrupts. */
 #define ARM_MC_IHAVEDATAIRQEN	BIT(0)
 
+#define BCM2835_MAX_CHANNELS     4
 
 struct bcm2835_mbox {
     void __iomem *regs;
     struct mbox_controller controller;
     struct device *dev;
-    struct mbox_chan chan;
-    struct completion tx_complete;
+    struct mbox_chan chans[BCM2835_MAX_CHANNELS];
+    struct completion tx_complete[BCM2835_MAX_CHANNELS];
     spinlock_t lock;
 };
 
-struct mbox_chan *global_rpi_mbox_chan;
-EXPORT_SYMBOL_GPL(global_rpi_mbox_chan);
+
+struct bcm2835_mbox *bcm2835_mbox_global;
 
 
 
+struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *cl)
+{
+    struct mbox_chan *chan;
+    int i, ret;
 
+    if (!cl || !bcm2835_mbox_global)
+        return ERR_PTR(-ENODEV);
 
+    for (i = 0; i < bcm2835_mbox_global->controller.num_chans; i++) {
+        chan = &bcm2835_mbox_global->chans[i];
+
+        if (!chan->cl) {
+            ret = mbox_bind_client(chan, cl);
+            if (ret) {
+                pr_err("Failed to bind mailbox client: %d\n", ret);
+                return ERR_PTR(ret);
+            }
+
+            init_completion(&bcm2835_mbox_global->tx_completions[i]);
+            return chan;
+        }
+    }
+
+    return ERR_PTR(-EBUSY);  // No free channel
+}
+EXPORT_SYMBOL_GPL(bcm2835_mbox_request_channel);
+
+int bcm2835_mbox_free_channel(struct mbox_chan *chan)
+{
+	if (!chan)
+		return -EINVAL;
+
+	if (!chan->cl)
+		return -ENODEV;  // Already unbound or never bound
+
+	mbox_unbind_client(chan);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(bcm2835_mbox_free_channel);
 
 static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 {
@@ -148,6 +187,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     platform_set_drvdata(pdev, mbox);
     mbox->dev = &pdev->dev;
+    bcm2835_mbox_global = mbox;
 
     
 
