@@ -330,26 +330,32 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 static int bcm2835_pwm_remove(struct platform_device *pdev)
 {
 	struct bcm2835_pwm *pc = platform_get_drvdata(pdev);
+	struct device *dev = &pdev->dev;
 
-pwmchip_remove(&pc->chip);
-pinctrl_unregister_mappings(bcm2835_pwm_map);
+	// Remove from genpd (optional, but required for clean pm_genpd_summary)
+	pm_genpd_remove_device(dev);
 
+	// Disable runtime PM
+	pm_runtime_disable(dev);
 
-if (pc->cm_base) {
-    iounmap(pc->cm_base);
-	dev_info(&pdev->dev, "Unmapped base\n");
-} else {
-	dev_warn(&pdev->dev, "Base was NULL\n");
+	// Unregister PWM
+	pwmchip_remove(&pc->chip);
+
+	// Clean up pinctrl mapping
+	pinctrl_unregister_mappings(bcm2835_pwm_map);
+
+	// Unmap MMIO region
+	if (pc->cm_base) {
+		iounmap(pc->cm_base);
+		dev_info(dev, "Unmapped base\n");
+	} else {
+		dev_warn(dev, "Base was NULL\n");
+	}
+
+	dev_info(dev, "Removed BCM2835 PWM driver\n");
+	return 0;
 }
 
-pm_runtime_disable(pc->chip.dev);
-
-
-
-dev_info(&pdev->dev, "Removed BCM2835 PWM driver\n");
-return 0;
-
-}
 
 static DEFINE_SIMPLE_DEV_PM_OPS(bcm2835_pwm_pm_ops, bcm2835_pwm_suspend,
 				bcm2835_pwm_resume);
