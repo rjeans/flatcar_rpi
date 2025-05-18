@@ -8,10 +8,10 @@
 #include <linux/slab.h>
 #include <linux/mailbox_client.h>
 #include <linux/mailbox_controller.h>
+#include "mailbox-bcm2835-acpi.h"
 
 
-// Use your external mailbox channel
-extern struct mbox_chan *rpi_mbox_chan0;
+
 
 #define CLOCK_ON   0x03
 #define CLOCK_OFF  0x02
@@ -139,7 +139,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 		dev_info(dev, "Clock frequency set from property: %lu\n", clk->rate);
 	}
 
-	clk->chan = rpi_mbox_chan0;
+	clk->chan = global_rpi_mbox_chan;
 	if (IS_ERR(clk->chan)) {
 		dev_err(dev, "Failed to acquire mailbox channel: %ld\n", PTR_ERR(clk->chan));
 		return PTR_ERR(clk->chan);
