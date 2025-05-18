@@ -163,13 +163,13 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         }
         rate = clk_get_rate(pc->clk);
         if (rate == 0) {
-            dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
+            dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %d Hz\n", FALLBACK_PWM_CLK_HZ);
             rate = FALLBACK_PWM_CLK_HZ;
         }
         dev_info(pc->dev, "PWM clock rate: %lu Hz\n", rate);
         dev_info(pc->dev, "PWM clock enabled");
     } else {
-        dev_warn(pc->dev, "No PWM clock available, using fallback rate: %lu Hz\n", FALLBACK_PWM_CLK_HZ);
+        dev_warn(pc->dev, "No PWM clock available, using fallback rate: %d Hz\n", FALLBACK_PWM_CLK_HZ);
         rate = FALLBACK_PWM_CLK_HZ;
     }
 
