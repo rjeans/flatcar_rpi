@@ -361,9 +361,15 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
 
     } 
 
-    ret = devm_gpio_request_one(&pdev->dev, 18, GPIOF_OUT_INIT_LOW, "pwm-gpio18");
-    if (ret)
-        dev_warn(&pdev->dev, "Failed to request GPIO18: %d\n", ret);
+    struct gpio_desc *desc;
+
+     desc = gpio_to_desc(18);
+    if (!desc) {
+        dev_warn(&pdev->dev, "gpio_to_desc failed for GPIO18\n");
+    } else {
+        gpiod_direction_output(desc, 0);
+        dev_info(&pdev->dev, "GPIO18 set to output low\n");
+    }
 
     dev_info(&pdev->dev, "PWM base mapped at %p\n", pc->base);
 	ret = pinctrl_register_mappings(bcm2835_pwm_map, ARRAY_SIZE(bcm2835_pwm_map));
