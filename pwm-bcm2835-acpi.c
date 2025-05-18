@@ -61,7 +61,7 @@ struct bcm2835_pwm {
 	unsigned long clk_rate;
     struct clk *clk;
     bool clk_enabled;
-    struct pinctrl *pinctl;
+    struct pinctrl *pinctrl;
 	
 
 };
