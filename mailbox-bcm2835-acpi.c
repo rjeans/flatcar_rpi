@@ -48,7 +48,7 @@ struct bcm2835_mbox {
     struct mbox_controller controller;
     struct device *dev;
     struct mbox_chan chans[BCM2835_MAX_CHANNELS];
-    struct completion tx_complete[BCM2835_MAX_CHANNELS];
+    struct completion tx_completions[BCM2835_MAX_CHANNELS];
     spinlock_t lock;
 };
 
@@ -92,7 +92,7 @@ int bcm2835_mbox_free_channel(struct mbox_chan *chan)
 	if (!chan->cl)
 		return -ENODEV;  // Already unbound or never bound
 
-	mbox_unbind_client(chan);
+	chan->cl = NULL;
 
 	return 0;
 }
