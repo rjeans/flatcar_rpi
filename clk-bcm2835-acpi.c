@@ -51,6 +51,9 @@ static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
 
 	msg->end_tag = 0;
 
+	dev_info(clk->mbox_client.dev, "Sending clock message to firmware: %s\n", enable ? "ON" : "OFF");
+	dev_info(clk->mbox_client.dev, "Clock firmware id: %u\n", clk->firmware_id);
+
 
 
 
