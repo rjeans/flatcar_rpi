@@ -169,7 +169,7 @@ static int rpi_power_probe(struct platform_device *pdev)
 
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
-	pm_runtime_no_callbacks(dev);
+	
 	
 
 	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
