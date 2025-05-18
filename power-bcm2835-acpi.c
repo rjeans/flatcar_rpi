@@ -178,8 +178,12 @@ static int rpi_power_probe(struct platform_device *pdev)
 
     rpd->genpd.name = rpd->name;
 
-    dev_pm_genpd_add(&pdev->dev, &rpd->genpd);  
-	
+   //  This registers the genpd globally under the name (needed for ACPI match)
+    ret = genpd_add_provider_simple(dev->fwnode, &rpd->genpd);
+    if (ret)
+        dev_warn(dev, "Failed to register GENPD provider: %d\n", ret);
+    else
+        dev_info(dev, "GENPD power domain registered for '%s'\n", rpd->name);	
 
 	dev_info(dev, "Power domain '%s' runtime PM ready\n", rpd->name);
 	return 0;
