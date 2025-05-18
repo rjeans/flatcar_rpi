@@ -20,8 +20,11 @@
 #define CLOCK_OFF  0x02
 #define FIXED_RATE 19200000 // 19.2 MHz example
 
+#define RPI_FIRMWARE_PWM_ID          0x00000004
+
 struct bcm2835_clk {
 	struct clk_hw hw;
+	u32 clock_id;
 	struct mbox_chan *chan;
 	struct mbox_client mbox_client;
 	struct completion tx_done;
@@ -46,13 +49,13 @@ static int bcm2835_clk_send(struct bcm2835_clk *clk, bool enable)
 	msg->body.tag      = 0x00038001; // SET_CLOCK_STATE
 	msg->body.buf_size = 8;
 	msg->body.val_len  = 8;
-	msg->body.clock_id = clk->firmware_id;  // e.g. 4 for PWM
+	msg->body.clock_id = clk->clock_id;  // e.g. 4 for PWM
 	msg->body.state    = enable ? CLOCK_ON : CLOCK_OFF;
 
 	msg->end_tag = 0;
 
 	dev_info(clk->mbox_client.dev, "Sending clock message to firmware: %s\n", enable ? "ON" : "OFF");
-	dev_info(clk->mbox_client.dev, "Clock firmware id: %u\n", clk->firmware_id);
+	dev_info(clk->mbox_client.dev, "Clock firmware id: %u\n", clk->clock_id);
 
 
 
@@ -153,6 +156,8 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
 	clk->mbox_client.tx_block = false;
 	clk->mbox_client.knows_txdone = true;
+
+	clk->clock_id = RPI_FIRMWARE_PWM_ID
 
 	/* Optional: set rate from property, or use fixed default */
 	device_property_read_u32(dev, "clock-frequency", (u32 *)&clk->rate);
