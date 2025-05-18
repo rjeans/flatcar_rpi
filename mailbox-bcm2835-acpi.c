@@ -76,6 +76,7 @@ struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *cl)
             }
 
             init_completion(&bcm2835_mbox_global->tx_completions[i]);
+            chan.mbox = &bcm2835_mbox_global->controller;
             return chan;
         }
     }
@@ -193,7 +194,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
 
     spin_lock_init(&mbox->lock);
-    init_completion(&mbox->tx_complete);
+    
 
     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     mbox->regs = devm_ioremap_resource(&pdev->dev, res);
@@ -216,15 +217,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     
 
    
-   
 
-    global_rpi_mbox_chan = &mbox->chan;
-    mbox->chan.mbox = &mbox->controller;
-
-    if (!mbox->chan.mbox)
-	dev_err(&pdev->dev, "mbox->chan.mbox is NULL before registration!\n");
-      else
-	dev_info(&pdev->dev, "mbox->chan.mbox is OK\n");
 
 
 
