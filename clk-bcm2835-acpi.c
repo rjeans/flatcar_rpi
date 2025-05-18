@@ -69,13 +69,17 @@ if (ret < 0) {
 	return ret;
 }
 
-WARN_ON_ONCE(in_atomic());
+if (WARN_ON_ONCE(in_atomic() || irqs_disabled())) {
+    dev_warn(clk->mbox_client.dev, "Skipping firmware wait in atomic context\n");
+    kfree(msg);
+    return -EAGAIN;  // Upstream safe failure code
+}
 
 ret = wait_for_completion_timeout(&clk->tx_done, msecs_to_jiffies(100));
 if (ret == 0) {
-	dev_err(clk->mbox_client.dev, "Timeout waiting for clock firmware response\n");
-	kfree(msg);
-	return -ETIMEDOUT;
+    dev_err(clk->mbox_client.dev, "Timeout waiting for clock firmware response\n");
+    kfree(msg);
+    return -ETIMEDOUT;
 }
 
 kfree(msg);
@@ -165,7 +169,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
 	clk->mbox_client.dev = dev;
 	clk->mbox_client.tx_done = bcm2835_clk_tx_done;
 	clk->mbox_client.tx_block = false;
-	clk->mbox_client.knows_txdone = false;
+	clk->mbox_client.knows_txdone = true;
 	clk->mbox_client.rx_callback = NULL;
 	clk->mbox_client.tx_tout = 500; // Timeout in ms
 
