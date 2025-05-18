@@ -47,6 +47,15 @@ static ssize_t trigger_show(struct kobject *kobj, struct kobj_attribute *attr, c
 
 static struct kobj_attribute trigger_attr = __ATTR_RO(trigger);
 
+static int match_bcm2851(struct device *dev, void *data)
+{
+	if (strcmp(dev_name(dev), "BCM2851:00") == 0) {
+		*((struct device **)data) = get_device(dev);
+		return 1; // Found
+	}
+	return 0; // Keep searching
+}
+
 static int __init pwm_test_init(void)
 {
 	struct acpi_device *adev;
@@ -60,11 +69,7 @@ static int __init pwm_test_init(void)
 		return -ENOMEM;
 	}
 
-	// Match by ACPI HID (e.g. "BCM2851")
-	for_each_acpi_dev_match(adev, "BCM2851", NULL, -1) {
-		pwr_dev = get_device(&adev->dev); // Take ref
-		break;
-	}
+	bus_for_each_dev(&platform_bus_type, NULL, &pwr_dev, match_bcm2851);
 
 	if (!pwr_dev)
 		pr_warn("pwm_power_test: ACPI power device 'BCM2851' not found\n");
