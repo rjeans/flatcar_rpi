@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_domain.h>
-#include <LinuxBoot/pm_genpd.h>
+#include <linux/pm_genpd.h>
 
 #include "mailbox-bcm2835-acpi.h"
 
