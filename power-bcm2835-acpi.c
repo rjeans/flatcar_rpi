@@ -112,6 +112,19 @@ static int rpi_power_runtime_suspend(struct device *dev)
 
 static struct generic_pm_domain *rpi_pwm_genpd;
 
+static int rpi_power_domain_power_on(struct generic_pm_domain *genpd)
+{
+    struct rpi_power_domain *rpd = container_of(genpd, struct rpi_power_domain, genpd);
+    return rpi_power_send(rpd, true);
+}
+
+static int rpi_power_domain_power_off(struct generic_pm_domain *genpd)
+{
+    struct rpi_power_domain *rpd = container_of(genpd, struct rpi_power_domain, genpd);
+    return rpi_power_send(rpd, false);
+}
+
+
 struct generic_pm_domain *rpi_power_get_domain(void)
 {
     return rpi_pwm_genpd;
@@ -181,6 +194,8 @@ static int rpi_power_probe(struct platform_device *pdev)
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 	rpd->genpd.name = rpd->name;
+	rpd->genpd.power_on  = rpi_power_domain_power_on;
+    rpd->genpd.power_off = rpi_power_domain_power_off;
 
 	rpi_pwm_genpd = &rpd->genpd;
 	
