@@ -58,6 +58,7 @@ struct bcm2835_pwm {
 	void __iomem *cm_base;
 	unsigned long clk_rate;
     struct clk *clk;
+    bool clk_enabled;
 	
 
 };
@@ -156,18 +157,22 @@ static int bcm2835_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     dev_info(pc->dev, "Power domain stable?? - proceeding with PWM configuration");
 
     // Enable and get the PWM clock rate if available
+    pc->clk_enabled = false;
     if (pc->clk) {
         ret = clk_prepare_enable(pc->clk);
         if (ret) {
             dev_warn(pc->dev, "clk_prepare_enable failed: %d\n", ret);
+        } else {
+            pc->clk_enabled = true;
+        
+            rate = clk_get_rate(pc->clk);
+            if (rate == 0) {
+                dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %d Hz\n", FALLBACK_PWM_CLK_HZ);
+                rate = FALLBACK_PWM_CLK_HZ;
+            }
+            dev_info(pc->dev, "PWM clock rate: %lu Hz\n", rate);
+            dev_info(pc->dev, "PWM clock enabled");
         }
-        rate = clk_get_rate(pc->clk);
-        if (rate == 0) {
-            dev_warn(pc->dev, "Failed to get PWM clock rate, using fallback rate: %d Hz\n", FALLBACK_PWM_CLK_HZ);
-            rate = FALLBACK_PWM_CLK_HZ;
-        }
-        dev_info(pc->dev, "PWM clock rate: %lu Hz\n", rate);
-        dev_info(pc->dev, "PWM clock enabled");
     } else {
         dev_warn(pc->dev, "No PWM clock available, using fallback rate: %d Hz\n", FALLBACK_PWM_CLK_HZ);
         rate = FALLBACK_PWM_CLK_HZ;
@@ -332,6 +337,7 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
     dev_info(&pdev->dev, "Clock Manager base mapped at %p\n", pc->cm_base);
 
 	pc->clk = devm_clk_get(&pdev->dev, "pwm");
+    pc->clk_enabled = false;
 if (IS_ERR(pc->clk)) {
 	dev_warn(&pdev->dev, "Failed to get PWM clock, using fallback rate: %ld\n",
 	         PTR_ERR(pc->clk));
@@ -410,7 +416,12 @@ static int bcm2835_pwm_remove(struct platform_device *pdev)
 	} else {
 		dev_warn(dev, "Base was NULL\n");
 	}
-    if (!IS_ERR_OR_NULL(pc->clk))
+    if (!IS_ERR_OR_NULL(pc->clk) && pc->clk_enabled) {
+        clk_disable_unprepare(pc->clk);
+        dev_info(dev, "Disabled PWM clock\n");
+    } else {
+        dev_warn(dev, "PWM clock was NULL or not enabled\n");
+    }
 	   clk_disable_unprepare(pc->clk);
 
 	dev_info(dev, "Removed BCM2835 PWM driver\n");
