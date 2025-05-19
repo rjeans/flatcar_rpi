@@ -26,36 +26,40 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 	return container_of(chip, struct acpi_pwm_driver_data, chip);
 }
 
-struct rpi_pwm_message {
+#define RPI_FIRMWARE_SET_POE_HAT_VAL 0x00038041
+#define RPI_PWM_CUR_DUTY_REG         0x00000001
+
+struct rpi_pwm_duty_msg {
+	__le32 tag;
+	__le32 buf_size;
+	__le32 val_len;
 	__le32 reg;
 	__le32 val;
-	__le32 ret;
-};
+	__le32 end_tag;
+} __packed;
 
 static int send_pwm_duty(struct mbox_chan *chan, u8 duty)
 {
-	struct rpi_pwm_message msg = {
-		.reg = cpu_to_le32(RPI_PWM_CUR_DUTY_REG),
-		.val = cpu_to_le32(duty),
+	struct rpi_pwm_duty_msg msg = {
+		.tag      = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL),
+		.buf_size = cpu_to_le32(8),
+		.val_len  = cpu_to_le32(8),
+		.reg      = cpu_to_le32(RPI_PWM_CUR_DUTY_REG),
+		.val      = cpu_to_le32(duty),
+		.end_tag  = 0
 	};
 
-    struct device *dev = chan->cl ? chan->cl->dev : NULL;
-
+	struct device *dev = chan->cl ? chan->cl->dev : NULL;
 
 	int ret = mbox_send_message(chan, &msg);
 	if (ret < 0) {
 		if (dev)
-			dev_info(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
+			dev_warn(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
 		return ret;
 	}
-    
-    dev_info(dev, "Sent PWM duty %d, response ret=0x%x\n", duty, le32_to_cpu(msg.ret));
-	// optional delay to allow hardware to settle
+
+	dev_info(dev, "Sent raw PWM duty=%u via tag 0x%08x\n", duty, RPI_FIRMWARE_SET_POE_HAT_VAL);
 	usleep_range(1000, 2000);
-
-	if (chan->cl && chan->cl->dev)
-		dev_info(chan->cl->dev, "PWM duty sent: %u\n", duty);
-
 	return 0;
 }
 
