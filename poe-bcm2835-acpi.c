@@ -79,7 +79,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
-static void acpi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+static int acpi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 			     struct pwm_state *state)
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
@@ -87,6 +87,8 @@ static void acpi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
 	state->duty_cycle = DIV_ROUND_UP(data->last_duty * PWM_PERIOD_NS, PWM_MAX_DUTY);
 	state->enabled = !!data->last_duty;
 	state->polarity = PWM_POLARITY_NORMAL;
+
+    return 0;
 }
 
 static const struct pwm_ops acpi_pwm_ops = {
@@ -99,13 +101,12 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data;
 	struct mbox_client *cl;
-	int ret;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
-data->dev = &pdev->dev;
+    data->dev = &pdev->dev;
 
 	cl = &data->mbox;
 	cl->dev = &pdev->dev;
