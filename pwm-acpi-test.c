@@ -7,6 +7,7 @@
 #include <linux/acpi.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
+#include <linux/delay.h>
 
 #define PWM_CTL     0x0
 #define PWM_RNG1    0x10
