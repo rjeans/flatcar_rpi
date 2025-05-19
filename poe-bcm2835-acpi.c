@@ -46,7 +46,8 @@ static int send_pwm_duty(struct mbox_chan *chan, u8 duty)
 			dev_info(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
 		return ret;
 	}
-
+    
+    dev_info(dev, "Sent PWM duty %d, response ret=0x%x\n", duty, le32_to_cpu(msg.ret));
 	// optional delay to allow hardware to settle
 	usleep_range(1000, 2000);
 
