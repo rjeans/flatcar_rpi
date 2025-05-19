@@ -6,10 +6,12 @@
 #include <linux/pm_runtime.h>
 #include <linux/mailbox_client.h>
 #include <linux/delay.h>
+#include "mailbox-bcm2835-acpi.h"
 
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 #define RPI_PWM_CUR_DUTY_REG 0x0
+
 
 struct acpi_pwm_driver_data {
 	struct pwm_chip chip;
@@ -110,7 +112,7 @@ data->dev = &pdev->dev;
 	cl->tx_block = true;
 	cl->knows_txdone = false;
 
-	data->chan = mbox_request_channel(cl, 0);
+	data->chan = bcm2835_mbox_request_channel(cl);
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
 
