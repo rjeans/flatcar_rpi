@@ -39,9 +39,11 @@ static int send_pwm_duty(struct mbox_chan *chan, u8 duty)
 		.val = cpu_to_le32(duty),
 	};
 
+    struct device *dev = chan->cl ? chan->cl->dev : NULL;
+
+
 	int ret = mbox_send_message(chan, &msg);
 	if (ret < 0) {
-		struct device *dev = chan->cl ? chan->cl->dev : NULL;
 		if (dev)
 			dev_info(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
 		return ret;
