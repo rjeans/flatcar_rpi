@@ -126,6 +126,35 @@ static const struct pwm_ops acpi_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
+static int acpi_pwm_enable_firmware(struct device *dev, struct mbox_chan *chan)
+{
+	dma_addr_t dma_handle;
+	u32 *dma_buf;
+	int ret;
+
+	dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
+	if (!dma_buf)
+		return -ENOMEM;
+
+	dma_buf[0] = 7 * sizeof(u32); // Total size
+	dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
+	dma_buf[2] = RPI_FIRMWARE_SET_POE_HAT_VAL;
+	dma_buf[3] = 8;
+	dma_buf[4] = 8;
+	dma_buf[5] = 0x00000000;   // Tag = enable
+	dma_buf[6] = 1;            // Value = enable
+	dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
+
+	wmb(); // Ensure DMA memory is visible
+
+	ret = mbox_send_message(chan, &dma_handle);
+	dev_info(dev, "Enable PoE logic message sent, ret = %d\n", ret);
+
+	dma_free_coherent(dev, 32, dma_buf, dma_handle);
+	return ret;
+}
+
+
 static int acpi_pwm_probe(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data;
@@ -146,6 +175,12 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	data->chan = bcm2835_mbox_request_channel(cl);
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
+
+    dev_info(dev, "Mailbox channel startup\n");
+
+    ret = acpi_pwm_enable_firmware(dev, pwm->chan);
+    if (ret < 0)
+        dev_warn(dev, "PoE firmware enable failed: %d\n", ret);
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
