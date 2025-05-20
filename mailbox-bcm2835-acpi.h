@@ -12,6 +12,7 @@ extern "C" {
 
 extern struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *);
 extern int bcm2835_mbox_free_channel(struct mbox_chan *);
+extern bcm2835_mbox_request_firmware_channel(struct mbox_client *);
 
 struct rpi_firmware_power_msg {
 	u32 size;           // Total size of the buffer in bytes

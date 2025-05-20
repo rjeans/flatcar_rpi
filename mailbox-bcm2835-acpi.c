@@ -56,6 +56,36 @@ struct bcm2835_mbox {
 
 struct bcm2835_mbox *bcm2835_mbox_global;
 
+#define RPI_MBOX_CHAN_FIRMWARE 8
+
+struct mbox_chan *bcm2835_mbox_request_firmware_channel(struct mbox_client *cl)
+{
+	struct bcm2835_mbox *mbox = bcm2835_mbox_global;
+	struct mbox_chan *chan;
+	int ret;
+
+	if (!cl || !mbox)
+		return ERR_PTR(-ENODEV);
+
+	if (RPI_MBOX_CHAN_FIRMWARE >= mbox->controller.num_chans)
+		return ERR_PTR(-EINVAL);
+
+	chan = &mbox->chans[RPI_MBOX_CHAN_FIRMWARE];
+
+	if (chan->cl)
+		return ERR_PTR(-EBUSY);  // Already bound
+
+	ret = mbox_bind_client(chan, cl);
+	if (ret)
+		return ERR_PTR(ret);
+
+	init_completion(&mbox->tx_completions[RPI_MBOX_CHAN_FIRMWARE]);
+	chan->mbox = &mbox->controller;
+
+	return chan;
+}
+EXPORT_SYMBOL_GPL(bcm2835_mbox_request_firmware_channel);
+
 
 
 struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *cl)
@@ -67,6 +97,8 @@ struct mbox_chan *bcm2835_mbox_request_channel(struct mbox_client *cl)
         return ERR_PTR(-ENODEV);
 
     for (i = 0; i < bcm2835_mbox_global->controller.num_chans; i++) {
+        if (i == RPI_MBOX_CHAN_FIRMWARE)
+                continue;  // Reserved for firmware
         chan = &bcm2835_mbox_global->chans[i];
 
         if (!chan->cl) {
