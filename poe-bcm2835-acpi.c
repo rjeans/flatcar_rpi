@@ -15,7 +15,7 @@ static DEFINE_MUTEX(transaction_lock);
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 
-#define RPI_PWM_CUR_DUTY_REG         0x00000001
+#define RPI_PWM_CUR_DUTY_REG         0x00000000
 #define RPI_MBOX_CHAN_FIRMWARE       8
 
 #define RPI_PWM_MAX_DUTY		255
@@ -44,6 +44,31 @@ static void response_callback(struct mbox_client *cl, void *msg)
 	complete(&data->c);
 }
 
+#define VC_MAILBOX_POE_TAG  0x00038049
+#define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
+// Sub-registers used inside the payload
+
+
+static int build_poe_firmware_msg(u32 *buf,
+                                  bool is_get,
+                                  u32 reg_id,
+                                  u32 value)
+{
+	if (!buf)
+		return -EINVAL;
+
+	buf[0] = cpu_to_le32(8 * sizeof(u32));      // total size: 32 bytes
+	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
+	buf[2] = cpu_to_le32(VC_MAILBOX_POE_TAG);   // compound PoE property tag
+	buf[3] = cpu_to_le32(8);                    // tag payload size
+	buf[4] = cpu_to_le32(is_get ? 0 : 8);       // 0 for GET, 8 for SET
+	buf[5] = cpu_to_le32(reg_id);               // register to read or write
+	buf[6] = cpu_to_le32(value);                // value (unused for GET)
+	buf[7] = cpu_to_le32(0);                    // end tag
+
+	return 0;
+}
+
 static int send_mbox_message(struct completion *c, struct device *dev, struct mbox_chan *chan,
                              u32 property_tag, u32 value, bool is_get, u32 *value_out)
 {
@@ -53,20 +78,13 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     dev_info(dev, "--------  send_mbox_message: IN: Sending property tag 0x%08x with value %u\n", property_tag, value);
 
-    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
+    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(8 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
         return -ENOMEM;
     }
 
-    dma_buf[0] = cpu_to_le32(7 * sizeof(u32)); // Buffer size in bytes
-    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
-    dma_buf[2] = cpu_to_le32(property_tag);   // Property tag
-    dma_buf[3] = cpu_to_le32(8);              // Value buffer size
-    dma_buf[4] = cpu_to_le32(is_get ? 0 : 8); // Request size (0 for get, 8 for set)
-    dma_buf[5] = cpu_to_le32(is_get ? 0 : value); // Value for set
-    dma_buf[6] = 0;                           // Placeholder for response
-    dma_buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
+    ret = build_poe_firmware_msg(dma_buf, is_get, property_tag, value);
 
     dev_info(dev, "DMA buffer BEFORE: [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
         dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
@@ -122,18 +140,14 @@ out_free:
 
 static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
 {
-    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, duty, false, NULL);
+    return send_mbox_message(c, dev, chan, RPI_PWM_CUR_DUTY_REG, duty, false, NULL);
 }
 
-static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, struct mbox_chan *chan)
-{
-    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, 1, false, NULL);
-}
 
-static int acpi_pwm_get_firmware_value(struct completion *c, struct device *dev, struct mbox_chan *chan,
-                                       u32 property_tag, u32 *value_out)
+static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan,
+                                       u32 *value_out)
 {
-    return send_mbox_message(c, dev, chan, property_tag, 0, true, value_out);
+    return send_mbox_message(c, dev, chan, RPI_PWM_CUR_DUTY_REG, 0, true, value_out);
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -186,8 +200,8 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return ret;
     }
 
-    ret = acpi_pwm_get_firmware_value(&data->c,data->dev, data->chan,
-                                      RPI_FIRMWARE_GET_POE_HAT_VAL, &updated_duty_cycle);
+    ret = get_pwm_duty(&data->c,data->dev, data->chan
+                                      , &updated_duty_cycle);
     if (ret < 0) {  
         dev_warn(data->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
@@ -256,13 +270,10 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox channel startup\n");
 
-    ret = acpi_pwm_enable_firmware(&data->c,&pdev->dev, data->chan);
-    if (ret < 0) {
-        dev_warn(&pdev->dev, "PoE firmware enable failed: %d\n", ret);
-    }
+    
 
-    ret = acpi_pwm_get_firmware_value(&data->c,&pdev->dev, data->chan,
-                                      RPI_FIRMWARE_GET_POE_HAT_VAL, &data->duty_cycle);
+    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan,
+                                      , &data->duty_cycle);
     if (ret < 0) {  
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
