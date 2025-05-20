@@ -76,8 +76,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     u32 *dma_buf;
     int ret;
 
-    dev_info(dev, "--------  send_mbox_message: IN: Sending property tag 0x%08x with value %u\n", property_tag, value);
-
+ 
     dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(8 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
@@ -86,11 +85,17 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     ret = build_poe_firmware_msg(dma_buf, is_get, property_tag, value);
 
+    
+
     dev_info(dev, "DMA buffer BEFORE: [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
         dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
         dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
 
     wmb(); // Ensure DMA memory is visible to the firmware
+
+    dev_info(dev, "------------------------  send_mbox_message: IN: Sending tag 0x%08x reg 0x%08x val %u\n",
+         buf[2], buf[5], buf[6]);
+
 
     mutex_lock(&transaction_lock);
 
@@ -131,7 +136,8 @@ out_free:
 
     mutex_unlock(&transaction_lock);
 
-    dev_info(dev, "--------  send_mbox_message: OUT Sending property tag 0x%08x with value %u\n", property_tag, value);
+   dev_info(dev, "------------------------  send_mbox_message: OUT: Sending tag 0x%08x reg 0x%08x val %u\n",
+         buf[2], buf[5], buf[6]);
 
     dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
 
