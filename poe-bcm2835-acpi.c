@@ -6,12 +6,16 @@
 #include <linux/pm_runtime.h>
 #include <linux/mailbox_client.h>
 #include <linux/delay.h>
-#include "mailbox-bcm2835-acpi.h"
+#include <linux/dma-mapping.h>
 
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
-#define RPI_PWM_CUR_DUTY_REG 0x0
 
+#define RPI_PWM_CUR_DUTY_REG         0x00000001
+#define RPI_FIRMWARE_SET_POE_HAT_VAL 0x00038041
+#define RPI_FIRMWARE_PROPERTY_END    0x00000000
+#define RPI_FIRMWARE_STATUS_REQUEST  0x00000000
+#define RPI_MBOX_CHAN_FIRMWARE       8
 
 struct acpi_pwm_driver_data {
 	struct pwm_chip chip;
@@ -26,41 +30,38 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 	return container_of(chip, struct acpi_pwm_driver_data, chip);
 }
 
-#define RPI_FIRMWARE_SET_POE_HAT_VAL 0x00038041
-#define RPI_PWM_CUR_DUTY_REG         0x00000001
-
-struct rpi_pwm_duty_msg {
-	__le32 tag;
-	__le32 buf_size;
-	__le32 val_len;
-	__le32 reg;
-	__le32 val;
-	__le32 end_tag;
-} __packed;
-
-static int send_pwm_duty(struct mbox_chan *chan, u8 duty)
+static int send_pwm_duty(struct device *dev, struct mbox_chan *chan, u8 duty)
 {
-	struct rpi_pwm_duty_msg msg = {
-		.tag      = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL),
-		.buf_size = cpu_to_le32(8),
-		.val_len  = cpu_to_le32(8),
-		.reg      = cpu_to_le32(RPI_PWM_CUR_DUTY_REG),
-		.val      = cpu_to_le32(duty),
-		.end_tag  = 0
-	};
+	dma_addr_t dma_handle;
+	u32 *buf;
+	u32 msg;
+	int ret;
 
-	struct device *dev = chan->cl ? chan->cl->dev : NULL;
+	buf = dma_alloc_coherent(dev, 64, &dma_handle, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
-	int ret = mbox_send_message(chan, &msg);
+	buf[0] = cpu_to_le32(7 * sizeof(u32));          // buffer size in bytes
+	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
+	buf[2] = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL);  // tag
+	buf[3] = cpu_to_le32(8);                        // value buffer size
+	buf[4] = cpu_to_le32(8);                        // request/response size
+	buf[5] = cpu_to_le32(RPI_PWM_CUR_DUTY_REG);     // register
+	buf[6] = cpu_to_le32(duty);                     // value
+	buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
+
+	wmb();
+
+	msg = (u32)dma_handle | RPI_MBOX_CHAN_FIRMWARE;
+	ret = mbox_send_message(chan, &msg);
 	if (ret < 0) {
-		if (dev)
-			dev_warn(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
-		return ret;
+		dev_warn(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
+	} else {
+		dev_info(dev, "PWM duty sent: %u\n", duty);
 	}
 
-	dev_info(dev, "Sent raw PWM duty=%u via tag 0x%08x\n", duty, RPI_FIRMWARE_SET_POE_HAT_VAL);
-	usleep_range(1000, 2000);
-	return 0;
+	dma_free_coherent(dev, 64, buf, dma_handle);
+	return ret;
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -70,11 +71,10 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	u8 duty;
 	int ret;
 
-	dev_info(data->dev, "acpi_pwm_apply: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
+	dev_info(data->dev, "apply: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity);
 
-	if (state->period < PWM_PERIOD_NS ||
-	    state->polarity != PWM_POLARITY_NORMAL) {
+	if (state->period < PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL) {
 		dev_info(data->dev, "Invalid period or polarity\n");
 		return -EINVAL;
 	}
@@ -84,7 +84,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	} else if (state->duty_cycle >= PWM_PERIOD_NS) {
 		duty = PWM_MAX_DUTY;
 	} else {
-		duty = DIV_ROUND_CLOSEST(state->duty_cycle * PWM_MAX_DUTY, PWM_PERIOD_NS);
+		duty = DIV_ROUND_DOWN_ULL(state->duty_cycle * PWM_MAX_DUTY, PWM_PERIOD_NS);
 	}
 
 	if (duty == data->last_duty) {
@@ -92,10 +92,10 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		return 0;
 	}
 
-	ret = send_pwm_duty(data->chan, duty);
+	ret = send_pwm_duty(data->dev, data->chan, duty);
 	if (ret) {
-		dev_info(data->dev, "Failed to send PWM duty: %d\n", ret);
-		return dev_err_probe(data->dev, ret, "Failed to send PWM duty\n");
+		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
+		return ret;
 	}
 
 	dev_info(data->dev, "PWM duty updated: %u\n", duty);
@@ -104,18 +104,19 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 }
 
 static int acpi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
-			     struct pwm_state *state)
+			      struct pwm_state *state)
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+
 	state->period = PWM_PERIOD_NS;
 	state->duty_cycle = DIV_ROUND_UP(data->last_duty * PWM_PERIOD_NS, PWM_MAX_DUTY);
 	state->enabled = !!data->last_duty;
 	state->polarity = PWM_POLARITY_NORMAL;
 
-	dev_info(data->dev, "acpi_pwm_get_state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
+	dev_info(data->dev, "get_state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity);
 
-    return 0;
+	return 0;
 }
 
 static const struct pwm_ops acpi_pwm_ops = {
@@ -132,23 +133,18 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "acpi_pwm_probe: probing device\n");
 
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		dev_info(&pdev->dev, "Failed to allocate driver data\n");
+	if (!data)
 		return -ENOMEM;
-	}
 
-    data->dev = &pdev->dev;
-
+	data->dev = &pdev->dev;
 	cl = &data->mbox;
 	cl->dev = &pdev->dev;
 	cl->tx_block = true;
 	cl->knows_txdone = false;
 
 	data->chan = bcm2835_mbox_request_channel(cl);
-	if (IS_ERR(data->chan)) {
-		dev_info(&pdev->dev, "mbox request failed: %ld\n", PTR_ERR(data->chan));
+	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
-	}
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
@@ -156,12 +152,11 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, data);
 
-	dev_info(&pdev->dev, "Registering PWM chip\n");
 	return devm_pwmchip_add(&pdev->dev, &data->chip);
 }
 
 static const struct acpi_device_id acpi_pwm_ids[] = {
-	{ "BCM2853", 0 }, // match _HID in ACPI SSDT
+	{ "BCM2853", 0 },
 	{}
 };
 MODULE_DEVICE_TABLE(acpi, acpi_pwm_ids);
@@ -174,20 +169,7 @@ static struct platform_driver acpi_pwm_driver = {
 	.probe = acpi_pwm_probe,
 };
 
-static int __init acpi_pwm_init(void)
-{
-	pr_info("acpi-mailbox-pwm: module init\n");
-	return platform_driver_register(&acpi_pwm_driver);
-}
-
-static void __exit acpi_pwm_exit(void)
-{
-	pr_info("acpi-mailbox-pwm: module exit\n");
-	platform_driver_unregister(&acpi_pwm_driver);
-}
-
-module_init(acpi_pwm_init);
-module_exit(acpi_pwm_exit);
+module_platform_driver(acpi_pwm_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("You");
