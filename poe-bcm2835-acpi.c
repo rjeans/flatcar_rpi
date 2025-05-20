@@ -44,7 +44,9 @@ static void response_callback(struct mbox_client *cl, void *msg)
 	complete(&data->c);
 }
 
-#define VC_MAILBOX_POE_TAG  0x00038049
+
+#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
+#define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
 // Sub-registers used inside the payload
 
@@ -146,13 +148,13 @@ out_free:
 
 static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
 {
-    return send_mbox_message(c, dev, chan, RPI_PWM_CUR_DUTY_REG, duty, false, NULL);
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, duty, false, NULL);
 }
 
 
 static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u32 *value_out)
 {
-    return send_mbox_message(c, dev, chan, RPI_PWM_CUR_DUTY_REG, 0, true, value_out);
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, 0, true, value_out);
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
