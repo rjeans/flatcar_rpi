@@ -34,11 +34,11 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 
 static void response_callback(struct mbox_client *cl, void *msg)
 {
-	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+	struct acpi_pwm_driver_data *data = container_of(cl, struct acpi_pwm_driver_data, mbox);
 	complete(&data->c);
 }
 
-static int send_pwm_duty(struct completion c, struct device *dev, struct mbox_chan *chan, u8 duty)
+static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
 {
 	dma_addr_t dma_handle;
 	u32 *buf;
@@ -141,7 +141,7 @@ static const struct pwm_ops acpi_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
-static int acpi_pwm_enable_firmware(struct completion c,struct device *dev, struct mbox_chan *chan)
+static int acpi_pwm_enable_firmware(struct completion *c,struct device *dev, struct mbox_chan *chan)
 {
 	dma_addr_t dma_handle;
 	u32 *dma_buf;
