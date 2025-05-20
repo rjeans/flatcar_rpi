@@ -179,7 +179,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox channel startup\n");
 
-    ret = acpi_pwm_enable_firmware(dev, data->chan);
+    ret = acpi_pwm_enable_firmware(&pdev->dev, data->chan);
     if (ret < 0) {
         dev_warn(&pdev->dev, "PoE firmware enable failed: %d\n", ret);
     }
