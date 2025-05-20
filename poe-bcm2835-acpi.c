@@ -69,6 +69,10 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     dma_buf[6] = 0;                           // Placeholder for response
     dma_buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
 
+    dev_info(dev, "DMA buffer: [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
+        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
+        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
+
     wmb(); // Ensure DMA memory is visible to the firmware
 
     mutex_lock(&transaction_lock);
