@@ -273,8 +273,9 @@ static int acpi_pwm_remove(struct platform_device *pdev)
 {
     struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
 
-    if (data->chan)
+    if (data->chan) {
         bcm2835_mbox_free_channel(data->chan);
+    }
 
     
 	dev_info(&pdev->dev, "acpi_pwm_remove: mailbox channel freed\n");
