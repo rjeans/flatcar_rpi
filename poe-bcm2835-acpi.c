@@ -18,6 +18,9 @@
 #define RPI_FIRMWARE_STATUS_REQUEST  0x00000000
 #define RPI_MBOX_CHAN_FIRMWARE       8
 
+#define RPI_PWM_MAX_DUTY		255
+#define RPI_PWM_PERIOD_NS		80000 /* 12.5 kHz */
+
 struct acpi_pwm_driver_data {
 	struct pwm_chip chip;
 	struct mbox_client mbox;
