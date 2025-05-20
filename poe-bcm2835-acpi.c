@@ -15,7 +15,7 @@ static DEFINE_MUTEX(transaction_lock);
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 
-define RPI_MBOX_CHAN_FIRMWARE       8
+#define RPI_MBOX_CHAN_FIRMWARE       8
 
 #define RPI_PWM_MAX_DUTY		255
 #define RPI_PWM_PERIOD_NS		80000 /* 12.5 kHz */
