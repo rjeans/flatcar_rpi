@@ -138,7 +138,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     return 0;
 }
 
-static int raspberrypi_pwm_get_state(struct pwm_chip *chip,
+static int acpi_pwm_get_state(struct pwm_chip *chip,
 				     struct pwm_device *pwm,
 				     struct pwm_state *state)
 {
