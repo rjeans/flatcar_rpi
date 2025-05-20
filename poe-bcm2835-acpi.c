@@ -44,7 +44,7 @@ static void response_callback(struct mbox_client *cl, void *msg)
 }
 
 
-#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
+#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
 
