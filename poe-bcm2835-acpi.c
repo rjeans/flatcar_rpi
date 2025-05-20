@@ -269,6 +269,16 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	return devm_pwmchip_add(&pdev->dev, &data->chip);
 }
 
+static int acpi_pwm_remove(struct platform_device *pdev)
+{
+    struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
+
+    if (data->chan)
+        bcm2835_mbox_free_channel(data->chan);
+
+    return 0;
+}
+
 static const struct acpi_device_id acpi_pwm_ids[] = {
 	{ "BCM2853", 0 },
 	{}
@@ -281,6 +291,7 @@ static struct platform_driver acpi_pwm_driver = {
 		.acpi_match_table = acpi_pwm_ids,
 	},
 	.probe = acpi_pwm_probe,
+    .remove = pwmchip_remove,
 };
 
 module_platform_driver(acpi_pwm_driver);
