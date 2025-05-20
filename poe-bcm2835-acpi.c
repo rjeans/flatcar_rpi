@@ -61,8 +61,8 @@ static int build_poe_firmware_msg(u32 *buf,
 		return -EINVAL;
 
 	buf[0] = cpu_to_le32(8 * sizeof(u32));      // total size: 32 bytes
-	buf[1] = cpu_to_le32(0x00038049);           // request
-	buf[2] = cpu_to_le32(property_tag);   // compound PoE property tag
+	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
+	buf[2] = cpu_to_le32(0x00038049);   // compound PoE property tag
 	buf[3] = cpu_to_le32(8);                    // tag payload size
 	buf[4] = cpu_to_le32(is_get ? 0 : 8);       // 0 for GET, 8 for SET
 	buf[5] = cpu_to_le32(is_get ? 0x00030049 : 0);               // register to read or write
