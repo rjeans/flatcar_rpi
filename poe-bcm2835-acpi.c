@@ -289,7 +289,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     ret=enable_pwm(&data->c, &pdev->dev, data->chan);
     if (ret < 0) {
-        dev_warn&pdev->dev, "Failed to enable PWM: %d\n", ret);
+        dev_warn(&pdev->dev, "Failed to enable PWM: %d\n", ret);
         
     }
 
