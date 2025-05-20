@@ -283,7 +283,6 @@ static int acpi_pwm_probe(struct platform_device *pdev)
     ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->duty_cycle);
     if (ret < 0) {  
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
-        return ret;
     }
     dev_info(&pdev->dev, "Current duty cycle: %u\n", data->duty_cycle);
 
