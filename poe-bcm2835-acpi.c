@@ -293,7 +293,7 @@ static struct platform_driver acpi_pwm_driver = {
 		.acpi_match_table = acpi_pwm_ids,
 	},
 	.probe = acpi_pwm_probe,
-    .remove = pwmchip_remove,
+    .remove = acpi_pwm_remove,
 };
 
 module_platform_driver(acpi_pwm_driver);
