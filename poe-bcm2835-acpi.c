@@ -7,7 +7,6 @@
 #include <linux/mailbox_client.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
-#include <soc/bcm2835/raspberrypi-firmware.h>
 #include "mailbox-bcm2835-acpi.h"
 
 static DEFINE_MUTEX(transaction_lock);
