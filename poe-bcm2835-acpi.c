@@ -70,7 +70,7 @@ static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_c
 		dev_info(dev, "PWM duty sent: %u\n", duty);
 	}
 
-    if (ret>= 0 && !wait_for_completion_timeout(&data->c, HZ)) {
+    if (ret>= 0 && !wait_for_completion_timeout(c, HZ)) {
         dev_err(dev, "Timeout waiting for PWM duty response\n");
 
         ret = -ETIMEDOUT;
@@ -169,7 +169,7 @@ static int acpi_pwm_enable_firmware(struct completion *c,struct device *dev, str
 	ret = mbox_send_message(chan, &dma_handle);
 	dev_info(dev, "Enable PoE logic message sent, ret = %d\n", ret);
 
-    if (ret>= 0 && !wait_for_completion_timeout(&data->c, HZ)) {
+    if (ret>= 0 && !wait_for_completion_timeout(c, HZ)) {
         dev_err(dev, "Timeout waiting for PWM duty response\n");
 
         ret = -ETIMEDOUT;
