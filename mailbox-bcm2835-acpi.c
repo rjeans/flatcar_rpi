@@ -225,7 +225,7 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
 
     mbox->irq  = platform_get_irq(pdev, 0);
     if (mbox->irq  < 0)
-        return dev_err_probe(&pdev->dev, irq, "Failed to get IRQ\n");
+        return dev_err_probe(&pdev->dev, mbox->irq, "Failed to get IRQ\n");
 
     ret = devm_request_irq(&pdev->dev, mbox->irq , bcm2835_mbox_irq,
                         0, dev_name(&pdev->dev), mbox);
