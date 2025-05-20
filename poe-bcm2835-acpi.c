@@ -177,7 +177,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
 
-    dev_info(dev, "Mailbox channel startup\n");
+    dev_info(&pdev->dev, "Mailbox channel startup\n");
 
     ret = acpi_pwm_enable_firmware(dev, data->chan);
     if (ret < 0) {
