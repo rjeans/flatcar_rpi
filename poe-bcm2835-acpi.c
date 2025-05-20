@@ -180,7 +180,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     ret = acpi_pwm_enable_firmware(dev, pwm->chan);
     if (ret < 0)
-        dev_warn(dev, "PoE firmware enable failed: %d\n", ret);
+        dev_warn(&pdev->dev, "PoE firmware enable failed: %d\n", ret);
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
