@@ -170,7 +170,7 @@ static int acpi_pwm_enable_firmware(struct completion *c,struct device *dev, str
 	dev_info(dev, "Enable PoE logic message sent, ret = %d\n", ret);
 
     if (ret>= 0 && !wait_for_completion_timeout(c, HZ)) {
-        dev_err(dev, "Timeout waiting for PWM duty response\n");
+        dev_err(dev, "Timeout waiting for firmware response\n");
 
         ret = -ETIMEDOUT;
     }
