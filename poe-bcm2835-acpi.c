@@ -47,7 +47,7 @@ static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_c
 	u32 msg;
 	int ret;
 
-	buf = dma_alloc_coherent(dev, 64, &dma_handle, GFP_KERNEL);
+    buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
 	if (!buf)
 		return -ENOMEM;
 
@@ -78,7 +78,7 @@ static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_c
         ret = -ETIMEDOUT;
     }
 
-	dma_free_coherent(dev, 64, buf, dma_handle);
+	dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), buf, dma_handle);
 	return ret;
 }
 
@@ -168,22 +168,23 @@ static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, st
     u32 *dma_buf;
     int ret;
 
+
     dev_info(dev, "acpi_pwm_enable_firmware: Allocating DMA buffer\n");
-    dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
+    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "acpi_pwm_enable_firmware: Failed to allocate DMA buffer\n");
         return -ENOMEM;
     }
 
     dev_info(dev, "acpi_pwm_enable_firmware: Preparing mailbox property buffer\n");
-    dma_buf[0] = 7 * sizeof(u32); // Total size
-    dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
-    dma_buf[2] = RPI_FIRMWARE_SET_POE_HAT_VAL;
-    dma_buf[3] = 8;
-    dma_buf[4] = 8;
-    dma_buf[5] = 0x00000000;   // Tag = enable
-    dma_buf[6] = 1;            // Value = enable
-    dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
+    dma_buf[0] = cpu_to_le32(7 * sizeof(u32)); // Total size
+    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
+    dma_buf[2] = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL); // Tag
+    dma_buf[3] = cpu_to_le32(8);
+    dma_buf[4] = cpu_to_le32(8);
+    dma_buf[5] = cpu_to_le32(0x00000000);   // Tag = enable
+    dma_buf[6] = cpu_to_le32(1);            // Value = enable
+    dma_buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
 
     dev_info(dev, "acpi_pwm_enable_firmware: Buffer contents: "
         "%08x %08x %08x %08x %08x %08x %08x %08x\n",
@@ -210,7 +211,7 @@ static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, st
     }
 
     dev_info(dev, "acpi_pwm_enable_firmware: Freeing DMA buffer\n");
-    dma_free_coherent(dev, 32, dma_buf, dma_handle);
+    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), dma_buf, dma_handle);
     return ret;
 }
 
@@ -225,20 +226,20 @@ static int acpi_pwm_get_firmware_value(struct completion *c,
     int ret;
 
     dev_info(dev, "acpi_pwm_get_firmware_value: Allocating DMA buffer\n");
-    dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
+    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "acpi_pwm_get_firmware_value: Failed to allocate DMA buffer\n");
         return -ENOMEM;
     }
 
     dev_info(dev, "acpi_pwm_get_firmware_value: Preparing mailbox property buffer for tag 0x%08x\n", property_tag);
-    dma_buf[0] = 7 * sizeof(u32);                         // Buffer size in bytes
-    dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;             // 0x00000000 for "get"
-    dma_buf[2] = property_tag;                            // e.g., RPI_PWM_CUR_DUTY_REG
-    dma_buf[3] = 8;                                       // Value buffer size
-    dma_buf[4] = 0;                                       // Request size = 0 when sending
-    dma_buf[5] = 0;                                       // Tag placeholder
-    dma_buf[6] = 0;                                       // Output will be written here
+    dma_buf[0] = cpu_to_le32(7 * sizeof(u32));                         // Buffer size in bytes
+    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);             // 0x00000000 for "get"
+    dma_buf[2] = cpu_to_le32(property_tag);                            // e.g., RPI_PWM_CUR_DUTY_REG
+    dma_buf[3] = cpu_to_le32(sizeof(u32));                                       // Value buffer size
+    dma_buf[4] = cpu_to_le32(0);                                       // Request size = 0 when sending
+    dma_buf[5] = cpu_to_le32(0);                                       // Tag placeholder
+    dma_buf[6] = cpu_to_le32(0);                                       // Output will be written here
     dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
 
     dev_info(dev, "acpi_pwm_get_firmware_value: Buffer contents: "
@@ -279,7 +280,7 @@ static int acpi_pwm_get_firmware_value(struct completion *c,
 
 out_free:
     dev_info(dev, "acpi_pwm_get_firmware_value: Freeing DMA buffer\n");
-    dma_free_coherent(dev, 32, dma_buf, dma_handle);
+    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), dma_buf, dma_handle);
     return ret;
 }
 
