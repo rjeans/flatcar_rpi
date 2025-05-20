@@ -35,6 +35,7 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 static void response_callback(struct mbox_client *cl, void *msg)
 {
 	struct acpi_pwm_driver_data *data = container_of(cl, struct acpi_pwm_driver_data, mbox);
+    dev_info(data->dev, "RX callback invoked\n");
 	complete(&data->c);
 }
 

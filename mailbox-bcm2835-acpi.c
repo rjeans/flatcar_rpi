@@ -49,6 +49,7 @@ struct bcm2835_mbox {
     struct device *dev;
     struct mbox_chan chans[BCM2835_MAX_CHANNELS];
     struct completion tx_completions[BCM2835_MAX_CHANNELS];
+    int irq;
     spinlock_t lock;
 };
 
@@ -161,6 +162,35 @@ static void bcm2835_shutdown(struct mbox_chan *chan)
     dev_info(mbox->dev, "Mailbox channel shutdown\n");
 }
 
+
+
+static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
+{
+    struct bcm2835_mbox *mbox = dev_id;
+    struct device *dev = mbox->controller.dev;
+    irqreturn_t handled = IRQ_NONE;
+
+    dev_info(dev, "Mailbox IRQ triggered: %d\n", irq);
+
+    while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+        u32 msg = readl(mbox->regs + MAIL0_RD);
+        u32 chan_index = msg & 0xf;
+        u32 payload = msg & ~0xf;
+
+        if (chan_index >= BCM2835_MAX_CHANNELS) {
+            dev_warn(dev, "Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
+            continue;
+        }
+
+        dev_info(dev, "Mailbox IRQ: channel %u, data 0x%08X\n", chan_index, payload);
+        mbox_chan_received_data(&mbox->chans[chan_index], &msg);
+        handled = IRQ_HANDLED;
+    }
+
+    return handled;
+}
+
+
 static const struct mbox_chan_ops bcm2835_chan_ops = {
     .send_data     = bcm2835_send_data,
     .startup       = bcm2835_startup,
@@ -193,8 +223,19 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     
 
 
-    spin_lock_init(&mbox->lock);
+    mbox->irq  = platform_get_irq(pdev, 0);
+    if (mbox->irq  < 0)
+        return dev_err_probe(&pdev->dev, irq, "Failed to get IRQ\n");
+
+    ret = devm_request_irq(&pdev->dev, mbox->irq , bcm2835_mbox_irq,
+                        0, dev_name(&pdev->dev), mbox);
+    if (ret) {
+        return dev_err_probe(&pdev->dev, ret, "Failed to request IRQ\n");
+    }
+
     
+
+
 
     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     mbox->regs = devm_ioremap_resource(&pdev->dev, res);
@@ -209,9 +250,8 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.chans = mbox->chans;
     mbox->controller.num_chans = BCM2835_MAX_CHANNELS;
     mbox->controller.ops = &bcm2835_chan_ops;
-    mbox->controller.txdone_irq = false;
     mbox->controller.txdone_poll = true;
-    mbox->controller.txpoll_period = 1;
+    mbox->controller.txpoll_period = 5;
 
 
     
