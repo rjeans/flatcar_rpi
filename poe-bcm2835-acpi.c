@@ -159,6 +159,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data;
 	struct mbox_client *cl;
+    int ret;
 
 	dev_info(&pdev->dev, "acpi_pwm_probe: probing device\n");
 
