@@ -52,7 +52,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     u32 *dma_buf;
     int ret;
 
-    dev_log(dev, "--------  send_mbox_message: IN: Sending property tag 0x%08x with value %u\n", property_tag, value);
+    dev_info(dev, "--------  send_mbox_message: IN: Sending property tag 0x%08x with value %u\n", property_tag, value);
 
     dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
@@ -105,7 +105,7 @@ out_free:
 
     mutex_unlock(&transaction_lock);
 
-    dev_log(dev, "--------  send_mbox_message: OUT Sending property tag 0x%08x with value %u\n", property_tag, value);
+    dev_info(dev, "--------  send_mbox_message: OUT Sending property tag 0x%08x with value %u\n", property_tag, value);
 
     dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
 
