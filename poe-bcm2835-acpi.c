@@ -10,6 +10,8 @@
 #include <soc/bcm2835/raspberrypi-firmware.h>
 #include "mailbox-bcm2835-acpi.h"
 
+
+
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 
@@ -18,6 +20,8 @@
 
 #define RPI_PWM_MAX_DUTY		255
 #define RPI_PWM_PERIOD_NS		80000 /* 12.5 kHz */
+
+#define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
 
 struct acpi_pwm_driver_data {
 	struct pwm_chip chip;
@@ -40,46 +44,76 @@ static void response_callback(struct mbox_client *cl, void *msg)
 	complete(&data->c);
 }
 
-static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
+static int send_mbox_message(struct completion *c, struct device *dev, struct mbox_chan *chan,
+                             u32 property_tag, u32 value, bool is_get, u32 *value_out)
 {
-	dma_addr_t dma_handle;
-	u32 *buf;
-	u32 msg;
-	int ret;
+    dma_addr_t dma_handle;
+    u32 *dma_buf;
+    int ret;
 
-    buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
-	if (!buf)
-		return -ENOMEM;
-
-	buf[0] = cpu_to_le32(7 * sizeof(u32));          // buffer size in bytes
-	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
-	buf[2] = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL);  // tag
-	buf[3] = cpu_to_le32(8);                        // value buffer size
-	buf[4] = cpu_to_le32(8);                        // request/response size
-	buf[5] = cpu_to_le32(RPI_PWM_CUR_DUTY_REG);     // register
-	buf[6] = cpu_to_le32(duty);                     // value
-	buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
-
-	wmb();
-
-	msg = (u32)dma_handle | RPI_MBOX_CHAN_FIRMWARE;
-
-    reinit_completion(c);
-	ret = mbox_send_message(chan, &msg);
-	if (ret < 0) {
-		dev_warn(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
-	} else {
-		dev_info(dev, "PWM duty sent: %u\n", duty);
-	}
-
-    if (ret>= 0 && !wait_for_completion_timeout(c, HZ)) {
-        dev_err(dev, "Timeout waiting for PWM duty response\n");
-
-        ret = -ETIMEDOUT;
+    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
+    if (!dma_buf) {
+        dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
+        return -ENOMEM;
     }
 
-	dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), buf, dma_handle);
-	return ret;
+    dma_buf[0] = cpu_to_le32(7 * sizeof(u32)); // Buffer size in bytes
+    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
+    dma_buf[2] = cpu_to_le32(property_tag);   // Property tag
+    dma_buf[3] = cpu_to_le32(8);              // Value buffer size
+    dma_buf[4] = cpu_to_le32(is_get ? 0 : 8); // Request size (0 for get, 8 for set)
+    dma_buf[5] = cpu_to_le32(is_get ? 0 : value); // Value for set
+    dma_buf[6] = 0;                           // Placeholder for response
+    dma_buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
+
+    wmb(); // Ensure DMA memory is visible to the firmware
+
+    reinit_completion(c);
+
+    u32 msg = MBOX_MSG(chan, dma_buf);
+
+    ret = mbox_send_message(chan, &msg);
+    if (ret < 0) {
+        dev_err(dev, "send_mbox_message: Failed to send message: %pe\n", ERR_PTR(ret));
+        goto out_free;
+    }
+
+    if (!wait_for_completion_timeout(c, HZ)) {
+        dev_err(dev, "send_mbox_message: Timeout waiting for response\n");
+        ret = -ETIMEDOUT;
+        goto out_free;
+    }
+
+    if (!(dma_buf[4] & 0x80000000)) { // Check response success bit
+        dev_err(dev, "send_mbox_message: Firmware did not acknowledge property tag 0x%08x\n", property_tag);
+        ret = -EIO;
+        goto out_free;
+    }
+
+    if (is_get && value_out)
+        *value_out = le32_to_cpu(dma_buf[6]);
+
+    ret = 0;
+
+out_free:
+    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
+    return ret;
+}
+
+static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
+{
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, duty, false, NULL);
+}
+
+static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, struct mbox_chan *chan)
+{
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, 1, false, NULL);
+}
+
+static int acpi_pwm_get_firmware_value(struct completion *c, struct device *dev, struct mbox_chan *chan,
+                                       u32 property_tag, u32 *value_out)
+{
+    return send_mbox_message(c, dev, chan, property_tag, 0, true, value_out);
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -161,129 +195,6 @@ static const struct pwm_ops acpi_pwm_ops = {
 	.get_state = acpi_pwm_get_state,
 	.owner = THIS_MODULE,
 };
-
-static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, struct mbox_chan *chan)
-{
-    dma_addr_t dma_handle;
-    u32 *dma_buf;
-    int ret;
-
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Allocating DMA buffer\n");
-    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
-    if (!dma_buf) {
-        dev_err(dev, "acpi_pwm_enable_firmware: Failed to allocate DMA buffer\n");
-        return -ENOMEM;
-    }
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Preparing mailbox property buffer\n");
-    dma_buf[0] = cpu_to_le32(7 * sizeof(u32)); // Total size
-    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);
-    dma_buf[2] = cpu_to_le32(RPI_FIRMWARE_SET_POE_HAT_VAL); // Tag
-    dma_buf[3] = cpu_to_le32(8);
-    dma_buf[4] = cpu_to_le32(8);
-    dma_buf[5] = cpu_to_le32(0x00000000);   // Tag = enable
-    dma_buf[6] = cpu_to_le32(1);            // Value = enable
-    dma_buf[7] = cpu_to_le32(RPI_FIRMWARE_PROPERTY_END);
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Buffer contents: "
-        "%08x %08x %08x %08x %08x %08x %08x %08x\n",
-        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
-
-    wmb(); // Ensure DMA memory is visible
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Reinitializing completion\n");
-    reinit_completion(c);
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Sending mailbox message (dma_handle=%pad)\n", &dma_handle);
-    ret = mbox_send_message(chan, &dma_handle);
-    dev_info(dev, "acpi_pwm_enable_firmware: Enable PoE logic message sent, ret = %d\n", ret);
-
-    if (ret >= 0) {
-        dev_info(dev, "acpi_pwm_enable_firmware: Waiting for firmware response\n");
-        if (!wait_for_completion_timeout(c, HZ)) {
-            dev_err(dev, "acpi_pwm_enable_firmware: Timeout waiting for firmware response\n");
-            ret = -ETIMEDOUT;
-        } else {
-            dev_info(dev, "acpi_pwm_enable_firmware: Firmware response received\n");
-        }
-    }
-
-    dev_info(dev, "acpi_pwm_enable_firmware: Freeing DMA buffer\n");
-    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), dma_buf, dma_handle);
-    return ret;
-}
-
-static int acpi_pwm_get_firmware_value(struct completion *c,
-                       struct device *dev,
-                       struct mbox_chan *chan,
-                       u32 property_tag,
-                       u32 *value_out)
-{
-    dma_addr_t dma_handle;
-    u32 *dma_buf;
-    int ret;
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Allocating DMA buffer\n");
-    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), &dma_handle, GFP_ATOMIC);
-    if (!dma_buf) {
-        dev_err(dev, "acpi_pwm_get_firmware_value: Failed to allocate DMA buffer\n");
-        return -ENOMEM;
-    }
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Preparing mailbox property buffer for tag 0x%08x\n", property_tag);
-    dma_buf[0] = cpu_to_le32(7 * sizeof(u32));                         // Buffer size in bytes
-    dma_buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);             // 0x00000000 for "get"
-    dma_buf[2] = cpu_to_le32(property_tag);                            // e.g., RPI_PWM_CUR_DUTY_REG
-    dma_buf[3] = cpu_to_le32(sizeof(u32));                                       // Value buffer size
-    dma_buf[4] = cpu_to_le32(0);                                       // Request size = 0 when sending
-    dma_buf[5] = cpu_to_le32(0);                                       // Tag placeholder
-    dma_buf[6] = cpu_to_le32(0);                                       // Output will be written here
-    dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Buffer contents: "
-        "%08x %08x %08x %08x %08x %08x %08x %08x\n",
-        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
-
-    wmb(); // Ensure DMA memory is visible to the firmware
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Reinitializing completion\n");
-    reinit_completion(c);
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Sending mailbox message (dma_handle=%pad)\n", &dma_handle);
-    ret = mbox_send_message(chan, &dma_handle);
-    if (ret < 0) {
-        dev_err(dev, "acpi_pwm_get_firmware_value: Failed to send get-property message: %pe\n", ERR_PTR(ret));
-        goto out_free;
-    }
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Waiting for firmware response\n");
-    if (!wait_for_completion_timeout(c, HZ)) {
-        dev_err(dev, "acpi_pwm_get_firmware_value: Timeout waiting for get-property response\n");
-        ret = -ETIMEDOUT;
-        goto out_free;
-    }
-
-    dev_info(dev, "acpi_pwm_get_firmware_value: Firmware response received, checking response\n");
-    /* Check for response success bit in response size (bit 31 set) */
-    if (!(dma_buf[4] & 0x80000000)) {
-        dev_err(dev, "acpi_pwm_get_firmware_value: Firmware did not acknowledge property tag %08x\n", property_tag);
-        ret = -EIO;
-        goto out_free;
-    }
-
-    *value_out = dma_buf[6];
-    dev_info(dev, "acpi_pwm_get_firmware_value: Got value 0x%08x for tag 0x%08x\n", *value_out, property_tag);
-    ret = 0;
-
-out_free:
-    dev_info(dev, "acpi_pwm_get_firmware_value: Freeing DMA buffer\n");
-    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7*sizeof(u32)), dma_buf, dma_handle);
-    return ret;
-}
-
 
 static int acpi_pwm_probe(struct platform_device *pdev)
 {
