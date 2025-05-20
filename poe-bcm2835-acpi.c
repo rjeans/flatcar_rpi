@@ -167,11 +167,11 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
     if (duty_cycle == data->duty_cycle) {
         dev_info(data->dev, "acpi_pwm_apply: No change in duty_cycle, skipping update\n");
-        return 0;
+     //   return 0;
     }
 
     dev_info(data->dev, "acpi_pwm_apply: Sending new duty_cycle=%u to firmware\n", duty_cycle);
-    ret = send_pwm_duty(&data->c, data->dev, data->chan, duty_cycle);
+    ret = send_pwm_duty(&data->c, data->dev, data->chan, 255);
     if (ret) {
         dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
         return ret;
@@ -183,7 +183,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         dev_warn(data->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
     }
-    dev_info(data->dev, "Updated duty cycle: %u\n", updated_duty_cycle);
+    dev_info(data->dev, "Stored duty cycle: %u\n", updated_duty_cycle);
 
     dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", duty_cycle);
     data->duty_cycle = duty_cycle;
