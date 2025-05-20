@@ -173,7 +173,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
     struct device *dev = mbox->controller.dev;
     irqreturn_t handled = IRQ_NONE;
 
-    dev_info(dev, "Mailbox IRQ triggered: %d\n", irq);
+    dev_info(dev, "Mailbox IRQ triggered: irq=%d\n", irq);
 
     while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
         u32 msg = readl(mbox->regs + MAIL0_RD);
@@ -185,8 +185,14 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
             continue;
         }
 
-        dev_info(dev, "Mailbox IRQ: channel %u, data 0x%08X\n", chan_index, payload);
-        mbox_chan_received_data(&mbox->chans[chan_index], &msg);
+        struct mbox_chan *chan = &mbox->chans[chan_index];
+        if (!chan->cl || !chan->cl->rx_callback) {
+            dev_warn(dev, "Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
+            continue;
+        }
+
+        dev_dbg(dev, "Dispatching msg 0x%08X to channel %u\n", payload, chan_index);
+        mbox_chan_received_data(chan, &msg);
         handled = IRQ_HANDLED;
     }
 
