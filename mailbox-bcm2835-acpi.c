@@ -144,7 +144,10 @@ static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 static int bcm2835_startup(struct mbox_chan *chan)
 {
     struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
- 
+
+           /* Enable the interrupt on data reception */
+    writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+
 
     dev_info(mbox->dev, "Mailbox channel startup\n");
     return 0;
