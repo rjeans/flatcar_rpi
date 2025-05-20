@@ -94,7 +94,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     wmb(); // Ensure DMA memory is visible to the firmware
 
     dev_info(dev, "------------------------  send_mbox_message: IN: Sending tag 0x%08x reg 0x%08x val %u\n",
-         buf[2], buf[5], buf[6]);
+         dma_buf[2], dma_buf[5], dma_buf[6]);
 
 
     mutex_lock(&transaction_lock);
@@ -137,7 +137,7 @@ out_free:
     mutex_unlock(&transaction_lock);
 
    dev_info(dev, "------------------------  send_mbox_message: OUT: Sending tag 0x%08x reg 0x%08x val %u\n",
-         buf[2], buf[5], buf[6]);
+         dma_buf[2], dma_buf[5], dma_buf[6]);
 
     dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
 
