@@ -199,6 +199,8 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	cl->tx_block = true;
 	cl->rx_callback = response_callback;
 
+    init_completion(&data->c);
+
 	data->chan = bcm2835_mbox_request_channel(cl);
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
