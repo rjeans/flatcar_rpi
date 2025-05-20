@@ -15,8 +15,7 @@ static DEFINE_MUTEX(transaction_lock);
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 
-#define RPI_PWM_CUR_DUTY_REG         0x00000000
-#define RPI_MBOX_CHAN_FIRMWARE       8
+define RPI_MBOX_CHAN_FIRMWARE       8
 
 #define RPI_PWM_MAX_DUTY		255
 #define RPI_PWM_PERIOD_NS		80000 /* 12.5 kHz */
@@ -48,13 +47,18 @@ static void response_callback(struct mbox_client *cl, void *msg)
 #define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
 #define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
-#define RPI_PWM_CUR_DUTY_REG         0x00000000
+
+#define RPI_PWM_CUR_DUTY_REG         0x00030049
+#define RPI_PWM_CUR_ENABLE_REG         0x00030050
+
+#
 // Sub-registers used inside the payload
 
 
 static int build_poe_firmware_msg(u32 *buf,
                                   bool is_get,
                                   u32 property_tag,
+                                  u32 reg,
                                   u32 value)
 {
 	if (!buf)
@@ -62,10 +66,10 @@ static int build_poe_firmware_msg(u32 *buf,
 
 	buf[0] = cpu_to_le32(8 * sizeof(u32));      // total size: 32 bytes
 	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
-	buf[2] = cpu_to_le32(0x00038049);   // compound PoE property tag
+	buf[2] = cpu_to_le32(property_tag);   // compound PoE property tag
 	buf[3] = cpu_to_le32(8);                    // tag payload size
 	buf[4] = cpu_to_le32(is_get ? 0 : 8);       // 0 for GET, 8 for SET
-	buf[5] = cpu_to_le32(0x00030049);               // register to read or write
+	buf[5] = cpu_to_le32(reg);               // register to read or write
 	buf[6] = cpu_to_le32(value);                // value (unused for GET)
 	buf[7] = cpu_to_le32(0);                    // end tag
 
@@ -73,7 +77,7 @@ static int build_poe_firmware_msg(u32 *buf,
 }
 
 static int send_mbox_message(struct completion *c, struct device *dev, struct mbox_chan *chan,
-                             u32 property_tag, u32 value, bool is_get, u32 *value_out)
+                             u32 property_tag, u32 reg,u32 value, bool is_get, u32 *value_out)
 {
     dma_addr_t dma_handle;
     u32 *dma_buf;
@@ -86,7 +90,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
         return -ENOMEM;
     }
 
-    ret = build_poe_firmware_msg(dma_buf, is_get, property_tag, value);
+    ret = build_poe_firmware_msg(dma_buf, is_get, property_tag, reg, value);
 
     
 
@@ -149,13 +153,18 @@ out_free:
 
 static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
 {
-    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, duty, false, NULL);
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, RPI_PWM_CUR_DUTY_REG, duty, false, NULL);
 }
 
 
 static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u32 *value_out)
 {
-    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, 0, true, value_out);
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, RPI_PWM_CUR_DUTY_REG,0, true, value_out);
+}
+
+static int enable_pwm(struct completion *c, struct device *dev, struct mbox_chan *chan)
+{
+    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, RPI_PWM_CUR_ENABLE_REG,1, false, NULL);
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -278,7 +287,11 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox channel startup\n");
 
-    
+    ret=enable_pwm(&data->c, &pdev->dev, data->chan);
+    if (ret < 0) {
+        dev_warn&pdev->dev, "Failed to enable PWM: %d\n", ret);
+        
+    }
 
     ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->duty_cycle);
     if (ret < 0) {  
