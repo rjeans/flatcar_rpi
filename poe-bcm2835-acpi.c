@@ -108,7 +108,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		return 0;
 	}
 
-	ret = send_pwm_duty(data->c,data->dev, data->chan, duty);
+	ret = send_pwm_duty(&data->c,data->dev, data->chan, duty);
 	if (ret) {
 		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
 		return ret;
@@ -205,7 +205,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox channel startup\n");
 
-    ret = acpi_pwm_enable_firmware(&pdev->dev, data->chan);
+    ret = acpi_pwm_enable_firmware(&data->c,&pdev->dev, data->chan);
     if (ret < 0) {
         dev_warn(&pdev->dev, "PoE firmware enable failed: %d\n", ret);
     }
