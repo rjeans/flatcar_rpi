@@ -24,7 +24,7 @@ struct acpi_pwm_driver_data {
 	struct mbox_chan *chan;
 	struct device *dev;
     struct completion c;
-	u8 last_duty;
+	unsigned int duty_cycle;
 };
 
 static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
@@ -82,53 +82,72 @@ static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_c
 }
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-			   const struct pwm_state *state)
+               const struct pwm_state *state)
 {
-	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-	u8 duty;
-	int ret;
+    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+    unsigned int duty_cycle;
+    int ret;
 
-	dev_info(data->dev, "apply: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
-		state->period, state->duty_cycle, state->enabled, state->polarity);
+    dev_info(data->dev, "acpi_pwm_apply: called for pwm=%u\n", pwm->hwpwm);
+    dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
+        state->period, state->duty_cycle, state->enabled, state->polarity);
 
-	if (state->period < PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL) {
-		dev_info(data->dev, "Invalid period or polarity\n");
-		return -EINVAL;
-	}
+    if (state->period < PWM_PERIOD_NS) {
+        dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu < %u)\n", state->period, PWM_PERIOD_NS);
+        return -EINVAL;
+    }
+    if (state->polarity != PWM_POLARITY_NORMAL) {
+        dev_info(data->dev, "acpi_pwm_apply: Unsupported polarity (%d)\n", state->polarity);
+        return -EINVAL;
+    }
 
-	if (!state->enabled || state->duty_cycle == 0) {
-		duty = 0;
-	} else if (state->duty_cycle >= PWM_PERIOD_NS) {
-		duty = PWM_MAX_DUTY;
-	} else {
-		duty = DIV_ROUND_DOWN_ULL(state->duty_cycle * PWM_MAX_DUTY, PWM_PERIOD_NS);
-	}
+    if (!state->enabled) {
+        duty_cycle = 0;
+        dev_info(data->dev, "acpi_pwm_apply: PWM disabled, setting duty_cycle=0\n");
+    } else if (state->duty_cycle < RPI_PWM_PERIOD_NS) {
+        duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY,
+                        RPI_PWM_PERIOD_NS);
+        dev_info(data->dev, "acpi_pwm_apply: Calculated duty_cycle=%u from duty_cycle=%llu, period=%llu\n",
+            duty_cycle, state->duty_cycle, state->period);
+    } else {
+        duty_cycle = RPI_PWM_MAX_DUTY;
+        dev_info(data->dev, "acpi_pwm_apply: duty_cycle >= period, setting duty_cycle=RPI_PWM_MAX_DUTY (%u)\n",
+            RPI_PWM_MAX_DUTY);
+    }
 
-	if (duty == data->last_duty) {
-		dev_info(data->dev, "Duty unchanged (%u), skipping\n", duty);
-		return 0;
-	}
+    dev_info(data->dev, "acpi_pwm_apply: Current stored duty_cycle=%u, new duty_cycle=%u\n",
+        data->duty_cycle, duty_cycle);
 
-	ret = send_pwm_duty(&data->c,data->dev, data->chan, duty);
-	if (ret) {
-		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
-		return ret;
-	}
+    if (duty_cycle == data->duty_cycle) {
+        dev_info(data->dev, "acpi_pwm_apply: No change in duty_cycle, skipping update\n");
+        return 0;
+    }
 
-	dev_info(data->dev, "PWM duty updated: %u\n", duty);
-	data->last_duty = duty;
-	return 0;
+    dev_info(data->dev, "acpi_pwm_apply: Sending new duty_cycle=%u to firmware\n", duty_cycle);
+    ret = send_pwm_duty(&data->c, data->dev, data->chan, duty_cycle);
+    if (ret) {
+        dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
+        return ret;
+    }
+
+    dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", duty_cycle);
+    data->duty_cycle = duty_cycle;
+    return 0;
 }
 
-static int acpi_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
-			      struct pwm_state *state)
+static int raspberrypi_pwm_get_state(struct pwm_chip *chip,
+				     struct pwm_device *pwm,
+				     struct pwm_state *state)
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
-	state->period = PWM_PERIOD_NS;
-	state->duty_cycle = DIV_ROUND_UP(data->last_duty * PWM_PERIOD_NS, PWM_MAX_DUTY);
-	state->enabled = !!data->last_duty;
+	state->period = RPI_PWM_PERIOD_NS;
+	state->duty_cycle = DIV_ROUND_UP(data->duty_cycle * RPI_PWM_PERIOD_NS,
+					 RPI_PWM_MAX_DUTY);
+	state->enabled = !!(data->duty_cycle);
 	state->polarity = PWM_POLARITY_NORMAL;
+
+
 
 	dev_info(data->dev, "get_state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity);
@@ -142,43 +161,125 @@ static const struct pwm_ops acpi_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
-static int acpi_pwm_enable_firmware(struct completion *c,struct device *dev, struct mbox_chan *chan)
+static int acpi_pwm_enable_firmware(struct completion *c, struct device *dev, struct mbox_chan *chan)
 {
-	dma_addr_t dma_handle;
-	u32 *dma_buf;
-	int ret;
+    dma_addr_t dma_handle;
+    u32 *dma_buf;
+    int ret;
 
-	dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
-	if (!dma_buf)
-		return -ENOMEM;
-
-    
-
-	dma_buf[0] = 7 * sizeof(u32); // Total size
-	dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
-	dma_buf[2] = RPI_FIRMWARE_SET_POE_HAT_VAL;
-	dma_buf[3] = 8;
-	dma_buf[4] = 8;
-	dma_buf[5] = 0x00000000;   // Tag = enable
-	dma_buf[6] = 1;            // Value = enable
-	dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
-
-	wmb(); // Ensure DMA memory is visible
-
-    reinit_completion(c);
-
-	ret = mbox_send_message(chan, &dma_handle);
-	dev_info(dev, "Enable PoE logic message sent, ret = %d\n", ret);
-
-    if (ret>= 0 && !wait_for_completion_timeout(c, HZ)) {
-        dev_err(dev, "Timeout waiting for firmware response\n");
-
-        ret = -ETIMEDOUT;
+    dev_info(dev, "acpi_pwm_enable_firmware: Allocating DMA buffer\n");
+    dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
+    if (!dma_buf) {
+        dev_err(dev, "acpi_pwm_enable_firmware: Failed to allocate DMA buffer\n");
+        return -ENOMEM;
     }
 
+    dev_info(dev, "acpi_pwm_enable_firmware: Preparing mailbox property buffer\n");
+    dma_buf[0] = 7 * sizeof(u32); // Total size
+    dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
+    dma_buf[2] = RPI_FIRMWARE_SET_POE_HAT_VAL;
+    dma_buf[3] = 8;
+    dma_buf[4] = 8;
+    dma_buf[5] = 0x00000000;   // Tag = enable
+    dma_buf[6] = 1;            // Value = enable
+    dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
 
-	dma_free_coherent(dev, 32, dma_buf, dma_handle);
-	return ret;
+    dev_info(dev, "acpi_pwm_enable_firmware: Buffer contents: "
+        "%08x %08x %08x %08x %08x %08x %08x %08x\n",
+        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
+        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
+
+    wmb(); // Ensure DMA memory is visible
+
+    dev_info(dev, "acpi_pwm_enable_firmware: Reinitializing completion\n");
+    reinit_completion(c);
+
+    dev_info(dev, "acpi_pwm_enable_firmware: Sending mailbox message (dma_handle=%pad)\n", &dma_handle);
+    ret = mbox_send_message(chan, &dma_handle);
+    dev_info(dev, "acpi_pwm_enable_firmware: Enable PoE logic message sent, ret = %d\n", ret);
+
+    if (ret >= 0) {
+        dev_info(dev, "acpi_pwm_enable_firmware: Waiting for firmware response\n");
+        if (!wait_for_completion_timeout(c, HZ)) {
+            dev_err(dev, "acpi_pwm_enable_firmware: Timeout waiting for firmware response\n");
+            ret = -ETIMEDOUT;
+        } else {
+            dev_info(dev, "acpi_pwm_enable_firmware: Firmware response received\n");
+        }
+    }
+
+    dev_info(dev, "acpi_pwm_enable_firmware: Freeing DMA buffer\n");
+    dma_free_coherent(dev, 32, dma_buf, dma_handle);
+    return ret;
+}
+
+static int acpi_pwm_get_firmware_value(struct completion *c,
+                       struct device *dev,
+                       struct mbox_chan *chan,
+                       u32 property_tag,
+                       u32 *value_out)
+{
+    dma_addr_t dma_handle;
+    u32 *dma_buf;
+    int ret;
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Allocating DMA buffer\n");
+    dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
+    if (!dma_buf) {
+        dev_err(dev, "acpi_pwm_get_firmware_value: Failed to allocate DMA buffer\n");
+        return -ENOMEM;
+    }
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Preparing mailbox property buffer for tag 0x%08x\n", property_tag);
+    dma_buf[0] = 7 * sizeof(u32);                         // Buffer size in bytes
+    dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;             // 0x00000000 for "get"
+    dma_buf[2] = property_tag;                            // e.g., RPI_PWM_CUR_DUTY_REG
+    dma_buf[3] = 8;                                       // Value buffer size
+    dma_buf[4] = 0;                                       // Request size = 0 when sending
+    dma_buf[5] = 0;                                       // Tag placeholder
+    dma_buf[6] = 0;                                       // Output will be written here
+    dma_buf[7] = RPI_FIRMWARE_PROPERTY_END;
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Buffer contents: "
+        "%08x %08x %08x %08x %08x %08x %08x %08x\n",
+        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
+        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
+
+    wmb(); // Ensure DMA memory is visible to the firmware
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Reinitializing completion\n");
+    reinit_completion(c);
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Sending mailbox message (dma_handle=%pad)\n", &dma_handle);
+    ret = mbox_send_message(chan, &dma_handle);
+    if (ret < 0) {
+        dev_err(dev, "acpi_pwm_get_firmware_value: Failed to send get-property message: %pe\n", ERR_PTR(ret));
+        goto out_free;
+    }
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Waiting for firmware response\n");
+    if (!wait_for_completion_timeout(c, HZ)) {
+        dev_err(dev, "acpi_pwm_get_firmware_value: Timeout waiting for get-property response\n");
+        ret = -ETIMEDOUT;
+        goto out_free;
+    }
+
+    dev_info(dev, "acpi_pwm_get_firmware_value: Firmware response received, checking response\n");
+    /* Check for response success bit in response size (bit 31 set) */
+    if (!(dma_buf[4] & 0x80000000)) {
+        dev_err(dev, "acpi_pwm_get_firmware_value: Firmware did not acknowledge property tag %08x\n", property_tag);
+        ret = -EIO;
+        goto out_free;
+    }
+
+    *value_out = dma_buf[6];
+    dev_info(dev, "acpi_pwm_get_firmware_value: Got value 0x%08x for tag 0x%08x\n", *value_out, property_tag);
+    ret = 0;
+
+out_free:
+    dev_info(dev, "acpi_pwm_get_firmware_value: Freeing DMA buffer\n");
+    dma_free_coherent(dev, 32, dma_buf, dma_handle);
+    return ret;
 }
 
 
@@ -212,6 +313,14 @@ static int acpi_pwm_probe(struct platform_device *pdev)
     if (ret < 0) {
         dev_warn(&pdev->dev, "PoE firmware enable failed: %d\n", ret);
     }
+
+    ret = acpi_pwm_get_firmware_value(&data->c,&pdev->dev, data->chan,
+                                      RPI_PWM_CUR_DUTY_REG, &data->duty_cycle);
+    if (ret < 0) {  
+        dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
+        return ret;
+    }
+    dev_info(&pdev->dev, "Current duty cycle: %u\n", data->duty_cycle);
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
