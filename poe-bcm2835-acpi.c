@@ -23,6 +23,7 @@ struct acpi_pwm_driver_data {
 	struct mbox_client mbox;
 	struct mbox_chan *chan;
 	struct device *dev;
+    struct completion c;
 	u8 last_duty;
 };
 
@@ -31,7 +32,13 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 	return container_of(chip, struct acpi_pwm_driver_data, chip);
 }
 
-static int send_pwm_duty(struct device *dev, struct mbox_chan *chan, u8 duty)
+static void response_callback(struct mbox_client *cl, void *msg)
+{
+	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+	complete(&data->c);
+}
+
+static int send_pwm_duty(struct completion c, struct device *dev, struct mbox_chan *chan, u8 duty)
 {
 	dma_addr_t dma_handle;
 	u32 *buf;
@@ -54,12 +61,20 @@ static int send_pwm_duty(struct device *dev, struct mbox_chan *chan, u8 duty)
 	wmb();
 
 	msg = (u32)dma_handle | RPI_MBOX_CHAN_FIRMWARE;
+
+    reinit_completion(c);
 	ret = mbox_send_message(chan, &msg);
 	if (ret < 0) {
 		dev_warn(dev, "mbox_send_message failed: %d (duty=%u)\n", ret, duty);
 	} else {
 		dev_info(dev, "PWM duty sent: %u\n", duty);
 	}
+
+    if (ret>= 0 && !wait_for_completion_timeout(&data->c, HZ)) {
+        dev_err(dev, "Timeout waiting for PWM duty response\n");
+
+        ret = -ETIMEDOUT;
+    }
 
 	dma_free_coherent(dev, 64, buf, dma_handle);
 	return ret;
@@ -93,7 +108,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		return 0;
 	}
 
-	ret = send_pwm_duty(data->dev, data->chan, duty);
+	ret = send_pwm_duty(data->c,data->dev, data->chan, duty);
 	if (ret) {
 		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
 		return ret;
@@ -126,7 +141,7 @@ static const struct pwm_ops acpi_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
-static int acpi_pwm_enable_firmware(struct device *dev, struct mbox_chan *chan)
+static int acpi_pwm_enable_firmware(struct completion c,struct device *dev, struct mbox_chan *chan)
 {
 	dma_addr_t dma_handle;
 	u32 *dma_buf;
@@ -135,6 +150,8 @@ static int acpi_pwm_enable_firmware(struct device *dev, struct mbox_chan *chan)
 	dma_buf = dma_alloc_coherent(dev, 32, &dma_handle, GFP_KERNEL);
 	if (!dma_buf)
 		return -ENOMEM;
+
+    
 
 	dma_buf[0] = 7 * sizeof(u32); // Total size
 	dma_buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
@@ -147,8 +164,17 @@ static int acpi_pwm_enable_firmware(struct device *dev, struct mbox_chan *chan)
 
 	wmb(); // Ensure DMA memory is visible
 
+    reinit_completion(c);
+
 	ret = mbox_send_message(chan, &dma_handle);
 	dev_info(dev, "Enable PoE logic message sent, ret = %d\n", ret);
+
+    if (ret>= 0 && !wait_for_completion_timeout(&data->c, HZ)) {
+        dev_err(dev, "Timeout waiting for PWM duty response\n");
+
+        ret = -ETIMEDOUT;
+    }
+
 
 	dma_free_coherent(dev, 32, dma_buf, dma_handle);
 	return ret;
@@ -171,7 +197,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	cl = &data->mbox;
 	cl->dev = &pdev->dev;
 	cl->tx_block = true;
-	cl->knows_txdone = false;
+	cl->rx_callback = response_callback;
 
 	data->chan = bcm2835_mbox_request_channel(cl);
 	if (IS_ERR(data->chan))
