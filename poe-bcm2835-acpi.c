@@ -48,12 +48,13 @@ static void response_callback(struct mbox_client *cl, void *msg)
 #define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
 #define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
+#define RPI_PWM_CUR_DUTY_REG         0x00000000
 // Sub-registers used inside the payload
 
 
 static int build_poe_firmware_msg(u32 *buf,
                                   bool is_get,
-                                  u32 reg_id,
+                                  u32 property_tag,
                                   u32 value)
 {
 	if (!buf)
@@ -61,10 +62,10 @@ static int build_poe_firmware_msg(u32 *buf,
 
 	buf[0] = cpu_to_le32(8 * sizeof(u32));      // total size: 32 bytes
 	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
-	buf[2] = cpu_to_le32(VC_MAILBOX_POE_TAG);   // compound PoE property tag
+	buf[2] = cpu_to_le32(property_tag);   // compound PoE property tag
 	buf[3] = cpu_to_le32(8);                    // tag payload size
 	buf[4] = cpu_to_le32(is_get ? 0 : 8);       // 0 for GET, 8 for SET
-	buf[5] = cpu_to_le32(reg_id);               // register to read or write
+	buf[5] = cpu_to_le32(RPI_PWM_CUR_DUTY_REG);               // register to read or write
 	buf[6] = cpu_to_le32(value);                // value (unused for GET)
 	buf[7] = cpu_to_le32(0);                    // end tag
 
