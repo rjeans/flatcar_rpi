@@ -120,7 +120,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                const struct pwm_state *state)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    unsigned int duty_cycle;
+    unsigned int duty_cycle,updated_duty_cycle;
     int ret;
 
     dev_info(data->dev, "acpi_pwm_apply: called for pwm=%u\n", pwm->hwpwm);
@@ -165,8 +165,21 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return ret;
     }
 
+    ret = acpi_pwm_get_firmware_value(&data->c,data->dev, data->chan,
+                                      RPI_FIRMWARE_GET_POE_HAT_VAL, &updated_duty_cycle);
+    if (ret < 0) {  
+        dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
+        return ret;
+    }
+    dev_info(&pdev->dev, "Updated duty cycle: %u\n", updated_duty_cycle);
+
     dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", duty_cycle);
     data->duty_cycle = duty_cycle;
+
+
+    
+
+
     return 0;
 }
 
