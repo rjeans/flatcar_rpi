@@ -7,15 +7,13 @@
 #include <linux/mailbox_client.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
+#include <soc/bcm2835/raspberrypi-firmware.h>
 #include "mailbox-bcm2835-acpi.h"
 
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
 
 #define RPI_PWM_CUR_DUTY_REG         0x00000001
-#define RPI_FIRMWARE_SET_POE_HAT_VAL 0x00038041
-#define RPI_FIRMWARE_PROPERTY_END    0x00000000
-#define RPI_FIRMWARE_STATUS_REQUEST  0x00000000
 #define RPI_MBOX_CHAN_FIRMWARE       8
 
 #define RPI_PWM_MAX_DUTY		255
@@ -318,7 +316,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
     }
 
     ret = acpi_pwm_get_firmware_value(&data->c,&pdev->dev, data->chan,
-                                      RPI_PWM_CUR_DUTY_REG, &data->duty_cycle);
+                                      RPI_FIRMWARE_GET_POE_HAT_VAL, &data->duty_cycle);
     if (ret < 0) {  
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
