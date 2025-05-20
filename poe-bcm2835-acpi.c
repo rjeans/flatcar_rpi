@@ -144,8 +144,7 @@ static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_c
 }
 
 
-static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan,
-                                       u32 *value_out)
+static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u32 *value_out)
 {
     return send_mbox_message(c, dev, chan, RPI_PWM_CUR_DUTY_REG, 0, true, value_out);
 }
@@ -272,8 +271,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     
 
-    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan
-                                      , &data->duty_cycle);
+    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->duty_cycle);
     if (ret < 0) {  
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
