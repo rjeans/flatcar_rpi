@@ -70,7 +70,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     reinit_completion(c);
 
-    u32 msg = MBOX_MSG(MBOX_CHAN_PROPERTY, dma_handle);
+    u32 msg = MBOX_MSG(RPI_MBOX_CHAN_FIRMWARE, dma_handle);
 
     ret = mbox_send_message(chan, &msg);
     if (ret < 0) {
