@@ -10,6 +10,7 @@
 #include <soc/bcm2835/raspberrypi-firmware.h>
 #include "mailbox-bcm2835-acpi.h"
 
+static DEFINE_MUTEX(transaction_lock);
 
 
 #define PWM_PERIOD_NS 80000 // 12.5kHz
@@ -51,6 +52,8 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     u32 *dma_buf;
     int ret;
 
+    dev_log(dev, "--------  send_mbox_message: IN: Sending property tag 0x%08x with value %u\n", property_tag, value);
+
     dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
@@ -68,9 +71,12 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     wmb(); // Ensure DMA memory is visible to the firmware
 
+    mutex_lock(&transaction_lock);
+
     reinit_completion(c);
 
     u32 msg = MBOX_MSG(RPI_MBOX_CHAN_FIRMWARE, dma_handle);
+
 
     ret = mbox_send_message(chan, &msg);
     if (ret < 0) {
@@ -96,7 +102,13 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     ret = 0;
 
 out_free:
+
+    mutex_unlock(&transaction_lock);
+
+    dev_log(dev, "--------  send_mbox_message: OUT Sending property tag 0x%08x with value %u\n", property_tag, value);
+
     dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
+
     return ret;
 }
 
