@@ -41,7 +41,7 @@
 /* Configuration register: Enable interrupts. */
 #define ARM_MC_IHAVEDATAIRQEN	BIT(0)
 
-#define BCM2835_MAX_CHANNELS     4
+#define BCM2835_MAX_CHANNELS     16
 
 struct bcm2835_mbox {
     void __iomem *regs;
