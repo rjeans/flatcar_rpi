@@ -7,6 +7,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
+#include "mailbox-bcm2835-acpi.h"
 
 #define PWM_PERIOD_NS 80000 // 12.5kHz
 #define PWM_MAX_DUTY 255
