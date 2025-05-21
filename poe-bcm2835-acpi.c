@@ -44,12 +44,12 @@ static void response_callback(struct mbox_client *cl, void *msg)
 }
 
 
-#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00038049
+#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
 #define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
 #define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
 
-#define RPI_PWM_CUR_DUTY_REG         0x00030049
-#define RPI_PWM_CUR_ENABLE_REG         0x00030050
+#define RPI_PWM_CUR_DUTY_REG         0x0
+#define RPI_PWM_CUR_ENABLE_REG         0x0
 
 #
 // Sub-registers used inside the payload
@@ -64,14 +64,15 @@ static int build_poe_firmware_msg(u32 *buf,
 	if (!buf)
 		return -EINVAL;
 
-	buf[0] = cpu_to_le32(8 * sizeof(u32));      // total size: 32 bytes
+	buf[0] = cpu_to_le32(9 * sizeof(u32));      // total size: 32 bytes
 	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
 	buf[2] = cpu_to_le32(property_tag);   // compound PoE property tag
 	buf[3] = cpu_to_le32(8);                    // tag payload size
-	buf[4] = cpu_to_le32(is_get ? 0 : 8);       // 0 for GET, 8 for SET
+	buf[4] = cpu_to_le32(0);       // 0 for GET, 0 for SET
 	buf[5] = cpu_to_le32(reg);               // register to read or write
 	buf[6] = cpu_to_le32(value);                // value (unused for GET)
-	buf[7] = cpu_to_le32(0);                    // end tag
+	buf[7] = cpu_to_le32(0);                    
+	buf[8] = cpu_to_le32(0);                    
 
 	return 0;
 }
@@ -84,7 +85,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     int ret;
 
  
-    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(8 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
+    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(9 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
     if (!dma_buf) {
         dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
         return -ENOMEM;
@@ -94,9 +95,9 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     
 
-    dev_info(dev, "DMA buffer BEFORE: [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
+    dev_info(dev, "DMA buffer BEFORE: [%08x %08x %08x %08x %08x %08x %08x %08x %08x]\n",
         dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
+        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7],dma_buf[8]);
 
     wmb(); // Ensure DMA memory is visible to the firmware
 
@@ -136,9 +137,9 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
 out_free:
 
-    dev_info(dev, "DMA buffer AFTER: [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
+    dev_info(dev, "DMA buffer AFTER: [%08x %08x %08x %08x %08x %08x %08x %08x %08x]\n",
         dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7]);
+        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7],dma_buf[8]);
 
 
     mutex_unlock(&transaction_lock);
