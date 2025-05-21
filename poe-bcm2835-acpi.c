@@ -306,7 +306,7 @@ static int acpi_pwm_remove(struct platform_device *pdev)
 {
     struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
 
-    ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
+    int ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
     if (ret) {
         dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
         return ret;
