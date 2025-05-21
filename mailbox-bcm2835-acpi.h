@@ -19,11 +19,12 @@ struct rpi_firmware_power_msg {
 	u32 code;           // Request code (0 = process request)
 
 	struct {
-		u32 tag;        // Tag ID (0x00028001 = set power state)
+		u32 tag;        // Tag ID (0x00030001 = set power state)
 		u32 buf_size;   // Size of the value buffer (8)
 		u32 val_len;    // Length of the actual value data (8)
 		u32 domain;     // Power domain ID (e.g., 0x00000000 = SD card)
 		u32 state;      // Bit 0: 1 = ON, Bit 1: 1 = WAIT
+		u32 padding;
 	} __packed body;
 
 	u32 end_tag;        // 0
@@ -34,11 +35,12 @@ struct rpi_firmware_clock_msg {
 	u32 code;      // Request code: 0 = request
 
 	struct {
-		u32 tag;        // 0x00038001 = set clock state
+		u32 tag;        // ???? = set clock state
 		u32 buf_size;   // Size of the value buffer: 8
 		u32 val_len;    // Length of value data: 8
 		u32 clock_id;   // ID of the clock (e.g. 4 = PWM)
 		u32 state;      // Bit 0: 1=enable, Bit 1: 1=wait
+		u32 padding;    // Padding for alignment
 	} __packed body;
 
 	u32 end_tag;   // Always 0

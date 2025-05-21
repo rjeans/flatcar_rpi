@@ -163,10 +163,7 @@ static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_ch
     return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, RPI_PWM_CUR_DUTY_REG,0, true, value_out);
 }
 
-static int enable_pwm(struct completion *c, struct device *dev, struct mbox_chan *chan)
-{
-    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, RPI_PWM_CUR_ENABLE_REG,1, false, NULL);
-}
+
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                const struct pwm_state *state)
@@ -288,11 +285,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
     dev_info(&pdev->dev, "Mailbox channel startup\n");
 
-    ret=enable_pwm(&data->c, &pdev->dev, data->chan);
-    if (ret < 0) {
-        dev_warn(&pdev->dev, "Failed to enable PWM: %d\n", ret);
-        
-    }
+ 
 
     ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->duty_cycle);
     if (ret < 0) {  
