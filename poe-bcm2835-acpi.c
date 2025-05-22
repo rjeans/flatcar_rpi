@@ -201,7 +201,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     }
 
     dev_info(data->dev, "acpi_pwm_apply: Current stored duty_cycle=%u, new duty_cycle=%u\n",
-        data->duty_cycle, new_duty_cycle);
+        data->scaled_duty_cycle, new_scaled_duty_cycle);
 
     if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
         dev_info(data->dev, "acpi_pwm_apply: No change in duty_cycle, skipping update\n");
