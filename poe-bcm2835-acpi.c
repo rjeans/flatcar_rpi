@@ -28,7 +28,8 @@ struct acpi_pwm_driver_data {
 	struct mbox_chan *chan;
 	struct device *dev;
     struct completion c;
-	unsigned int duty_cycle;
+	unsigned int scaled_duty_cycle;
+    struct pwm_state state;
 };
 
 static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
@@ -169,12 +170,12 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
                const struct pwm_state *state)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    unsigned int duty_cycle,updated_duty_cycle;
     int ret;
+    unsigned new_scaled_duty_cycle,updated_scaled_duty_cycle;
 
     dev_info(data->dev, "acpi_pwm_apply: called for pwm=%u\n", pwm->hwpwm);
-    dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
-        state->period, state->duty_cycle, state->enabled, state->polarity);
+    dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d, scaled duty cycle=%d\n",
+        state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 
     if (state->period < PWM_PERIOD_NS) {
         dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu < %u)\n", state->period, PWM_PERIOD_NS);
@@ -186,45 +187,45 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     }
 
     if (!state->enabled) {
-        duty_cycle = 0;
+        new_scaled_duty_cycle = 0;
         dev_info(data->dev, "acpi_pwm_apply: PWM disabled, setting duty_cycle=0\n");
     } else if (state->duty_cycle < RPI_PWM_PERIOD_NS) {
-        duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY,
+        new_scaled_duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY,
                         RPI_PWM_PERIOD_NS);
         dev_info(data->dev, "acpi_pwm_apply: Calculated duty_cycle=%u from duty_cycle=%llu, period=%llu\n",
-            duty_cycle, state->duty_cycle, state->period);
+            new_scaled_duty_cycle, state->duty_cycle, state->period);
     } else {
-        duty_cycle = RPI_PWM_MAX_DUTY;
+        data->scaled_duty_cycle = RPI_PWM_MAX_DUTY;
         dev_info(data->dev, "acpi_pwm_apply: duty_cycle >= period, setting duty_cycle=RPI_PWM_MAX_DUTY (%u)\n",
             RPI_PWM_MAX_DUTY);
     }
 
     dev_info(data->dev, "acpi_pwm_apply: Current stored duty_cycle=%u, new duty_cycle=%u\n",
-        data->duty_cycle, duty_cycle);
+        data->duty_cycle, new_duty_cycle);
 
-    if (duty_cycle == data->duty_cycle) {
+    if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
         dev_info(data->dev, "acpi_pwm_apply: No change in duty_cycle, skipping update\n");
         return 0;
     }
 
     
-    dev_info(data->dev, "acpi_pwm_apply: Sending new duty_cycle=%u to firmware\n", duty_cycle);
-    ret = send_pwm_duty(&data->c, data->dev, data->chan, duty_cycle);
+    dev_info(data->dev, "acpi_pwm_apply: Sending new scaled_duty_cycle=%u to firmware\n", new_scaled_duty_cycle);
+    ret = send_pwm_duty(&data->c, data->dev, data->chan, new_scaled_duty_cycle);
     if (ret) {
         dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
         return ret;
     }
 
     ret = get_pwm_duty(&data->c,data->dev, data->chan
-                                      , &updated_duty_cycle);
+                                      , &updated_scaled_duty_cycle);
     if (ret < 0) {  
         dev_warn(data->dev, "Failed to get current duty cycle: %d\n", ret);
         return ret;
     }
-    dev_info(data->dev, "Stored duty cycle: %u\n", updated_duty_cycle);
+    dev_info(data->dev, "Stored duty cycle: %u\n", updated_scaled_duty_cycle);
 
-    dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", duty_cycle);
-    data->duty_cycle = duty_cycle;
+    dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", new_scaled_duty_cycle);
+    data->scaled_duty_cycle = new_scaled_duty_cycle;
 
 
     
@@ -240,26 +241,52 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
     dev_info(data->dev, "get_state BEFORE: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
-		state->period, state->duty_cycle, state->enabled, state->polarity,data->duty_cycle);
+		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 
 
 	state->period = RPI_PWM_PERIOD_NS;
-	state->duty_cycle = DIV_ROUND_UP(data->duty_cycle * RPI_PWM_PERIOD_NS,
+	state->duty_cycle = DIV_ROUND_UP(data->scaled_duty_cycle * RPI_PWM_PERIOD_NS,
 					 RPI_PWM_MAX_DUTY);
-	state->enabled = !!(data->duty_cycle);
+	state->enabled = !!(data->scaled_duty_cycle);
 	state->polarity = PWM_POLARITY_NORMAL;
 
 
 
 	dev_info(data->dev, "get_state AFTER: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
-		state->period, state->duty_cycle, state->enabled, state->polarity,data->duty_cycle);
+		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 
 	return 0;
+}
+
+static int acpi_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+
+    dev_info(data->dev, "acpi_pwm_request: requested PWM device %u\n", pwm->hwpwm);
+    return 0;
+}
+
+static void acpi_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+
+    dev_info(data->dev, "acpi_pwm_free: freeing PWM device %u\n", pwm->hwpwm);
+}
+static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+                 struct pwm_state *state)
+{
+    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+
+    dev_info(data->dev, "acpi_pwm_capture: capturing PWM device %u\n", pwm->hwpwm);
+    return acpi_pwm_get_state(chip, pwm, state);
 }
 
 static const struct pwm_ops acpi_pwm_ops = {
 	.apply = acpi_pwm_apply,
 	.get_state = acpi_pwm_get_state,
+    .request = acpi_pwm_request,
+    .free = acpi_pwm_free,
+    .capture = acpi_pwm_capture,
 	.owner = THIS_MODULE,
 };
 
@@ -291,11 +318,11 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
  
 
-    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->duty_cycle);
+    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->scaled_duty_cycle);
     if (ret < 0) {  
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
     }
-    dev_info(&pdev->dev, "Current duty cycle: %u\n", data->duty_cycle);
+    dev_info(&pdev->dev, "Current scaled duty cycle: %u\n", data->scaled_duty_cycle);
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
