@@ -257,10 +257,10 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 	state->enabled = !!(data->scaled_duty_cycle);
 	state->polarity = PWM_POLARITY_NORMAL;
 
-    data.state.period = state->period;
-    data.state.duty_cycle = state->duty_cycle;
-    data.state.enabled = state->enabled;
-    data.state.polarity = state->polarity;
+    data->state.period = state->period;
+    data->state.duty_cycle = state->duty_cycle;
+    data->state.enabled = state->enabled;
+    data->state.polarity = state->polarity;
 
 	dev_info(data->dev, "get_state AFTER: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
