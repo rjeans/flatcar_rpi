@@ -278,7 +278,7 @@ static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
     dev_info(data->dev, "acpi_pwm_capture: capturing PWM device %u\n", pwm->hwpwm);
-    return acpi_pwm_get_state(chip, pwm, state);
+    return 0;
 }
 
 static const struct pwm_ops acpi_pwm_ops = {
