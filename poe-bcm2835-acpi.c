@@ -272,12 +272,18 @@ static void acpi_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 
     dev_info(data->dev, "acpi_pwm_free: freeing PWM device %u\n", pwm->hwpwm);
 }
+
 static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
-                 struct pwm_capture *capture,long unsigned int timeout)
+                            struct pwm_capture *capture, unsigned long timeout)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
-    dev_info(data->dev, "acpi_pwm_capture: capturing PWM device %u\n", pwm->hwpwm);
+    capture->period = data->state.period;
+    capture->duty_cycle = data->state.duty_cycle;
+
+    dev_info(data->dev, "acpi_pwm_capture: returning cached values for PWM %u: period=%llu, duty=%llu\n",
+             pwm->hwpwm, capture->period, capture->duty_cycle);
+
     return 0;
 }
 
