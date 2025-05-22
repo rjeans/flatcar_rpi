@@ -271,6 +271,12 @@ static int acpi_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 static void acpi_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+    data->state.period = RPI_PWM_PERIOD_NS;
+    data->state.duty_cycle = 0;
+    data->state.enabled = false;
+    data->state.polarity = PWM_POLARITY_NORMAL;
+
+    acpi_pwm_apply(chip, pwm, &data->state);
 
     dev_info(data->dev, "acpi_pwm_free: freeing PWM device %u\n", pwm->hwpwm);
 }
