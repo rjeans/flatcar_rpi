@@ -264,10 +264,6 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 static int acpi_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    data->state.period = RPI_PWM_PERIOD_NS;
-    data->state.duty_cycle = 0;
-    data->state.enabled = false;
-    data->state.polarity = PWM_POLARITY_NORMAL;
     dev_info(data->dev, "acpi_pwm_request: requested PWM device %u\n", pwm->hwpwm);
     return 0;
 }
@@ -335,6 +331,11 @@ static int acpi_pwm_probe(struct platform_device *pdev)
         dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
     }
     dev_info(&pdev->dev, "Current scaled duty cycle: %u\n", data->scaled_duty_cycle);
+
+    data->state.period = RPI_PWM_PERIOD_NS;
+    data->state.duty_cycle = 0;
+    data->state.enabled = false;
+    data->state.polarity = PWM_POLARITY_NORMAL;
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
