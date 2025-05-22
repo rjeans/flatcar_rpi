@@ -251,7 +251,7 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 
 	state->period = RPI_PWM_PERIOD_NS;
     state->polarity = PWM_POLARITY_NORMAL;
-	state->duty_cycle = data->state.duty_cycle;
+	state->duty_cycle = state->enabled ? data->state.duty_cycle : 0;
     state->enabled = data->state.enabled;
 
 
