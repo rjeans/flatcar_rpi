@@ -281,7 +281,7 @@ static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
     capture->period = data->state.period;
     capture->duty_cycle = data->state.duty_cycle;
 
-    dev_info(data->dev, "acpi_pwm_capture: returning cached values for PWM %u: period=%llu, duty=%llu\n",
+    dev_info(data->dev, "acpi_pwm_capture: returning cached values for PWM %u: period=%u, duty=%u\n",
              pwm->hwpwm, capture->period, capture->duty_cycle);
 
     return 0;
