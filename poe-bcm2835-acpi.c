@@ -177,6 +177,11 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d, scaled duty cycle=%d\n",
         state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 
+    data->state.period = state->period;
+    data->state.duty_cycle = state->duty_cycle;
+    data->state.enabled = state->enabled;
+    data->state.polarity = state->polarity;
+
     if (state->period < PWM_PERIOD_NS) {
         dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu < %u)\n", state->period, PWM_PERIOD_NS);
         return -EINVAL;
@@ -200,7 +205,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
             RPI_PWM_MAX_DUTY);
     }
 
-    dev_info(data->dev, "acpi_pwm_apply: Current stored duty_cycle=%u, new duty_cycle=%u\n",
+    dev_info(data->dev, "acpi_pwm_apply: Current stored scaled_duty_cycle=%u, new scaled_duty_cycle=%u\n",
         data->scaled_duty_cycle, new_scaled_duty_cycle);
 
     if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
@@ -242,6 +247,8 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 
     dev_info(data->dev, "get_state BEFORE: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
+   dev_info(data->dev, "get_state CACHED: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
+		data->state.period, data->state.duty_cycle, data->state.enabled, data->state.polarity,data->scaled_duty_cycle);
 
 
 	state->period = RPI_PWM_PERIOD_NS;
