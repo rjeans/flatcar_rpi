@@ -200,7 +200,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         dev_info(data->dev, "acpi_pwm_apply: Calculated duty_cycle=%u from duty_cycle=%llu, period=%llu\n",
             new_scaled_duty_cycle, state->duty_cycle, state->period);
     } else {
-        data->scaled_duty_cycle = RPI_PWM_MAX_DUTY;
+        new_scaled_duty_cycle = RPI_PWM_MAX_DUTY;
         dev_info(data->dev, "acpi_pwm_apply: duty_cycle >= period, setting duty_cycle=RPI_PWM_MAX_DUTY (%u)\n",
             RPI_PWM_MAX_DUTY);
     }
