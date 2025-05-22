@@ -273,7 +273,7 @@ static void acpi_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
     dev_info(data->dev, "acpi_pwm_free: freeing PWM device %u\n", pwm->hwpwm);
 }
 static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
-                 struct pwm_state *state)
+                 struct pwm_capture *capture)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
