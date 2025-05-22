@@ -207,7 +207,7 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return 0;
     }
 
-    duty_cycle=254;
+    
     dev_info(data->dev, "acpi_pwm_apply: Sending new duty_cycle=%u to firmware\n", duty_cycle);
     ret = send_pwm_duty(&data->c, data->dev, data->chan, duty_cycle);
     if (ret) {
