@@ -239,6 +239,10 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
+    dev_info(data->dev, "get_state BEFORE: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
+		state->period, state->duty_cycle, state->enabled, state->polarity,data->duty_cycle);
+
+
 	state->period = RPI_PWM_PERIOD_NS;
 	state->duty_cycle = DIV_ROUND_UP(data->duty_cycle * RPI_PWM_PERIOD_NS,
 					 RPI_PWM_MAX_DUTY);
@@ -247,8 +251,8 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 
 
 
-	dev_info(data->dev, "get_state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d\n",
-		state->period, state->duty_cycle, state->enabled, state->polarity);
+	dev_info(data->dev, "get_state AFTER: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
+		state->period, state->duty_cycle, state->enabled, state->polarity,data->duty_cycle);
 
 	return 0;
 }
