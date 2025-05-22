@@ -12,8 +12,7 @@
 static DEFINE_MUTEX(transaction_lock);
 
 
-#define PWM_PERIOD_NS 80000 // 12.5kHz
-#define PWM_MAX_DUTY 255
+
 
 #define RPI_MBOX_CHAN_FIRMWARE       8
 
@@ -177,19 +176,21 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
     dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d, scaled duty cycle=%d\n",
         state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 
-    data->state.period = state->period;
-    data->state.duty_cycle = state->duty_cycle;
-    data->state.enabled = state->enabled;
-    data->state.polarity = state->polarity;
 
-    if (state->period < PWM_PERIOD_NS) {
-        dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu < %u)\n", state->period, PWM_PERIOD_NS);
+
+    if (state->period != RPI_PWM_PERIOD_NS) {
+        dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu != %u)\n", state->period, RPI_PWM_PERIOD_NS);
         return -EINVAL;
     }
     if (state->polarity != PWM_POLARITY_NORMAL) {
         dev_info(data->dev, "acpi_pwm_apply: Unsupported polarity (%d)\n", state->polarity);
         return -EINVAL;
     }
+
+    data->state.period = state->period;
+    data->state.duty_cycle = state->duty_cycle;
+    data->state.enabled = state->enabled;
+    data->state.polarity = state->polarity;
 
     if (!state->enabled) {
         new_scaled_duty_cycle = 0;
@@ -252,15 +253,12 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 
 
 	state->period = RPI_PWM_PERIOD_NS;
-	state->duty_cycle = DIV_ROUND_UP(data->scaled_duty_cycle * RPI_PWM_PERIOD_NS,
-					 RPI_PWM_MAX_DUTY);
-	state->enabled = !!(data->scaled_duty_cycle);
-	state->polarity = PWM_POLARITY_NORMAL;
+    state->polarity = PWM_POLARITY_NORMAL;
+	state->duty_cycle = data->state.duty_cycle;
+    state->enabled = data->state.enabled;
 
-    data->state.period = state->period;
-    data->state.duty_cycle = state->duty_cycle;
-    data->state.enabled = state->enabled;
-    data->state.polarity = state->polarity;
+
+ 
 
 	dev_info(data->dev, "get_state AFTER: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
 		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
@@ -273,7 +271,10 @@ static int acpi_pwm_get_state(struct pwm_chip *chip,
 static int acpi_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
     struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-
+    data->state.period = RPI_PWM_PERIOD_NS;
+    data->state.duty_cycle = 0;
+    data->state.enabled = false;
+    data->state.polarity = PWM_POLARITY_NORMAL;
     dev_info(data->dev, "acpi_pwm_request: requested PWM device %u\n", pwm->hwpwm);
     return 0;
 }
