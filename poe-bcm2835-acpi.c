@@ -187,10 +187,9 @@ static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
         return -EINVAL;
     }
 
-    data->state.period = state->period;
-    data->state.duty_cycle = state->duty_cycle;
-    data->state.enabled = state->enabled;
-    data->state.polarity = state->polarity;
+    data->state=*state;
+   
+    
 
     if (!state->enabled) {
         new_scaled_duty_cycle = 0;
