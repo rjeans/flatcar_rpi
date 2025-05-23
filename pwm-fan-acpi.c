@@ -495,6 +495,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	if (IS_ERR(ctx->pwm))
 		return dev_err_probe(dev, PTR_ERR(ctx->pwm), "Could not get PWM\n");
 
+	dev_info(dev, "PWM: %s\n", dev_name(ctx->pwm->chip->dev));
+
 	platform_set_drvdata(pdev, ctx);
 
 	ctx->reg_en = devm_regulator_get_optional(dev, "fan");
@@ -503,6 +505,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			return PTR_ERR(ctx->reg_en);
 
 		ctx->reg_en = NULL;
+		dev_info(dev, "No regulator found\n");
 	}
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
