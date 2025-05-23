@@ -1,4 +1,4 @@
-obj-m += pinctrl-bcm2835-acpi.o pwm-bcm2835-acpi.o mailbox-bcm2835-acpi.o power-bcm2835-acpi.o clk-bcm2835-acpi.o pwm-power-test.o pwm-acpi-test.o poe-bcm2835-acpi.o
+obj-m += mailbox-bcm2835-acpi.o poe-bcm2835-acpi.o pwm-fan-acpi.o
 
 KBUILD_MODPOST_WARN=1
 
