@@ -419,7 +419,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 	struct device_node *np = dev->of_node;
 	int num, i, ret;
 
-	if (!of_property_present(np, "cooling-levels")) {
+	if (!fwnode_property_present(np, "cooling-levels")) {
 		dev_info(dev, "No cooling levels property found\n");
 		return 0;
 	}
@@ -593,7 +593,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 				return ret;
 			}
 		}
-		fwnode_property_read_u32_index(dev_fwnode(dev), "pulses-per-revolution", i, &ppr);
+		fwnode_property_read_u32(dev_fwnode(dev), "pulses-per-revolution", i, &ppr);
 
 
 		tach->pulses_per_revolution = ppr;
