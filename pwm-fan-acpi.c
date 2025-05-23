@@ -667,7 +667,7 @@ static int pwm_fan_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
 
 static const struct acpi_device_id acpi_pwm_fan_match[] = {
-	{ .compatible = "pwm-fan", },
+	{ "PWMF0001", 0},
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, acpi_pwm_fan_match);
