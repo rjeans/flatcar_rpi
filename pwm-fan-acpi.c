@@ -526,6 +526,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return ret;
 	}
 	dev_info(dev, "PWM set to %d\n", ctx->pwm_value);
+
+	
 	timer_setup(&ctx->rpm_timer, sample_timer, 0);
 	ret = devm_add_action_or_reset(dev, pwm_fan_cleanup, ctx);
 	if (ret)

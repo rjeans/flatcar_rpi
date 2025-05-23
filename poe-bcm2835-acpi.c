@@ -39,7 +39,6 @@ static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
 static void response_callback(struct mbox_client *cl, void *msg)
 {
 	struct acpi_pwm_driver_data *data = container_of(cl, struct acpi_pwm_driver_data, mbox);
-    dev_info(data->dev, "RX callback invoked\n");
 	complete(&data->c);
 }
 
@@ -78,7 +77,7 @@ static int build_poe_firmware_msg(u32 *buf,
 }
 
 static int send_mbox_message(struct completion *c, struct device *dev, struct mbox_chan *chan,
-                             u32 property_tag, u32 reg,u32 value, bool is_get, u32 *value_out)
+                             u32 property_tag, u32 reg, u32 value, bool is_get, u32 *value_out)
 {
     dma_addr_t dma_handle;
     u32 *dma_buf;
@@ -95,14 +94,7 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
 
     
 
-    dev_info(dev, "DMA buffer BEFORE: [%08x %08x %08x %08x %08x %08x %08x %08x %08x]\n",
-        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7],dma_buf[8]);
-
-    wmb(); // Ensure DMA memory is visible to the firmware
-
-    dev_info(dev, "------------------------  send_mbox_message: IN: Sending tag 0x%08x reg 0x%08x val %u\n",
-         dma_buf[2], dma_buf[5], dma_buf[6]);
+    dev_dbg(dev, "Sending tag 0x%08x reg 0x%08x val %u\n", dma_buf[2], dma_buf[5], dma_buf[6]);
 
 
     mutex_lock(&transaction_lock);
@@ -119,13 +111,13 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     }
 
     if (!wait_for_completion_timeout(c, HZ)) {
-        dev_err(dev, "send_mbox_message: Timeout waiting for response\n");
+        dev_err(dev, "Timeout waiting for response\n");
         ret = -ETIMEDOUT;
         goto out_free;
     }
 
-    if (!(dma_buf[4] & 0x80000000)) { // Check response success bit
-        dev_err(dev, "send_mbox_message: Firmware did not acknowledge property tag 0x%08x\n", property_tag);
+    if (!(dma_buf[4] & 0x80000000)) {
+        dev_err(dev, "Firmware did not acknowledge property tag 0x%08x\n", property_tag);
         ret = -EIO;
         goto out_free;
     }
@@ -136,20 +128,10 @@ static int send_mbox_message(struct completion *c, struct device *dev, struct mb
     ret = 0;
 
 out_free:
+	mutex_unlock(&transaction_lock);
+	dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
 
-    dev_info(dev, "DMA buffer AFTER: [%08x %08x %08x %08x %08x %08x %08x %08x %08x]\n",
-        dma_buf[0], dma_buf[1], dma_buf[2], dma_buf[3],
-        dma_buf[4], dma_buf[5], dma_buf[6], dma_buf[7],dma_buf[8]);
-
-
-    mutex_unlock(&transaction_lock);
-
-   dev_info(dev, "------------------------  send_mbox_message: OUT: Sending tag 0x%08x reg 0x%08x val %u\n",
-         dma_buf[2], dma_buf[5], dma_buf[6]);
-
-    dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
-
-    return ret;
+	return ret;
 }
 
 static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
@@ -166,77 +148,33 @@ static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_ch
 
 
 static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-               const struct pwm_state *state)
+                          const struct pwm_state *state)
 {
-    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    int ret;
-    unsigned new_scaled_duty_cycle,updated_scaled_duty_cycle;
+	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+	int ret;
+	unsigned new_scaled_duty_cycle;
 
-    dev_info(data->dev, "acpi_pwm_apply: called for pwm=%u\n", pwm->hwpwm);
-    dev_info(data->dev, "acpi_pwm_apply: input state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d, scaled duty cycle=%d\n",
-        state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
+	if (state->period != RPI_PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL)
+		return -EINVAL;
 
+	data->state = *state;
 
+	if (!state->enabled)
+		new_scaled_duty_cycle = 0;
+	else if (state->duty_cycle < RPI_PWM_PERIOD_NS)
+		new_scaled_duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY, RPI_PWM_PERIOD_NS);
+	else
+		new_scaled_duty_cycle = RPI_PWM_MAX_DUTY;
 
-    if (state->period != RPI_PWM_PERIOD_NS) {
-        dev_info(data->dev, "acpi_pwm_apply: Invalid period (%llu != %u)\n", state->period, RPI_PWM_PERIOD_NS);
-        return -EINVAL;
-    }
-    if (state->polarity != PWM_POLARITY_NORMAL) {
-        dev_info(data->dev, "acpi_pwm_apply: Unsupported polarity (%d)\n", state->polarity);
-        return -EINVAL;
-    }
+	if (new_scaled_duty_cycle == data->scaled_duty_cycle)
+		return 0;
 
-    data->state=*state;
-   
-    
+	ret = send_pwm_duty(&data->c, data->dev, data->chan, new_scaled_duty_cycle);
+	if (ret)
+		return ret;
 
-    if (!state->enabled) {
-        new_scaled_duty_cycle = 0;
-        dev_info(data->dev, "acpi_pwm_apply: PWM disabled, setting duty_cycle=0\n");
-    } else if (state->duty_cycle < RPI_PWM_PERIOD_NS) {
-        new_scaled_duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY,
-                        RPI_PWM_PERIOD_NS);
-        dev_info(data->dev, "acpi_pwm_apply: Calculated duty_cycle=%u from duty_cycle=%llu, period=%llu\n",
-            new_scaled_duty_cycle, state->duty_cycle, state->period);
-    } else {
-        new_scaled_duty_cycle = RPI_PWM_MAX_DUTY;
-        dev_info(data->dev, "acpi_pwm_apply: duty_cycle >= period, setting duty_cycle=RPI_PWM_MAX_DUTY (%u)\n",
-            RPI_PWM_MAX_DUTY);
-    }
-
-    dev_info(data->dev, "acpi_pwm_apply: Current stored scaled_duty_cycle=%u, new scaled_duty_cycle=%u\n",
-        data->scaled_duty_cycle, new_scaled_duty_cycle);
-
-    if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
-        dev_info(data->dev, "acpi_pwm_apply: No change in duty_cycle, skipping update\n");
-        return 0;
-    }
-
-    
-    dev_info(data->dev, "acpi_pwm_apply: Sending new scaled_duty_cycle=%u to firmware\n", new_scaled_duty_cycle);
-    ret = send_pwm_duty(&data->c, data->dev, data->chan, new_scaled_duty_cycle);
-    if (ret) {
-        dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
-        return ret;
-    }
-
-    ret = get_pwm_duty(&data->c,data->dev, data->chan
-                                      , &updated_scaled_duty_cycle);
-    if (ret < 0) {  
-        dev_warn(data->dev, "Failed to get current duty cycle: %d\n", ret);
-        return ret;
-    }
-    dev_info(data->dev, "Stored duty cycle: %u\n", updated_scaled_duty_cycle);
-
-    dev_info(data->dev, "acpi_pwm_apply: PWM duty updated successfully to %u\n", new_scaled_duty_cycle);
-    data->scaled_duty_cycle = new_scaled_duty_cycle;
-
-
-    
-
-
-    return 0;
+	data->scaled_duty_cycle = new_scaled_duty_cycle;
+	return 0;
 }
 
 static int acpi_pwm_get_state(struct pwm_chip *chip,
@@ -308,9 +246,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data;
 	struct mbox_client *cl;
-    int ret;
-
-	dev_info(&pdev->dev, "acpi_pwm_probe: probing device\n");
+	int ret;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -322,26 +258,20 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 	cl->tx_block = true;
 	cl->rx_callback = response_callback;
 
-    init_completion(&data->c);
+	init_completion(&data->c);
 
 	data->chan = bcm2835_mbox_request_firmware_channel(cl);
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
 
-    dev_info(&pdev->dev, "Mailbox channel startup\n");
+	ret = get_pwm_duty(&data->c, &pdev->dev, data->chan, &data->scaled_duty_cycle);
+	if (ret < 0)
+		dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
 
- 
-
-    ret = get_pwm_duty(&data->c,&pdev->dev, data->chan, &data->scaled_duty_cycle);
-    if (ret < 0) {  
-        dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
-    }
-    dev_info(&pdev->dev, "Current scaled duty cycle: %u\n", data->scaled_duty_cycle);
-
-    data->state.period = RPI_PWM_PERIOD_NS;
-    data->state.duty_cycle = 0;
-    data->state.enabled = false;
-    data->state.polarity = PWM_POLARITY_NORMAL;
+	data->state.period = RPI_PWM_PERIOD_NS;
+	data->state.duty_cycle = 0;
+	data->state.enabled = false;
+	data->state.polarity = PWM_POLARITY_NORMAL;
 
 	data->chip.dev = &pdev->dev;
 	data->chip.ops = &acpi_pwm_ops;
