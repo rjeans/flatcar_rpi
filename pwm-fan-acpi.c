@@ -41,7 +41,6 @@ struct pwm_fan_ctx {
 	struct mutex lock;
 	struct pwm_device *pwm;
 	struct pwm_state pwm_state;
-	struct regulator *reg_en;
 	enum pwm_fan_enable_mode enable_mode;
 	bool regulator_enabled;
 	bool enabled;
@@ -121,18 +120,7 @@ static int pwm_fan_switch_power(struct pwm_fan_ctx *ctx, bool on)
 {
 	int ret = 0;
 
-	if (!ctx->reg_en)
-		return ret;
 
-	if (!ctx->regulator_enabled && on) {
-		ret = regulator_enable(ctx->reg_en);
-		if (ret == 0)
-			ctx->regulator_enabled = true;
-	} else if (ctx->regulator_enabled && !on) {
-		ret = regulator_disable(ctx->reg_en);
-		if (ret == 0)
-			ctx->regulator_enabled = false;
-	}
 	return ret;
 }
 
@@ -499,14 +487,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
-	ctx->reg_en = devm_regulator_get_optional(dev, "fan");
-	if (IS_ERR(ctx->reg_en)) {
-		if (PTR_ERR(ctx->reg_en) != -ENODEV)
-			return PTR_ERR(ctx->reg_en);
 
-		ctx->reg_en = NULL;
-		dev_info(dev, "No regulator found\n");
-	}
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
 
