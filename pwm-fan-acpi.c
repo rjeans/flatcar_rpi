@@ -558,6 +558,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			return -ENOMEM;
 
 		ctx->fan_channel.type = hwmon_fan;
+		dev_info(dev, "Fan channel: %d\n", ctx->tach_count);
 		fan_channel_config = devm_kcalloc(dev, ctx->tach_count + 1,
 						  sizeof(u32), GFP_KERNEL);
 		if (!fan_channel_config)
@@ -588,6 +589,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 					ret);
 				return ret;
 			}
+			dev_info(dev, "Tachometer %d: irq=%d\n", i, tach->irq);
 		}
 
 		of_property_read_u32_index(dev->of_node,
