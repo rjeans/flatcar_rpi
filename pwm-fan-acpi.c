@@ -666,11 +666,11 @@ static int pwm_fan_resume(struct device *dev)
 
 static DEFINE_SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
 
-static const struct of_device_id of_pwm_fan_match[] = {
+static const struct acpi_device_id acpi_pwm_fan_match[] = {
 	{ .compatible = "pwm-fan", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, of_pwm_fan_match);
+MODULE_DEVICE_TABLE(acpi, acpi_pwm_fan_match);
 
 static struct platform_driver pwm_fan_driver = {
 	.probe		= pwm_fan_probe,
@@ -678,7 +678,7 @@ static struct platform_driver pwm_fan_driver = {
 	.driver	= {
 		.name		= "pwm-fan",
 		.pm		= pm_sleep_ptr(&pwm_fan_pm),
-		.of_match_table	= of_pwm_fan_match,
+		.acpi_match_table	= acpi_pwm_fan_match,
 	},
 };
 
