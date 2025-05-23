@@ -18,6 +18,8 @@
 #include <linux/sysfs.h>
 #include <linux/thermal.h>
 #include <linux/timer.h>
+#include <linux/property.h>
+
 
 #define MAX_PWM 255
 
