@@ -74,7 +74,6 @@ static void sample_timer(struct timer_list *t)
 {
 	struct pwm_fan_ctx *ctx = from_timer(ctx, t, rpm_timer);
 
-	dev_info(ctx->dev, "sample timer fired\n");
 
 	unsigned int delta = ktime_ms_delta(ktime_get(), ctx->sample_start);
 	int i;
@@ -418,8 +417,10 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 	struct device_node *np = dev->of_node;
 	int num, i, ret;
 
-	if (!of_property_present(np, "cooling-levels"))
+	if (!of_property_present(np, "cooling-levels")) {
+		dev_info(dev, "No cooling levels property found\n");
 		return 0;
+	}
 
 	ret = of_property_count_u32_elems(np, "cooling-levels");
 	if (ret <= 0) {
@@ -589,7 +590,6 @@ static int pwm_fan_probe(struct platform_device *pdev)
 					ret);
 				return ret;
 			}
-			dev_info(dev, "Tachometer %d: irq=%d\n", i, tach->irq);
 		}
 
 		of_property_read_u32_index(dev->of_node,
@@ -597,8 +597,6 @@ static int pwm_fan_probe(struct platform_device *pdev)
 					   i,
 					   &ppr);
 		tach->pulses_per_revolution = ppr;
-		dev_info(dev, "Tachometer %d: pulses-per-revolution=%d\n",
-			 i, tach->pulses_per_revolution);
 		if (!tach->pulses_per_revolution) {
 			dev_err(dev, "pulses-per-revolution can't be zero.\n");
 			return -EINVAL;
@@ -606,7 +604,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 		fan_channel_config[i] = HWMON_F_INPUT;
 
-		dev_dbg(dev, "tach%d: irq=%d, pulses_per_revolution=%d\n",
+		dev_info(dev, "tach%d: irq=%d, pulses_per_revolution=%d\n",
 			i, tach->irq, tach->pulses_per_revolution);
 	}
 
