@@ -490,7 +490,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
     dev_info(dev, "Calling pwm_init_state \n");
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
-	dev_info(dev, "PWM state: period=%lu, duty_cycle=%lu, polarity=%d\n",
+	dev_info(dev, "PWM state: period=%llu, duty_cycle=%llu, polarity=%d\n",
 		 ctx->pwm_state.period, ctx->pwm_state.duty_cycle,
 		 ctx->pwm_state.polarity);
 
