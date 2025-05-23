@@ -457,6 +457,8 @@ static void pwm_fan_cleanup(void *__ctx)
 {
 	struct pwm_fan_ctx *ctx = __ctx;
 
+	dev_info(ctx->dev, "Cleaning up\n");
+
 	del_timer_sync(&ctx->rpm_timer);
 	/* Switch off everything */
 	ctx->enable_mode = pwm_disable_reg_disable;
@@ -531,6 +533,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	dev_info(dev, "PWM set to %d\n", ctx->pwm_value);
 
 
+	dev_info(dev, "Setting up timer\n");
 	timer_setup(&ctx->rpm_timer, sample_timer, 0);
 
     
@@ -543,7 +546,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	if (ctx->tach_count < 0)
 		return dev_err_probe(dev, ctx->tach_count,
 				     "Could not get number of fan tachometer inputs\n");
-	dev_dbg(dev, "%d fan tachometer inputs\n", ctx->tach_count);
+	dev_info(dev, "%d fan tachometer inputs\n", ctx->tach_count);
 
 	if (ctx->tach_count) {
 		channel_count++;	/* We also have a FAN channel. */
