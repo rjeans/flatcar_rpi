@@ -419,7 +419,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 	struct device_node *np = dev->of_node;
 	int num, i, ret;
 
-	if (!fwnode_property_present(np, "cooling-levels")) {
+	if (!fwnode_property_present(dev_fwnode(dev), "cooling-levels")) {
 		dev_info(dev, "No cooling levels property found\n");
 		return 0;
 	}
