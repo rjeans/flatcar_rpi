@@ -593,7 +593,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 				return ret;
 			}
 		}
-		fwnode_property_read_u32(dev_fwnode(dev), "pulses-per-revolution", i, &ppr);
+		fwnode_property_read_u32_array(dev_fwnode(dev), "pulses-per-revolution",  &ppr,i);
 
 
 		tach->pulses_per_revolution = ppr;
