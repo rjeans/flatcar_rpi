@@ -181,7 +181,7 @@ static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
 		u32 chan_index = msg & 0xf;
-		u32 payload = msg & ~0xf;
+		
 
 		if (chan_index >= BCM2835_MAX_CHANNELS) {
 			dev_warn(dev, "Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
