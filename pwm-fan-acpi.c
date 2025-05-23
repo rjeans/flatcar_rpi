@@ -597,6 +597,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 					   i,
 					   &ppr);
 		tach->pulses_per_revolution = ppr;
+		dev_info(dev, "Tachometer %d: pulses-per-revolution=%d\n",
+			 i, tach->pulses_per_revolution);
 		if (!tach->pulses_per_revolution) {
 			dev_err(dev, "pulses-per-revolution can't be zero.\n");
 			return -EINVAL;
