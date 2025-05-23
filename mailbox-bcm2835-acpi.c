@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -137,98 +136,69 @@ static int bcm2835_send_data(struct mbox_chan *chan, void *data)
 	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	u32 msg = *(u32 *)data;
 
- 
-
-
-    dev_info(mbox->controller.dev, "SEND DATA: chan->cl=%px\n", chan->cl);
-
- 
-
 	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
-	dev_info(mbox->controller.dev, "Request 0x%08X\n", msg);
 	spin_unlock(&mbox->lock);
-	
 
-    dev_info(mbox->dev, "Mailbox message sent successfully\n");
-
-    return 0;
+	return 0;
 }
 
 static bool bcm2835_last_tx_done(struct mbox_chan *chan)
 {
-    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 	bool ret;
-    dev_info(mbox->dev, "Checking if last transmission is done\n");
 
 	spin_lock(&mbox->lock);
 	ret = !(readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL);
 	spin_unlock(&mbox->lock);
-    dev_info(mbox->dev, "Last transmission done: %s\n", ret ? "Yes" : "No");
-    if (ret) {
-        dev_info(mbox->dev, "Last transmission completed successfully\n");
-    } else {
-        dev_info(mbox->dev, "Last transmission not completed yet\n");
-    }
+
 	return ret;
 }
 
 static int bcm2835_startup(struct mbox_chan *chan)
 {
-    struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
+	struct bcm2835_mbox *mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 
-           /* Enable the interrupt on data reception */
-    writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
+	/* Enable the interrupt on data reception */
+	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
 
-
-    dev_info(mbox->dev, "Mailbox channel startup\n");
-    return 0;
+	return 0;
 }
 
 static void bcm2835_shutdown(struct mbox_chan *chan)
 {
-    struct bcm2835_mbox *mbox;
+	struct bcm2835_mbox *mbox;
 
- 
-    mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
-
- 
- 
-    dev_info(mbox->dev, "Mailbox channel shutdown\n");
+	mbox = container_of(chan->mbox, struct bcm2835_mbox, controller);
 }
-
-
 
 static irqreturn_t bcm2835_mbox_irq(int irq, void *dev_id)
 {
-    struct bcm2835_mbox *mbox = dev_id;
-    struct device *dev = mbox->controller.dev;
-    irqreturn_t handled = IRQ_NONE;
+	struct bcm2835_mbox *mbox = dev_id;
+	struct device *dev = mbox->controller.dev;
+	irqreturn_t handled = IRQ_NONE;
 
-    dev_info(dev, "Mailbox IRQ triggered: irq=%d\n", irq);
+	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
+		u32 msg = readl(mbox->regs + MAIL0_RD);
+		u32 chan_index = msg & 0xf;
+		u32 payload = msg & ~0xf;
 
-    while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
-        u32 msg = readl(mbox->regs + MAIL0_RD);
-        u32 chan_index = msg & 0xf;
-        u32 payload = msg & ~0xf;
+		if (chan_index >= BCM2835_MAX_CHANNELS) {
+			dev_warn(dev, "Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
+			continue;
+		}
 
-        if (chan_index >= BCM2835_MAX_CHANNELS) {
-            dev_warn(dev, "Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
-            continue;
-        }
+		struct mbox_chan *chan = &mbox->chans[chan_index];
+		if (!chan->cl || !chan->cl->rx_callback) {
+			dev_warn(dev, "Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
+			continue;
+		}
 
-        struct mbox_chan *chan = &mbox->chans[chan_index];
-        if (!chan->cl || !chan->cl->rx_callback) {
-            dev_warn(dev, "Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
-            continue;
-        }
+		mbox_chan_received_data(chan, &msg);
+		handled = IRQ_HANDLED;
+	}
 
-        dev_dbg(dev, "Dispatching msg 0x%08X to channel %u\n", payload, chan_index);
-        mbox_chan_received_data(chan, &msg);
-        handled = IRQ_HANDLED;
-    }
-
-    return handled;
+	return handled;
 }
 
 
@@ -251,7 +221,6 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     struct bcm2835_mbox *mbox;
     struct resource *res;
     int ret;
-    
 
     mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
     if (!mbox)
@@ -261,32 +230,20 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->dev = &pdev->dev;
     bcm2835_mbox_global = mbox;
 
-    
-
-
-    mbox->irq  = platform_get_irq(pdev, 0);
-    if (mbox->irq  < 0)
+    mbox->irq = platform_get_irq(pdev, 0);
+    if (mbox->irq < 0)
         return dev_err_probe(&pdev->dev, mbox->irq, "Failed to get IRQ\n");
 
-    ret = devm_request_irq(&pdev->dev, mbox->irq , bcm2835_mbox_irq,
-                        0, dev_name(&pdev->dev), mbox);
-    if (ret) {
+    ret = devm_request_irq(&pdev->dev, mbox->irq, bcm2835_mbox_irq,
+			       0, dev_name(&pdev->dev), mbox);
+    if (ret)
         return dev_err_probe(&pdev->dev, ret, "Failed to request IRQ\n");
-    }
-
-    
-
-
 
     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     mbox->regs = devm_ioremap_resource(&pdev->dev, res);
     if (IS_ERR(mbox->regs))
         return PTR_ERR(mbox->regs);
 
-
-
-
-    dev_info(&pdev->dev, "Mailbox registers mapped at %p\n", mbox->regs);
     mbox->controller.dev = &pdev->dev;
     mbox->controller.chans = mbox->chans;
     mbox->controller.num_chans = BCM2835_MAX_CHANNELS;
@@ -294,27 +251,12 @@ static int bcm2835_mbox_probe(struct platform_device *pdev)
     mbox->controller.txdone_poll = true;
     mbox->controller.txpoll_period = 5;
 
-
-    
-
-   
-
-
-
-
-
-
-
     ret = devm_mbox_controller_register(&pdev->dev, &mbox->controller);
     if (ret) {
         dev_err(&pdev->dev, "Failed to register mailbox controller: %d\n", ret);
         return ret;
     }
- 
-   
-    
- 
-    dev_info(&pdev->dev, "BCM2835 ACPI mailbox controller initialized successfully\n");
+
     return 0;
 }
 
