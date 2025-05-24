@@ -66,7 +66,7 @@ struct pwm_fan_ctx {
 static irqreturn_t pulse_handler(int irq, void *dev_id)
 {
 	struct pwm_fan_tach *tach = dev_id;
-	dev_info(tach->dev, "pulse_handler: irq=%d\n", irq);
+    pr_info( "pulse_handler: irq=%d\n", irq);
 
 	atomic_inc(&tach->pulses);
 
