@@ -376,7 +376,18 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			return ret;
 		}
 		ctx->cdev = cdev;
+		dev_info(dev, "Registered as cooling device\n");
+
+
 	}
+
+	if (!has_acpi_companion(dev)) {
+	dev_warn(dev, "No ACPI companion – binding to thermal zone may fail\n");
+} else {
+	struct acpi_device *adev = ACPI_COMPANION(dev);
+	dev_info(dev, "ACPI companion: %s\n", acpi_device_hid(adev));
+}
+
 
 	return 0;
 }
