@@ -82,6 +82,7 @@ static void sample_timer(struct timer_list *t)
 
 	unsigned int delta = ktime_ms_delta(ktime_get(), ctx->sample_start);
 	int i;
+	log_info("sample_timer: delta=%u\n", delta);
 
 	if (delta) {
 		for (i = 0; i < ctx->tach_count; i++) {
