@@ -93,6 +93,7 @@ static void sample_timer(struct timer_list *t)
 			atomic_sub(pulses, &tach->pulses);
 			tach->rpm = (unsigned int)(pulses * 1000 * 60) /
 				(tach->pulses_per_revolution * delta);
+			dev_info(ctx->dev, "tach%d: %d rpm\n", i, tach->rpm);
 		}
 
 		ctx->sample_start = ktime_get();
