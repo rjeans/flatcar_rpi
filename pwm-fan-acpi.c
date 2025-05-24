@@ -250,7 +250,7 @@ static const struct thermal_cooling_device_ops pwm_fan_cooling_ops = {
 	.set_cur_state = pwm_fan_set_cur_state,
 };
 
-static int pwm_fan_of_get_cooling_data(struct device *dev,
+static int pwm_fan_get_cooling_data(struct device *dev,
 				       struct pwm_fan_ctx *ctx)
 {
 	
@@ -363,14 +363,14 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return PTR_ERR(hwmon);
 	}
 
-	ret = pwm_fan_of_get_cooling_data(dev, ctx);  // Still useful for thermal binding
+	ret = pwm_fan_get_cooling_data(dev, ctx);  // Still useful for thermal binding
 	if (ret)
 		return ret;
 
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-cdev = devm_thermal_cooling_device_register(dev, "pwm-fan", ctx,
+cdev = thermal_cooling_device_register( "pwm-fan", ctx,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
