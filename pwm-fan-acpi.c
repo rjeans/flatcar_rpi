@@ -45,13 +45,7 @@ struct pwm_fan_ctx {
 
 
 
-static int pwm_fan_switch_power(struct pwm_fan_ctx *ctx, bool on)
-{
-	int ret = 0;
 
-
-	return ret;
-}
 
 static int pwm_fan_power_on(struct pwm_fan_ctx *ctx)
 {
