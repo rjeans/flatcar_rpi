@@ -369,9 +369,9 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-		cdev = devm_thermal_of_cooling_device_register(dev, dev->of_node,
-							       "pwm-fan", ctx,
-							       &pwm_fan_cooling_ops);
+cdev = devm_thermal_cooling_device_register(dev, "pwm-fan", ctx,
+					    &pwm_fan_cooling_ops);
+
 		if (IS_ERR(cdev)) {
 			ret = PTR_ERR(cdev);
 			dev_err(dev, "Failed to register pwm-fan as cooling device: %d\n", ret);
