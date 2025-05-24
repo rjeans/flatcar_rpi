@@ -12,7 +12,6 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
-#include <linux/regulator/consumer.h>
 #include <linux/sysfs.h>
 #include <linux/thermal.h>
 #include <linux/property.h>
@@ -22,12 +21,7 @@
 
 
 
-enum pwm_fan_enable_mode {
-	pwm_off_reg_off,
-	pwm_disable_reg_enable,
-	pwm_enable_reg_enable,
-	pwm_disable_reg_disable,
-};
+
 
 struct pwm_fan_ctx {
 	struct device *dev;
@@ -35,8 +29,6 @@ struct pwm_fan_ctx {
 	struct mutex lock;
 	struct pwm_device *pwm;
 	struct pwm_state pwm_state;
-	enum pwm_fan_enable_mode enable_mode;
-	bool regulator_enabled;
 	bool enabled;
 
 
@@ -53,30 +45,6 @@ struct pwm_fan_ctx {
 
 
 
-
-static void pwm_fan_enable_mode_2_state(int enable_mode,
-					struct pwm_state *state,
-					bool *enable_regulator)
-{
-	switch (enable_mode) {
-	case pwm_disable_reg_enable:
-		/* disable pwm, keep regulator enabled */
-		state->enabled = false;
-		*enable_regulator = true;
-		break;
-	case pwm_enable_reg_enable:
-		/* keep pwm and regulator enabled */
-		state->enabled = true;
-		*enable_regulator = true;
-		break;
-	case pwm_off_reg_off:
-	case pwm_disable_reg_disable:
-		/* disable pwm and regulator */
-		state->enabled = false;
-		*enable_regulator = false;
-	}
-}
-
 static int pwm_fan_switch_power(struct pwm_fan_ctx *ctx, bool on)
 {
 	int ret = 0;
@@ -87,60 +55,30 @@ static int pwm_fan_switch_power(struct pwm_fan_ctx *ctx, bool on)
 
 static int pwm_fan_power_on(struct pwm_fan_ctx *ctx)
 {
-	struct pwm_state *state = &ctx->pwm_state;
-	int ret;
-
 	if (ctx->enabled)
 		return 0;
 
-	ret = pwm_fan_switch_power(ctx, true);
-	if (ret < 0) {
-		dev_err(ctx->dev, "failed to enable power supply\n");
-		return ret;
-	}
+	ctx->pwm_state.enabled = true;
+	int ret = pwm_apply_might_sleep(ctx->pwm, &ctx->pwm_state);
+	if (!ret)
+		ctx->enabled = true;
 
-	state->enabled = true;
-	ret = pwm_apply_might_sleep(ctx->pwm, state);
-	if (ret) {
-		dev_err(ctx->dev, "failed to enable PWM\n");
-		goto disable_regulator;
-	}
-
-	ctx->enabled = true;
-
-	return 0;
-
-disable_regulator:
-	pwm_fan_switch_power(ctx, false);
 	return ret;
 }
 
+
 static int pwm_fan_power_off(struct pwm_fan_ctx *ctx)
 {
-	struct pwm_state *state = &ctx->pwm_state;
-	bool enable_regulator = false;
-	int ret;
-
 	if (!ctx->enabled)
 		return 0;
 
-	pwm_fan_enable_mode_2_state(ctx->enable_mode,
-				    state,
-				    &enable_regulator);
+	ctx->pwm_state.enabled = false;
+	ctx->pwm_state.duty_cycle = 0;
+	int ret = pwm_apply_might_sleep(ctx->pwm, &ctx->pwm_state);
+	if (!ret)
+		ctx->enabled = false;
 
-	state->enabled = false;
-	state->duty_cycle = 0;
-	ret = pwm_apply_might_sleep(ctx->pwm, state);
-	if (ret) {
-		dev_err(ctx->dev, "failed to disable PWM\n");
-		return ret;
-	}
-
-	pwm_fan_switch_power(ctx, enable_regulator);
-
-	ctx->enabled = false;
-
-	return 0;
+	return ret;
 }
 
 static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
@@ -150,9 +88,7 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
 	int ret = 0;
 
 	if (pwm > 0) {
-		if (ctx->enable_mode == pwm_off_reg_off)
-			/* pwm-fan hard disabled */
-			return 0;
+
 
 		period = state->period;
 		state->duty_cycle = DIV_ROUND_UP(pwm * (period - 1), MAX_PWM);
@@ -191,52 +127,6 @@ static void pwm_fan_update_state(struct pwm_fan_ctx *ctx, unsigned long pwm)
 	ctx->pwm_fan_state = i;
 }
 
-static int pwm_fan_update_enable(struct pwm_fan_ctx *ctx, long val)
-{
-	int ret = 0;
-	int old_val;
-
-	mutex_lock(&ctx->lock);
-
-	if (ctx->enable_mode == val)
-		goto out;
-
-	old_val = ctx->enable_mode;
-	ctx->enable_mode = val;
-
-	if (val == 0) {
-		/* Disable pwm-fan unconditionally */
-		if (ctx->enabled)
-			ret = __set_pwm(ctx, 0);
-		else
-			ret = pwm_fan_switch_power(ctx, false);
-		if (ret)
-			ctx->enable_mode = old_val;
-		pwm_fan_update_state(ctx, 0);
-	} else {
-		/*
-		 * Change PWM and/or regulator state if currently disabled
-		 * Nothing to do if currently enabled
-		 */
-		if (!ctx->enabled) {
-			struct pwm_state *state = &ctx->pwm_state;
-			bool enable_regulator = false;
-
-			state->duty_cycle = 0;
-			pwm_fan_enable_mode_2_state(val,
-						    state,
-						    &enable_regulator);
-
-			pwm_apply_might_sleep(ctx->pwm, state);
-			pwm_fan_switch_power(ctx, enable_regulator);
-			pwm_fan_update_state(ctx, 0);
-		}
-	}
-out:
-	mutex_unlock(&ctx->lock);
-
-	return ret;
-}
 
 static int pwm_fan_write(struct device *dev, enum hwmon_sensor_types type,
 			 u32 attr, int channel, long val)
@@ -254,12 +144,10 @@ static int pwm_fan_write(struct device *dev, enum hwmon_sensor_types type,
 		pwm_fan_update_state(ctx, val);
 		break;
 	case hwmon_pwm_enable:
-		if (val < 0 || val > 3)
-			ret = -EINVAL;
-		else
-			ret = pwm_fan_update_enable(ctx, val);
+		if (val != 1)
+			return -EOPNOTSUPP;
+		return 0;
 
-		return ret;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -279,7 +167,7 @@ static int pwm_fan_read(struct device *dev, enum hwmon_sensor_types type,
 			*val = ctx->pwm_value;
 			return 0;
 		case hwmon_pwm_enable:
-			*val = ctx->enable_mode;
+			*val = 1;
 			return 0;
 		}
 		return -EOPNOTSUPP;
@@ -418,8 +306,7 @@ static void pwm_fan_cleanup(void *__ctx)
 
 	dev_info(ctx->dev, "Cleaning up\n");
 
-	/* Switch off everything */
-	ctx->enable_mode = pwm_disable_reg_disable;
+
 	pwm_fan_power_off(ctx);
 }
 
@@ -448,12 +335,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
-	ctx->reg_en = devm_regulator_get_optional(dev, "fan");
-	if (IS_ERR(ctx->reg_en)) {
-		if (PTR_ERR(ctx->reg_en) != -ENODEV)
-			return PTR_ERR(ctx->reg_en);
-		ctx->reg_en = NULL;
-	}
+
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
 	ctx->pwm_state.usage_power = true;
@@ -463,7 +345,6 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	ctx->enable_mode = pwm_disable_reg_enable;
 
 	ret = set_pwm(ctx, MAX_PWM);
 	if (ret) {
