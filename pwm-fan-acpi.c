@@ -15,6 +15,8 @@
 #include <linux/sysfs.h>
 #include <linux/thermal.h>
 #include <linux/property.h>
+#include <linux/acpi.h>
+
 
 
 #define MAX_PWM 255
