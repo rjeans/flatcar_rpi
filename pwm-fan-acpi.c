@@ -16,6 +16,7 @@
 #include <linux/thermal.h>
 #include <linux/property.h>
 #include <linux/acpi.h>
+#include <linux/thermal.h>
 
 
 
