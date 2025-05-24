@@ -416,7 +416,7 @@ static const struct thermal_cooling_device_ops pwm_fan_cooling_ops = {
 static int pwm_fan_of_get_cooling_data(struct device *dev,
 				       struct pwm_fan_ctx *ctx)
 {
-	struct device_node *np = dev->of_node;
+	
 	int num, i, ret;
 
 	if (!fwnode_property_present(dev_fwnode(dev), "cooling-levels")) {
@@ -451,7 +451,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 		}
 	}
 
-	dev_inform(dev, "Cooling levels: \n");
+	dev_info(dev, "Cooling levels: \n");
 	for (i = 0; i < num; i++)
 		dev_info(dev, "level %d --> %d ", i,ctx->pwm_fan_cooling_levels[i]);
 
@@ -648,7 +648,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		}
 		ctx->cdev = cdev;
 		dev_info(dev, "pwm-fan cooling device registered\n");
-		
+
 	}
 
 	return 0;
