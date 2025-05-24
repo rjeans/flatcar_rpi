@@ -451,6 +451,10 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 		}
 	}
 
+	dev_inform(dev, "Cooling levels: \n");
+	for (i = 0; i < num; i++)
+		dev_info(dev, "level %d --> %d ", i,ctx->pwm_fan_cooling_levels[i]);
+
 	ctx->pwm_fan_max_state = num - 1;
 
 	return 0;
@@ -629,6 +633,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	dev_info(dev, "pwm_fan cooling levels done`n");
+
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 	if (IS_ENABLED(CONFIG_THERMAL)) {
 		cdev = devm_thermal_of_cooling_device_register(dev,
@@ -641,6 +647,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			return ret;
 		}
 		ctx->cdev = cdev;
+		dev_info(dev, "pwm-fan cooling device registered\n");
+		
 	}
 
 	return 0;
