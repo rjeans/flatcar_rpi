@@ -250,6 +250,31 @@ static const struct thermal_cooling_device_ops pwm_fan_cooling_ops = {
 	.set_cur_state = pwm_fan_set_cur_state,
 };
 
+
+static struct thermal_cooling_device *
+devm_thermal_cooling_device_register(struct device *dev,
+                                     const char *type,
+                                     void *devdata,
+                                     const struct thermal_cooling_device_ops *ops)
+{
+    struct thermal_cooling_device **ptr, *tcd;
+
+    ptr = devres_alloc(devm_thermal_cooling_device_release, sizeof(*ptr), GFP_KERNEL);
+    if (!ptr)
+        return ERR_PTR(-ENOMEM);
+
+    tcd = thermal_cooling_device_register_with_dev(type, devdata, ops, dev);
+    if (IS_ERR(tcd)) {
+        devres_free(ptr);
+        return tcd;
+    }
+
+    *ptr = tcd;
+    devres_add(dev, ptr);
+
+    return tcd;
+}
+
 static int pwm_fan_get_cooling_data(struct device *dev,
 				       struct pwm_fan_ctx *ctx)
 {
@@ -370,7 +395,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-cdev = thermal_cooling_device_register( "pwm-fan", ctx,
+cdev = devm_thermal_cooling_device_register( dev,"pwm-fan", ctx,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
