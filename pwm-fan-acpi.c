@@ -388,6 +388,7 @@ cdev = thermal_cooling_device_register( "pwm-fan", ctx,
 	ret = sysfs_create_link(&dev->kobj, &ctx->cdev->device.kobj, "thermal_cooling");
 if (ret) {
 	dev_err(dev, "Failed to create sysfs link 'thermal_cooling'\n");
+	
 	return ret;
 	
 }
@@ -436,8 +437,24 @@ static const struct acpi_device_id acpi_pwm_fan_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, acpi_pwm_fan_match);
 
+static int pwm_fan_remove(struct platform_device *pdev)
+{
+	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
+
+	if (ctx->cdev) {
+		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
+		sysfs_remove_link(&ctx->dev->kobj, "thermal_cooling");
+		thermal_cooling_device_unregister(ctx->cdev);
+	}
+
+	pwm_fan_cleanup(ctx);
+
+	return 0;
+}
+
 static struct platform_driver pwm_fan_driver = {
 	.probe		= pwm_fan_probe,
+	.remove		= pwm_fan_remove,
 	.shutdown	= pwm_fan_shutdown,
 	.driver	= {
 		.name		= "pwm-fan",
