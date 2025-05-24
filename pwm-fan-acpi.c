@@ -250,6 +250,15 @@ static const struct thermal_cooling_device_ops pwm_fan_cooling_ops = {
 	.set_cur_state = pwm_fan_set_cur_state,
 };
 
+static void devm_thermal_cooling_device_release(struct device *dev, void *res)
+{
+    thermal_cooling_device_unregister(*(struct thermal_cooling_device **)res);
+}
+
+static int devm_thermal_cooling_device_match(struct device *dev, void *res, void *data)
+{
+    return res == data;
+}
 
 static struct thermal_cooling_device *
 devm_thermal_cooling_device_register(struct device *dev,
