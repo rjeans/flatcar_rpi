@@ -424,7 +424,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 		return 0;
 	}
 
-	ret = of_property_count_u32_elems(np, "cooling-levels");
+	ret = fwnode_property_count_u32(dev_fwnode(dev), "cooling-levels");
 	if (ret <= 0) {
 		dev_err(dev, "Wrong data!\n");
 		return ret ? : -EINVAL;
@@ -436,7 +436,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
 	if (!ctx->pwm_fan_cooling_levels)
 		return -ENOMEM;
 
-	ret = of_property_read_u32_array(np, "cooling-levels",
+	ret = fwnode_property_read_u32_array(dev_fwnode(dev), "cooling-levels",
 					 ctx->pwm_fan_cooling_levels, num);
 	if (ret) {
 		dev_err(dev, "Property 'cooling-levels' cannot be read!\n");
