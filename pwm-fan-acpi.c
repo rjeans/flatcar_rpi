@@ -66,6 +66,7 @@ struct pwm_fan_ctx {
 static irqreturn_t pulse_handler(int irq, void *dev_id)
 {
 	struct pwm_fan_tach *tach = dev_id;
+	dev_info(tach->dev, "pulse_handler: irq=%d\n", irq);
 
 	atomic_inc(&tach->pulses);
 
@@ -75,6 +76,8 @@ static irqreturn_t pulse_handler(int irq, void *dev_id)
 static void sample_timer(struct timer_list *t)
 {
 	struct pwm_fan_ctx *ctx = from_timer(ctx, t, rpm_timer);
+
+	dev_info(ctx->dev, "sample_timer: tach_count=%d\n", ctx->tach_count);
 
 
 	unsigned int delta = ktime_ms_delta(ktime_get(), ctx->sample_start);
@@ -628,6 +631,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to register hwmon device\n");
 		return PTR_ERR(hwmon);
 	}
+
+	dev_info(dev, "hwmon device registered\n");
 
 	ret = pwm_fan_of_get_cooling_data(dev, ctx);
 	if (ret)
