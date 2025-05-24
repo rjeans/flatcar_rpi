@@ -1,4 +1,4 @@
-obj-m += mailbox-bcm2835-acpi.o poe-bcm2835-acpi.o pwm-fan-acpi.o
+obj-m += rpi-mailbox.o rpi-pwm-fan.o rpi-pwm-fan.o
 
 KBUILD_MODPOST_WARN=1
 

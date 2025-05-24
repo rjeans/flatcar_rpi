@@ -1,0 +1,23 @@
+
+menu "Raspberry Pi ACPI Drivers"
+
+config RPI_MAILBOX_ACPI
+    tristate "Raspberry Pi ACPI Mailbox"
+    depends on ACPI
+    help
+      ACPI interface for Raspberry Pi mailbox. Required by other drivers.
+
+config RPI_PWM_POE_ACPI
+    tristate "Raspberry Pi PoE HAT PWM Fan via ACPI"
+    depends on RPI_MAILBOX_ACPI
+    help
+      PoE HAT PWM driver using the mailbox ACPI interface.
+
+config RPI_PWM_FAN_ACPI
+    bool "Raspberry Pi PWM Fan Cooling Device"
+    depends on RPI_PWM_POE_ACPI
+    help
+      Thermal cooling device driver for the PoE HAT fan. Always built-in.
+
+endmenu
+
