@@ -385,15 +385,25 @@ cdev = thermal_cooling_device_register( "pwm-fan", ctx,
 
 	}
 
-	if (!has_acpi_companion(dev)) {
-	dev_warn(dev, "No ACPI companion – binding to thermal zone may fail\n");
-} else {
-	struct acpi_device *adev = ACPI_COMPANION(dev);
-	dev_info(dev, "ACPI companion: %s\n", acpi_device_hid(adev));
+	ret = sysfs_create_link(&dev->kobj, &ctx->cdev->device.kobj, "thermal_cooling");
+if (ret) {
+	dev_err(dev, "Failed to create sysfs link 'thermal_cooling'\n");
+	return ret;
+	
+}
+
+ret = sysfs_create_link(&ctx->cdev->device.kobj, &dev->kobj, "device");
+if (ret) {
+	dev_err(dev, "Failed to create sysfs link 'device'\n");
+	return ret;
 }
 
 
+
+
 	return 0;
+
+
 }
 
 
