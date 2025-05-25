@@ -246,6 +246,12 @@ static int rpi_pwm_poe_probe(struct platform_device *pdev)
 	struct mbox_client *cl;
 	int ret;
 
+	// Check if CONFIG_PWM is enabled
+#ifndef CONFIG_PWM
+	dev_err(&pdev->dev, "CONFIG_PWM is not enabled. Cannot initialize rpi-pwm-poe.\n");
+	return -ENODEV;
+#endif
+
 	// Log the start of the probe function
 	dev_info(&pdev->dev, "Probing rpi-pwm-poe device\n");
 

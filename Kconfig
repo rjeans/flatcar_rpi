@@ -1,15 +1,14 @@
-
 menu "Raspberry Pi ACPI Drivers"
 
 config RPI_MAILBOX_ACPI
     tristate "Raspberry Pi ACPI Mailbox"
-    depends on ACPI
+    depends on ACPI && MBOX
     help
       ACPI interface for Raspberry Pi mailbox. Required by other drivers.
 
 config RPI_PWM_POE_ACPI
     tristate "Raspberry Pi PoE HAT PWM Fan via ACPI"
-    depends on RPI_MAILBOX_ACPI
+    depends on RPI_MAILBOX_ACPI && PWM
     help
       PoE HAT PWM driver using the mailbox ACPI interface.
 
