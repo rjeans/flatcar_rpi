@@ -260,7 +260,7 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
 	init_completion(&data->c);
 
-	data->chan = bcm2835_mbox_request_firmware_channel(cl);
+	data->chan = rpi_mbox_request_firmware_channel(cl);
 	if (IS_ERR(data->chan))
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
 
@@ -284,19 +284,18 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
 static int acpi_pwm_remove(struct platform_device *pdev)
 {
-    struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
+	struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
 
-    int ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
+	int ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
     if (ret) {
         dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
         return ret;
     }
 
     if (data->chan) {
-        bcm2835_mbox_free_channel(data->chan);
+        rpi_mbox_free_channel(data->chan);
     }
 
-    
 	dev_info(&pdev->dev, "acpi_pwm_remove: mailbox channel freed\n");
     return 0;
 }
