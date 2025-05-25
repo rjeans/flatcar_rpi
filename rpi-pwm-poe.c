@@ -252,6 +252,7 @@ static int rpi_pwm_poe_probe(struct platform_device *pdev)
 	// Allocate memory for the driver data
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data) {
+		dev_err(&pdev->dev, "Failed to allocate memory for driver data\n");
 		return -ENOMEM;
 	}
 
@@ -266,7 +267,9 @@ static int rpi_pwm_poe_probe(struct platform_device *pdev)
 	// Request the firmware mailbox channel
 	data->chan = rpi_mbox_request_firmware_channel(cl);
 	if (IS_ERR(data->chan)) {
-		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
+		ret = PTR_ERR(data->chan);
+		dev_err(&pdev->dev, "Failed to request firmware mailbox channel: %d\n", ret);
+		return ret;
 	}
 
 	// Get the current duty cycle from the firmware
@@ -289,7 +292,15 @@ static int rpi_pwm_poe_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, data);
 
 	// Register the PWM chip
-	return devm_pwmchip_add(&pdev->dev, &data->chip);
+	ret = devm_pwmchip_add(&pdev->dev, &data->chip);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to register PWM chip: %d\n", ret);
+		rpi_mbox_free_channel(data->chan);
+		return ret;
+	}
+
+	dev_info(&pdev->dev, "rpi-pwm-poe device initialized successfully\n");
+	return 0;
 }
 
 static int rpi_pwm_poe_remove(struct platform_device *pdev)
