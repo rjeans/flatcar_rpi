@@ -147,110 +147,113 @@ static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_ch
 
 
 
-static int acpi_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-                          const struct pwm_state *state)
+static int rpi_pwm_poe_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+                             const struct pwm_state *state)
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 	int ret;
 	unsigned new_scaled_duty_cycle;
 
-	if (state->period != RPI_PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL)
+	// Validate the PWM state
+	if (state->period != RPI_PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL) {
 		return -EINVAL;
+	}
 
 	data->state = *state;
 
-	if (!state->enabled)
+	// Calculate the new scaled duty cycle
+	if (!state->enabled) {
 		new_scaled_duty_cycle = 0;
-	else if (state->duty_cycle < RPI_PWM_PERIOD_NS)
+	} else if (state->duty_cycle < RPI_PWM_PERIOD_NS) {
 		new_scaled_duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY, RPI_PWM_PERIOD_NS);
-	else
+	} else {
 		new_scaled_duty_cycle = RPI_PWM_MAX_DUTY;
+	}
 
-	if (new_scaled_duty_cycle == data->scaled_duty_cycle)
+	// Skip updating if the duty cycle hasn't changed
+	if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
 		return 0;
+	}
 
+	// Send the new duty cycle to the firmware
 	ret = send_pwm_duty(&data->c, data->dev, data->chan, new_scaled_duty_cycle);
-	if (ret)
+	if (ret) {
 		return ret;
+	}
 
 	data->scaled_duty_cycle = new_scaled_duty_cycle;
 	return 0;
 }
 
-static int acpi_pwm_get_state(struct pwm_chip *chip,
-				     struct pwm_device *pwm,
-				     struct pwm_state *state)
+static int rpi_pwm_poe_get_state(struct pwm_chip *chip,
+                                 struct pwm_device *pwm,
+                                 struct pwm_state *state)
 {
 	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
-
-
-
+	// Populate the PWM state with the current values
 	state->period = RPI_PWM_PERIOD_NS;
-    state->polarity = PWM_POLARITY_NORMAL;
+	state->polarity = PWM_POLARITY_NORMAL;
 	state->duty_cycle = data->state.duty_cycle;
-    state->enabled = data->state.enabled;
+	state->enabled = data->state.enabled;
 
-
- 
-
-	dev_info(data->dev, "get_state: period=%llu, duty_cycle=%llu, enabled=%d, polarity=%d (scaled=%d)\n",
-		state->period, state->duty_cycle, state->enabled, state->polarity,data->scaled_duty_cycle);
 	return 0;
 }
 
-static int acpi_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+static int rpi_pwm_poe_request(struct pwm_chip *chip, struct pwm_device *pwm)
 {
-    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    dev_info(data->dev, "acpi_pwm_request: requested PWM device %u\n", pwm->hwpwm);
-    return 0;
+	// No special handling required for requesting a PWM device
+	return 0;
 }
 
-static void acpi_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+static void rpi_pwm_poe_free(struct pwm_chip *chip, struct pwm_device *pwm)
 {
-    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
-    data->state.period = RPI_PWM_PERIOD_NS;
-    data->state.duty_cycle = 0;
-    data->state.enabled = false;
-    data->state.polarity = PWM_POLARITY_NORMAL;
+	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
-    acpi_pwm_apply(chip, pwm, &data->state);
+	// Reset the PWM state to disabled
+	data->state.period = RPI_PWM_PERIOD_NS;
+	data->state.duty_cycle = 0;
+	data->state.enabled = false;
+	data->state.polarity = PWM_POLARITY_NORMAL;
 
-    dev_info(data->dev, "acpi_pwm_free: freeing PWM device %u\n", pwm->hwpwm);
+	rpi_pwm_poe_apply(chip, pwm, &data->state);
 }
 
-static int acpi_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
-                            struct pwm_capture *capture, unsigned long timeout)
+static int rpi_pwm_poe_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+                               struct pwm_capture *capture, unsigned long timeout)
 {
-    struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
+	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
 
-    capture->period = data->state.period;
-    capture->duty_cycle = data->state.duty_cycle;
+	// Return the cached period and duty cycle
+	capture->period = data->state.period;
+	capture->duty_cycle = data->state.duty_cycle;
 
-    dev_info(data->dev, "acpi_pwm_capture: returning cached values for PWM %u: period=%u, duty=%u\n",
-             pwm->hwpwm, capture->period, capture->duty_cycle);
-
-    return 0;
+	return 0;
 }
 
-static const struct pwm_ops acpi_pwm_ops = {
-	.apply = acpi_pwm_apply,
-	.get_state = acpi_pwm_get_state,
-    .request = acpi_pwm_request,
-    .free = acpi_pwm_free,
-    .capture = acpi_pwm_capture,
+static const struct pwm_ops rpi_pwm_poe_ops = {
+	.apply = rpi_pwm_poe_apply,
+	.get_state = rpi_pwm_poe_get_state,
+	.request = rpi_pwm_poe_request,
+	.free = rpi_pwm_poe_free,
+	.capture = rpi_pwm_poe_capture,
 	.owner = THIS_MODULE,
 };
 
-static int acpi_pwm_probe(struct platform_device *pdev)
+static int rpi_pwm_poe_probe(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data;
 	struct mbox_client *cl;
 	int ret;
 
+	// Log the start of the probe function
+	dev_info(&pdev->dev, "Probing rpi-pwm-poe device\n");
+
+	// Allocate memory for the driver data
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data)
+	if (!data) {
 		return -ENOMEM;
+	}
 
 	data->dev = &pdev->dev;
 	cl = &data->mbox;
@@ -260,62 +263,74 @@ static int acpi_pwm_probe(struct platform_device *pdev)
 
 	init_completion(&data->c);
 
+	// Request the firmware mailbox channel
 	data->chan = rpi_mbox_request_firmware_channel(cl);
-	if (IS_ERR(data->chan))
+	if (IS_ERR(data->chan)) {
 		return dev_err_probe(&pdev->dev, PTR_ERR(data->chan), "mbox request failed\n");
+	}
 
+	// Get the current duty cycle from the firmware
 	ret = get_pwm_duty(&data->c, &pdev->dev, data->chan, &data->scaled_duty_cycle);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
+	}
 
+	// Initialize the PWM state
 	data->state.period = RPI_PWM_PERIOD_NS;
 	data->state.duty_cycle = 0;
 	data->state.enabled = false;
 	data->state.polarity = PWM_POLARITY_NORMAL;
 
+	// Initialize the PWM chip
 	data->chip.dev = &pdev->dev;
-	data->chip.ops = &acpi_pwm_ops;
+	data->chip.ops = &rpi_pwm_poe_ops;
 	data->chip.npwm = 1;
 
 	platform_set_drvdata(pdev, data);
 
+	// Register the PWM chip
 	return devm_pwmchip_add(&pdev->dev, &data->chip);
 }
 
-static int acpi_pwm_remove(struct platform_device *pdev)
+static int rpi_pwm_poe_remove(struct platform_device *pdev)
 {
 	struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
+	int ret;
 
-	int ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
-    if (ret) {
-        dev_warn(data->dev, "acpi_pwm_apply: Failed to send PWM duty: %d\n", ret);
-        return ret;
-    }
+	// Log the start of the remove function
+	dev_info(&pdev->dev, "Removing rpi-pwm-poe device\n");
 
-    if (data->chan) {
-        rpi_mbox_free_channel(data->chan);
-    }
+	// Reset the duty cycle to 0
+	ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
+	if (ret) {
+		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
+		return ret;
+	}
 
-	dev_info(&pdev->dev, "acpi_pwm_remove: mailbox channel freed\n");
-    return 0;
+	// Free the mailbox channel
+	if (data->chan) {
+		rpi_mbox_free_channel(data->chan);
+	}
+
+	return 0;
 }
 
-static const struct acpi_device_id acpi_pwm_ids[] = {
+static const struct acpi_device_id rpi_pwm_poe_ids[] = {
 	{ "BCM2853", 0 },
 	{}
 };
-MODULE_DEVICE_TABLE(acpi, acpi_pwm_ids);
+MODULE_DEVICE_TABLE(acpi, rpi_pwm_poe_ids);
 
-static struct platform_driver acpi_pwm_driver = {
+static struct platform_driver rpi_pwm_poe_driver = {
 	.driver = {
-		.name = "acpi-mailbox-pwm",
-		.acpi_match_table = acpi_pwm_ids,
+		.name = "rpi-pwm-poe",
+		.acpi_match_table = rpi_pwm_poe_ids,
 	},
-	.probe = acpi_pwm_probe,
-    .remove = acpi_pwm_remove,
+	.probe = rpi_pwm_poe_probe,
+	.remove = rpi_pwm_poe_remove,
 };
 
-module_platform_driver(acpi_pwm_driver);
+module_platform_driver(rpi_pwm_poe_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("You");

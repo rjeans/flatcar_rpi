@@ -2,6 +2,7 @@
 
 KDIR ?= /usr/src/linux/
 INSTALL_MOD_PATH ?=/usr
+ KBUILD_MODPOST_WARN=1 t
 PWD := $(shell pwd)
 
 # Kernel module object list
