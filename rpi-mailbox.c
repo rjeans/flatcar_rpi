@@ -82,20 +82,28 @@ struct mbox_chan *rpi_mbox_request_firmware_channel(struct mbox_client *cl)
 	struct mbox_chan *chan;
 	int ret;
 
-	if (!cl || !mbox)
+	if (!cl || !mbox) {
+		pr_err("rpi_mbox_request_firmware_channel: Invalid client or uninitialized mailbox\n");
 		return ERR_PTR(-ENODEV);
+	}
 
-	if (RPI_MBOX_CHAN_FIRMWARE >= mbox->controller.num_chans)
+	if (RPI_MBOX_CHAN_FIRMWARE >= mbox->controller.num_chans) {
+		pr_err("rpi_mbox_request_firmware_channel: Firmware channel index out of range\n");
 		return ERR_PTR(-EINVAL);
+	}
 
 	chan = &mbox->chans[RPI_MBOX_CHAN_FIRMWARE];
 
-	if (chan->cl)
-		return ERR_PTR(-EBUSY);  // Already bound
+	if (chan->cl) {
+		pr_err("rpi_mbox_request_firmware_channel: Firmware channel already bound\n");
+		return ERR_PTR(-EBUSY);
+	}
 
 	ret = mbox_bind_client(chan, cl);
-	if (ret)
+	if (ret) {
+		pr_err("rpi_mbox_request_firmware_channel: Failed to bind client: %d\n", ret);
 		return ERR_PTR(ret);
+	}
 
 	init_completion(&mbox->tx_completions[RPI_MBOX_CHAN_FIRMWARE]);
 	chan->mbox = &mbox->controller;
@@ -111,20 +119,20 @@ struct mbox_chan *rpi_mbox_request_channel(struct mbox_client *cl)
 	struct mbox_chan *chan;
 	int i, ret;
 
-	// Ensure the global mailbox is initialized
-	if (!cl || !rpi_mbox_global)
+	if (!cl || !rpi_mbox_global) {
+		pr_err("rpi_mbox_request_channel: Invalid client or uninitialized mailbox\n");
 		return ERR_PTR(-ENODEV);
+	}
 
-	// Iterate through available channels to find a free one
 	for (i = 0; i < rpi_mbox_global->controller.num_chans; i++) {
-		if (i == RPI_MBOX_CHAN_FIRMWARE) // Skip reserved firmware channel
+		if (i == RPI_MBOX_CHAN_FIRMWARE)
 			continue;
 
 		chan = &rpi_mbox_global->chans[i];
 		if (!chan->cl) {
 			ret = mbox_bind_client(chan, cl);
 			if (ret) {
-				pr_err("Failed to bind mailbox client: %d\n", ret);
+				pr_err("rpi_mbox_request_channel: Failed to bind client: %d\n", ret);
 				return ERR_PTR(ret);
 			}
 
@@ -134,18 +142,22 @@ struct mbox_chan *rpi_mbox_request_channel(struct mbox_client *cl)
 		}
 	}
 
-	// No free channel found
+	pr_err("rpi_mbox_request_channel: No free channel available\n");
 	return ERR_PTR(-EBUSY);
 }
 EXPORT_SYMBOL_GPL(rpi_mbox_request_channel);
 
 int rpi_mbox_free_channel(struct mbox_chan *chan)
 {
-	if (!chan)
+	if (!chan) {
+		pr_err("rpi_mbox_free_channel: Invalid channel\n");
 		return -EINVAL;
+	}
 
-	if (!chan->cl)
-		return -ENODEV;  // Already unbound or never bound
+	if (!chan->cl) {
+		pr_err("rpi_mbox_free_channel: Channel not bound or already unbound\n");
+		return -ENODEV;
+	}
 
 	chan->cl = NULL;
 
@@ -157,6 +169,11 @@ static int rpi_mbox_send_data(struct mbox_chan *chan, void *data)
 {
 	struct rpi_mbox *mbox = container_of(chan->mbox, struct rpi_mbox, controller);
 	u32 msg = *(u32 *)data;
+
+	if (!chan || !data) {
+		pr_err("rpi_mbox_send_data: Invalid channel or data\n");
+		return -EINVAL;
+	}
 
 	spin_lock(&mbox->lock);
 	writel(msg, mbox->regs + MAIL1_WRT);
@@ -200,6 +217,11 @@ static irqreturn_t rpi_mbox_irq(int irq, void *dev_id)
 	struct device *dev = mbox->controller.dev;
 	irqreturn_t handled = IRQ_NONE;
 
+	if (!mbox) {
+		pr_err("rpi_mbox_irq: Invalid mailbox context\n");
+		return IRQ_NONE;
+	}
+
 	// Process all pending messages
 	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
 		u32 msg = readl(mbox->regs + MAIL0_RD);
@@ -207,14 +229,14 @@ static irqreturn_t rpi_mbox_irq(int irq, void *dev_id)
 
 		// Validate channel index
 		if (chan_index >= BCM2835_MAX_CHANNELS) {
-			dev_warn(dev, "Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
+			dev_warn(dev, "rpi_mbox_irq: Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
 			continue;
 		}
 
 		// Get the channel and ensure it is bound
 		struct mbox_chan *chan = &mbox->chans[chan_index];
 		if (!chan->cl || !chan->cl->rx_callback) {
-			dev_warn(dev, "Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
+			dev_warn(dev, "rpi_mbox_irq: Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
 			continue;
 		}
 
@@ -244,8 +266,10 @@ static int rpi_mbox_probe(struct platform_device *pdev)
 
 	// Allocate memory for the mailbox structure
 	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
-	if (!mbox)
+	if (!mbox) {
+		dev_err(&pdev->dev, "Failed to allocate memory for mailbox structure\n");
 		return -ENOMEM;
+	}
 
 	// Store the mailbox structure in the platform device's driver data
 	platform_set_drvdata(pdev, mbox);
@@ -301,6 +325,22 @@ err_free_mbox:
 	return ret;
 }
 
+static int rpi_mbox_remove(struct platform_device *pdev)
+{
+	struct rpi_mbox *mbox = platform_get_drvdata(pdev);
+
+	// Log the start of the remove function
+	dev_info(&pdev->dev, "Removing rpi-mailbox device\n");
+
+	if (mbox) {
+		// Perform any necessary cleanup here
+		devm_kfree(&pdev->dev, mbox);
+	}
+
+	dev_info(&pdev->dev, "rpi-mailbox device removed successfully\n");
+	return 0;
+}
+
 static const struct acpi_device_id rpi_mbox_acpi_ids[] = {
 	{ "BCM2849", 0 },
 	{ }
@@ -313,6 +353,7 @@ static struct platform_driver rpi_mbox_driver = {
 		.acpi_match_table = rpi_mbox_acpi_ids,
 	},
 	.probe = rpi_mbox_probe,
+	.remove = rpi_mbox_remove,
 };
 
 module_platform_driver(rpi_mbox_driver);
