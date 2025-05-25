@@ -1,6 +1,6 @@
 # Top-level Makefile for out-of-tree Raspberry Pi ACPI drivers
 
-KDIR ?= /usr/src/linux/$(shell uname -r)
+KDIR ?= /usr/src/linux/
 INSTALL_MOD_PATH ?=/usr
 PWD := $(shell pwd)
 
