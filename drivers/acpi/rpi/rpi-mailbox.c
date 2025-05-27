@@ -326,7 +326,7 @@ static int rpi_mbox_probe(struct platform_device *pdev)
 	return 0;
 
 err_free_mbox:
-	// Cleanup in case of errors
+	// Cleanup in case of any errors
 	devm_kfree(&pdev->dev, mbox);
 	return ret;
 }
