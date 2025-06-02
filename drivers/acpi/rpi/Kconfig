@@ -1,8 +1,8 @@
 menu "Raspberry Pi ACPI Drivers"
 
 config RPI_MAILBOX_ACPI
-    tristate "Raspberry Pi ACPI Mailbox"
-    depends on ACPI && MBOX
+    bool "Raspberry Pi ACPI Mailbox"
+    depends on ACPI && MAILBOX
     help
       ACPI interface for Raspberry Pi mailbox. Required by other drivers.
 

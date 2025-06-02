@@ -261,8 +261,8 @@ static int rpi_mbox_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 
-	// Check if CONFIG_MBOX is enabled
-#ifndef CONFIG_MBOX
+	// Check if CONFIG_MAILBOX is enabled
+#ifndef CONFIG_MAILBOX
 	dev_err(&pdev->dev, "CONFIG_MBOX is not enabled. Cannot initialize rpi-mailbox.\n");
 	return -ENODEV;
 #endif
