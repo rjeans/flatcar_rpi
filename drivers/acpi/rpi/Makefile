@@ -1,24 +1,4 @@
-# Top-level Makefile for out-of-tree Raspberry Pi ACPI drivers
+obj-$(CONFIG_RPI_POE_FAN_ACPI) += rpi-poe-fan.o
+obj-$(CONFIG_RPI_MAILBOX_ACPI) += rpi-mailbox.o
+obj-$(CONFIG_RPI_PWM_POE_ACPI) += rpi-poe-pwm.o
 
-KDIR ?= /usr/src/linux/
-INSTALL_MOD_PATH ?=/usr
- KBUILD_MODPOST_WARN=1 t
-PWD := $(shell pwd)
-
-# Kernel module object list
-obj-m += rpi-mailbox.o
-obj-m += rpi-pwm-poe.o
-obj-m += rpi-pwm-fan.o
-
-# Default target: build all modules
-all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
-
-# Install modules to the current kernel's module path
-install: all
-	$(MAKE) -C $(KDIR) M=$(PWD) INSTALL_MOD_PATH=$(INSTALL_MOD_PATH) modules_install
-	depmod -a
-
-# Clean build artifacts
-clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
