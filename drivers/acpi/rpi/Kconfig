@@ -6,8 +6,8 @@ menuconfig RPI_ACPI
 
 if RPI_ACPI
 
-config RPI_POE_FAN_ACPI
-    tristate "Raspberry Pi PoE Fan ACPI driver"
+config RPI_PWM_FAN_ACPI
+    tristate "Raspberry Pi PWM Fan ACPI driver"
     depends on ACPI
     help
       Enables support for the Raspberry Pi PoE HAT fan via ACPI thermal control.
