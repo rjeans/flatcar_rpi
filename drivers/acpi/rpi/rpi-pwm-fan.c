@@ -232,7 +232,6 @@ pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
 	struct pwm_fan_ctx *ctx = NULL;
 	int ret;
-	struct pwm_fan_ctx *ctx = NULL;
 	struct acpi_device *adev = ACPI_COMPANION(&cdev->device);
 	if (adev->driver_data)
 		ctx = adev->driver_data;
