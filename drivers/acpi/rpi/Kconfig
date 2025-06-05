@@ -24,5 +24,12 @@ config RPI_PWM_POE_ACPI
     help
       Enables support for controlling the PoE fan via PWM from ACPI.
 
+config RPI_THERMAL_ACPI
+    tristate "Raspberry Pi ACPI Thermal Zone"
+    depends on ACPI && THERMAL
+    help
+      Enables the ACPI thermal zone driver for Raspberry Pi. Provides thermal
+      management and cooling support for Raspberry Pi devices using ACPI.
+
 endif
 
