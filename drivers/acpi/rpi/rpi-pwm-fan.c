@@ -340,7 +340,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(ctx->pwm), "Could not get PWM\n");
 
 	platform_set_drvdata(pdev, ctx);
-    adev->data = ctx;
+    adev->driver_data = ctx;
 
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
