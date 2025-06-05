@@ -710,7 +710,7 @@ static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
 	.get_trend = thermal_get_trend,
 	.hot = acpi_thermal_zone_device_hot,
 	.critical = acpi_thermal_zone_device_critical,
-	.get_trip_hysteresis = acpi_thermal_zone_get_trip_hysteresis,
+	.get_trip_hyst = acpi_thermal_zone_get_trip_hysteresis,
 };
 
 static int acpi_thermal_zone_sysfs_add(struct acpi_thermal *tz)
