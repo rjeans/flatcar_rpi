@@ -776,7 +776,6 @@ static int acpi_thermal_register_thermal_zone(struct acpi_thermal *tz)
 
 		trip->type = THERMAL_TRIP_ACTIVE;
 		trip->temperature = acpi_thermal_temp(tz, acpi_trip->temperature);
-		trip->hysteresis = 50000;
 		trip->priv = acpi_trip;
 		trip++;
 	}
@@ -785,8 +784,9 @@ static int acpi_thermal_register_thermal_zone(struct acpi_thermal *tz)
 		 dev_name(&tz->device->dev), trip_count);
 	for (i = 0; i < trip_count; i++) {
 		struct thermal_trip *t = &tz->trip_table[i];
-		pr_info("Trip %d: type=%d, temperature=%d, hysteresis=%d, priv=%p\n",
-			i, t->type, t->temperature, t->hysteresis, t->priv);
+		if (t->valid) t->hysteresis = 50000;
+		pr_info("Trip %d: type=%d, temperature=%d, hysteresis=%d, priv=%p, valid=%d\n",
+			i, t->type, t->temperature, t->hysteresis, t->priv, t->valid);
 	}
 
 	tz->thermal_zone = thermal_zone_device_register_with_trips("acpitz",
