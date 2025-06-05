@@ -47,7 +47,10 @@ struct pwm_fan_ctx {
 
 
 
-
+struct pwm_fan_binding {
+	struct pwm_fan_ctx *ctx;
+	struct acpi_device *adev;
+};
 
 
 static int pwm_fan_power_on(struct pwm_fan_ctx *ctx)
@@ -198,10 +201,11 @@ static const struct hwmon_ops pwm_fan_hwmon_ops = {
 static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
-
-	if (!ctx)
+	struct pwm_fan_binding *binding = cdev->devdata;
+	if (!binding || !binding->ctx)
 		return -EINVAL;
+	struct pwm_fan_ctx *ctx = binding->ctx;
+
 
 	*state = ctx->pwm_fan_max_state;
 
@@ -211,7 +215,9 @@ static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
+	struct pwm_fan_binding *binding = cdev->devdata;
+	if (!binding || !binding->ctx)
+		return -EINVAL;
 
 	if (!ctx)
 		return -EINVAL;
@@ -224,8 +230,11 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 static int
 pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
 	int ret;
+	struct pwm_fan_binding *binding = cdev->devdata;
+	if (!binding || !binding->ctx)
+		return -EINVAL;
+
 
 	if (!ctx || (state > ctx->pwm_fan_max_state))
 		return -EINVAL;
@@ -320,11 +329,17 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	struct device *hwmon;
 	int ret;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	struct pwm_fan_binding *binding;
+
+	binding = devm_kzalloc(dev, sizeof(*binding), GFP_KERNEL);
+	if (!binding)
+		return -ENOMEM;
 
 	if (!adev) {
 		dev_err(dev, "No ACPI companion found\n");
 		return -ENODEV;
 	}
+
 
 
 
@@ -341,6 +356,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, ctx);
 
+	binding->ctx = ctx;
+	binding->adev = adev;
 
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
@@ -379,7 +396,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-         cdev = thermal_cooling_device_register( "pwm-fan", adev,
+         cdev = thermal_cooling_device_register( "pwm-fan", binding,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
