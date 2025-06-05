@@ -375,7 +375,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->info.ops = &pwm_fan_hwmon_ops;
 	ctx->info.info = ctx_channels;
 
-	hwmon = devm_hwmon_device_register_with_info(dev, "pwmfan", adev, &ctx->info, NULL);
+	hwmon = devm_hwmon_device_register_with_info(dev, "pwmfan", ctx, &ctx->info, NULL);
 	if (IS_ERR(hwmon)) {
 		dev_err(dev, "Failed to register hwmon device\n");
 		return PTR_ERR(hwmon);
@@ -388,7 +388,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-         cdev = thermal_cooling_device_register( "pwm-fan", ctx,
+         cdev = thermal_cooling_device_register( "pwm-fan", adev,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
