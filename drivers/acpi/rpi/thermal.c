@@ -237,14 +237,17 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 		char name[5] = { '_', 'A', 'C', ('0' + i), '\0' };
 		valid = tz->trips.active[i].trip.valid;
 
-		if (act == -1)
+		if (act == -1) {
+			dev_info(&tz->device->dev, "Active trip points disabled by parameter\n");
 			break; /* disable all active trip points */
+		}
 
 		if (flag == ACPI_TRIPS_INIT || ((flag & ACPI_TRIPS_ACTIVE) &&
 		    tz->trips.active[i].trip.valid)) {
 			status = acpi_evaluate_integer(tz->device->handle,
 						       name, NULL, &tmp);
 			if (ACPI_FAILURE(status)) {
+				dev_info(&tz->device->dev, "Failed to evaluate active trip point %s\n", name);
 				tz->trips.active[i].trip.valid = false;
 				if (i == 0)
 					break;
@@ -269,6 +272,7 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			} else {
 				tz->trips.active[i].trip.temperature = tmp;
 				tz->trips.active[i].trip.valid = true;
+				dev_info(&tz->device->dev, "Loaded active trip point %s with temperature %llu dK\n", name, tmp);
 			}
 		}
 
@@ -278,11 +282,11 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			status = acpi_evaluate_reference(tz->device->handle,
 							 name, NULL, &devices);
 			if (ACPI_FAILURE(status)) {
-				acpi_handle_info(tz->device->handle,
-						 "Invalid active%d threshold\n", i);
+				dev_info(&tz->device->dev, "Failed to evaluate active trip point devices for %s\n", name);
 				tz->trips.active[i].trip.valid = false;
 			} else {
 				tz->trips.active[i].trip.valid = true;
+				dev_info(&tz->device->dev, "Loaded devices for active trip point %s\n", name);
 			}
 
 			if (memcmp(&tz->trips.active[i].devices, &devices,
