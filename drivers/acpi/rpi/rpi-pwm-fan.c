@@ -319,6 +319,14 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	struct thermal_cooling_device *cdev;
 	struct device *hwmon;
 	int ret;
+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+
+	if (!adev) {
+		dev_err(dev, "No ACPI companion found\n");
+		return -ENODEV;
+	}
+
+
 
 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
@@ -371,7 +379,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-cdev = thermal_cooling_device_register( "pwm-fan", ctx,
+         cdev = thermal_cooling_device_register( "pwm-fan", adev,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
