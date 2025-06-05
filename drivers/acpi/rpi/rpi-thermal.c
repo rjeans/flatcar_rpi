@@ -10,6 +10,7 @@
 #include <linux/acpi.h>
 #include <linux/thermal.h>
 #include <linux/platform_device.h> // Include for platform_device and related functions
+#include <linux/err.h>             // Include for IS_ERR and PTR_ERR macros
 
 #undef pr_fmt
 #define pr_fmt(fmt) "RPI_THERMAL: " fmt

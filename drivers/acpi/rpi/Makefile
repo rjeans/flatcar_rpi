@@ -14,7 +14,7 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
 modules:
-	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m CONFIG_RPI_THERMAL_ACPI=m modules
+	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m CONFIG_RPI_THERMAL_ACPI=m CONFIG_THERMAL=m modules
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
