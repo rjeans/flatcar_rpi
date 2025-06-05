@@ -640,7 +640,7 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 					 bind ? "bound" : "unbound");
 			}
 		}
-	}
+	
 			if (dev != device) {
 				dev_info(&thermal->device,
 					 "  Skipping: device does not match\n");
