@@ -584,20 +584,36 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 				 "Active trip[%d] device[%d]: handle=%p, dev=%p, device=%p\n",
 				 i, j, handle, dev, device);
 
+			/* Print both dev and device info for debugging */
 			if (dev) {
 				dev_info(&thermal->device,
-					 "  Device name: %s\n", acpi_device_name(dev));
+					 "  [dev] name: %s\n", acpi_device_name(dev));
 				dev_info(&thermal->device,
-					 "  Device class: %s\n", acpi_device_class(dev));
+					 "  [dev] class: %s\n", acpi_device_class(dev));
 				dev_info(&thermal->device,
-					 "  Device bus_id: %s\n", dev->pnp.bus_id);
+					 "  [dev] bus_id: %s\n", dev->pnp.bus_id);
 				dev_info(&thermal->device,
-					 "  Device status: 0x%x\n", dev->status);
+					 "  [dev] status: 0x%x\n", dev->status);
 				dev_info(&thermal->device,
-					 "  Device type: 0x%x\n", dev->device_type);
+					 "  [dev] type: 0x%x\n", dev->device_type);
 			} else {
 				dev_info(&thermal->device,
-					 "  Device not found for handle\n");
+					 "  [dev] Device not found for handle\n");
+			}
+			if (device) {
+				dev_info(&thermal->device,
+					 "  [device] name: %s\n", acpi_device_name(device));
+				dev_info(&thermal->device,
+					 "  [device] class: %s\n", acpi_device_class(device));
+				dev_info(&thermal->device,
+					 "  [device] bus_id: %s\n", device->pnp.bus_id);
+				dev_info(&thermal->device,
+					 "  [device] status: 0x%x\n", device->status);
+				dev_info(&thermal->device,
+					 "  [device] type: 0x%x\n", device->device_type);
+			} else {
+				dev_info(&thermal->device,
+					 "  [device] Device pointer is NULL\n");
 			}
 			if (dev != device) {
 				dev_info(&thermal->device,
