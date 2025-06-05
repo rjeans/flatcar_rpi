@@ -13,13 +13,13 @@ config RPI_PWM_FAN_ACPI
       Enables support for the Raspberry Pi PoE HAT fan via ACPI thermal control.
 
 config RPI_MAILBOX_ACPI
-    bool "Raspberry Pi ACPI mailbox client"
+    tristate "Raspberry Pi ACPI mailbox client"
     depends on ACPI
     help
       Enables the mailbox interface as an ACPI client device.
 
 config RPI_PWM_POE_ACPI
-    bool "Raspberry Pi PoE PWM ACPI device"
+    tristate "Raspberry Pi PoE PWM ACPI device"
     depends on ACPI
     help
       Enables support for controlling the PoE fan via PWM from ACPI.
