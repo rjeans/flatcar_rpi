@@ -287,6 +287,9 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			} else {
 				tz->trips.active[i].trip.valid = true;
 				dev_info(&tz->device->dev, "Loaded devices for active trip point %s\n", name);
+				for (int d = 0; d < devices.count; d++) {
+					dev_info(&tz->device->dev, "  Device handle[%d]: %p\n", d, devices.handles[d]);
+				}
 			}
 
 			if (memcmp(&tz->trips.active[i].devices, &devices,
