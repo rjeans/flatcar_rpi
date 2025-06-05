@@ -582,15 +582,6 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 			handle = tz->trips.passive.devices.handles[i];
 			dev = acpi_fetch_acpi_dev(handle);
 
-			pr_info("Cooling device (passive): handle=%p, bind=%d, dev=%p, status={present=%d, enabled=%d, functioning=%d}, name=%s, hid=%s\n",
-				handle, bind, dev,
-				dev ? dev->status.present : 0,
-				dev ? dev->status.enabled : 0,
-				dev ? dev->status.functional : 0,
-				dev ? acpi_device_name(dev) : "NULL",
-				dev ? acpi_device_hid(dev) : "NULL");
-
-
 			if (dev != device)
 				continue;
 
@@ -618,6 +609,15 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 		for (j = 0; j < tz->trips.active[i].devices.count; j++) {
 			handle = tz->trips.active[i].devices.handles[j];
 			dev = acpi_fetch_acpi_dev(handle);
+
+			pr_info("Cooling device (active): handle=%p, bind=%d, dev=%p, status={present=%d, enabled=%d, functioning=%d}, name=%s, hid=%s\n",
+				handle, bind, dev,
+				dev ? dev->status.present : 0,
+				dev ? dev->status.enabled : 0,
+				dev ? dev->status.functional : 0,
+				dev ? acpi_device_name(dev) : "NULL",
+				dev ? acpi_device_hid(dev) : "NULL");
+
 			if (dev != device)
 				continue;
 
