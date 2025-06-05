@@ -18,7 +18,7 @@ static int rpi_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	// Placeholder for temperature retrieval logic
 	*temp = 50000; // Example: 50°C
-	dev_info(tz->device, "Retrieved temperature: %d m°C\n", *temp);
+	dev_info(&tz->device->parent, "Retrieved temperature: %d m°C\n", *temp);
 	return 0;
 }
 
