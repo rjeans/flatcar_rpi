@@ -94,6 +94,7 @@ static struct workqueue_struct *acpi_thermal_pm_queue;
 
 struct acpi_thermal_trip {
 	unsigned long temperature;
+	unsigned long hysteresis;
 	bool valid;
 };
 
@@ -116,6 +117,7 @@ struct acpi_thermal_trips {
 	struct acpi_thermal_passive passive;
 	struct acpi_thermal_active active[ACPI_THERMAL_MAX_ACTIVE];
 };
+};
 
 struct acpi_thermal {
 	struct acpi_device *device;
@@ -133,6 +135,8 @@ struct acpi_thermal {
 	struct mutex thermal_check_lock;
 	refcount_t thermal_check_count;
 };
+
+
 
 /* --------------------------------------------------------------------------
                              Thermal Zone Management
