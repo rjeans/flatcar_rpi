@@ -47,10 +47,7 @@ struct pwm_fan_ctx {
 
 
 
-struct pwm_fan_binding {
-	struct pwm_fan_ctx *ctx;
-	struct acpi_device *adev;
-};
+
 
 
 static int pwm_fan_power_on(struct pwm_fan_ctx *ctx)
@@ -201,12 +198,12 @@ static const struct hwmon_ops pwm_fan_hwmon_ops = {
 static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_binding *binding = cdev->devdata;
-	if (!binding || !binding->ctx)
+	struct pwm_fan_ctx *ctx = cdev->devdata;
+
+	if (!ctx)
 		return -EINVAL;
 
-
-	*state = binding->ctx->pwm_fan_max_state;
+	*state = ctx->pwm_fan_max_state;
 
 	return 0;
 }
@@ -214,14 +211,12 @@ static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_binding *binding = cdev->devdata;
-	if (!binding || !binding->ctx)
+	struct pwm_fan_ctx *ctx = cdev->devdata;
+
+	if (!ctx)
 		return -EINVAL;
 
-	if (!binding->ctx)
-		return -EINVAL;
-
-	*state = binding->ctx->pwm_fan_state;
+	*state = ctx->pwm_fan_state;
 
 	return 0;
 }
@@ -229,25 +224,22 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 static int
 pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
+	struct pwm_fan_ctx *ctx = cdev->devdata;
 	int ret;
-	struct pwm_fan_binding *binding = cdev->devdata;
-	if (!binding || !binding->ctx)
+
+	if (!ctx || (state > ctx->pwm_fan_max_state))
 		return -EINVAL;
 
-
-	if (!binding->ctx || (state > binding->ctx->pwm_fan_max_state))
-		return -EINVAL;
-
-	if (state == binding->ctx->pwm_fan_state)
+	if (state == ctx->pwm_fan_state)
 		return 0;
 
-	ret = set_pwm(binding->ctx, binding->ctx->pwm_fan_cooling_levels[state]);
+	ret = set_pwm(ctx, ctx->pwm_fan_cooling_levels[state]);
 	if (ret) {
 		dev_err(&cdev->device, "Cannot set pwm!\n");
 		return ret;
 	}
 
-	binding->ctx->pwm_fan_state = state;
+	ctx->pwm_fan_state = state;
 
 	return ret;
 }
@@ -328,17 +320,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	struct device *hwmon;
 	int ret;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-	struct pwm_fan_binding *binding;
-
-	binding = devm_kzalloc(dev, sizeof(*binding), GFP_KERNEL);
-	if (!binding)
-		return -ENOMEM;
 
 	if (!adev) {
 		dev_err(dev, "No ACPI companion found\n");
 		return -ENODEV;
 	}
-
 
 
 
@@ -354,9 +340,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(ctx->pwm), "Could not get PWM\n");
 
 	platform_set_drvdata(pdev, ctx);
-
-	binding->ctx = ctx;
-	binding->adev = adev;
+    adev->devdata = ctx;
 
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
@@ -395,7 +379,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-         cdev = thermal_cooling_device_register( "pwm-fan", binding,
+         cdev = thermal_cooling_device_register( "pwm-fan", ctx,
 					    &pwm_fan_cooling_ops);
 
 		if (IS_ERR(cdev)) {
