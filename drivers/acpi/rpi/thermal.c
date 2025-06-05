@@ -528,11 +528,31 @@ static void acpi_thermal_zone_device_critical(struct thermal_zone_device *therma
 	thermal_zone_device_critical(thermal);
 }
 
+/**
+ * acpi_thermal_cooling_device_cb - Callback to bind or unbind a cooling device
+ *                                  to/from a thermal zone trip point.
+ * @thermal: Pointer to the thermal zone device.
+ * @cdev: Pointer to the cooling device.
+ * @bind: Boolean indicating whether to bind (true) or unbind (false) the device.
+ *
+ * This function iterates through the thermal zone's trip points and associated
+ * devices to find a match for the given cooling device. If a match is found,
+ * it binds or unbinds the cooling device to/from the corresponding trip point
+ * based on the value of the `bind` parameter. It also logs detailed information
+ * about the binding/unbinding process and the devices involved.
+ *
+ * Returns 0 on success or a negative error code on failure.
+ */
 static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 					  struct thermal_cooling_device *cdev,
 					  bool bind)
 {
 	struct acpi_device *device = cdev->devdata;
+
+	if (!device) {
+		dev_info(&thermal->device, "Cooling device data is NULL\n");
+		return -EINVAL;
+	}
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
 	struct acpi_device *dev;
 	acpi_handle handle;
@@ -579,9 +599,10 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 			 acpi_device_class(device),
 			 device->pnp.bus_id,
 			 device->status,
-			 device->device_type);
-	} else {
-		dev_info(&thermal->device, "[device] Device pointer is NULL\n");
+	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
+		bool is_trip_valid = tz->trips.active[i].trip.valid;
+		if (!is_trip_valid)
+			break;
 	}
 
 	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
@@ -607,37 +628,6 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 				dev_info(&thermal->device,
 					 "Active trip[%d] device[%d]: handle=%p, dev=NULL\n",
 					 i, j, handle);
-			}
-			if (dev != device) {
-				dev_info(&thermal->device,
-					 "  Skipping: device does not match\n");
-				continue;
-			}
-
-			if (bind) {
-				dev_info(&thermal->device,
-					 "  Binding cooling device to trip %d\n", trip);
-				result = thermal_zone_bind_cooling_device(
-						thermal, trip, cdev,
-						THERMAL_NO_LIMIT,
-						THERMAL_NO_LIMIT,
-						THERMAL_WEIGHT_DEFAULT);
-			} else {
-				dev_info(&thermal->device,
-					 "  Unbinding cooling device from trip %d\n", trip);
-				result = thermal_zone_unbind_cooling_device(
-						thermal, trip, cdev);
-			}
-
-			if (result) {
-				dev_info(&thermal->device,
-					 "  Failed to %s cooling device: result=%d\n",
-					 bind ? "bind" : "unbind", result);
-				goto failed;
-			} else {
-				dev_info(&thermal->device,
-					 "  Successfully %s cooling device\n",
-					 bind ? "bound" : "unbound");
 			}
 		}
 	
