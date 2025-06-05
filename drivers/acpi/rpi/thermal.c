@@ -690,7 +690,7 @@ static int acpi_thermal_zone_get_trip_hysteresis(struct thermal_zone_device *the
 
 
 
-    dev_info(&tz->device->dev, "Getting trip hysteresis: \n");
+    pr_info("Getting trip hysteresis: \n");
 	*hyst = 5000;
 	return 0;
 }
