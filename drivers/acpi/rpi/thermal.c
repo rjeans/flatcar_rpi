@@ -327,6 +327,47 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			ACPI_THERMAL_TRIPS_EXCEPTION(flag, tz, "device");
 		}
 	}
+	/* Log full details of the tz structure including trip and devices */
+	dev_info(&tz->device->dev, "---- ACPI Thermal Zone Details ----");
+	dev_info(&tz->device->dev, "Name: %s", tz->name);
+	dev_info(&tz->device->dev, "Temperature: %lu dK", tz->temperature);
+	dev_info(&tz->device->dev, "Last Temperature: %lu dK", tz->last_temperature);
+	dev_info(&tz->device->dev, "Polling Frequency: %lu dS", tz->polling_frequency);
+	dev_info(&tz->device->dev, "Kelvin Offset: %d", tz->kelvin_offset);
+
+	/* Critical trip */
+	dev_info(&tz->device->dev, "Critical Trip: valid=%d, temp=%lu dK",
+			 tz->trips.critical.valid, tz->trips.critical.temperature);
+
+	/* Hot trip */
+	dev_info(&tz->device->dev, "Hot Trip: valid=%d, temp=%lu dK",
+			 tz->trips.hot.valid, tz->trips.hot.temperature);
+
+	/* Passive trip */
+	dev_info(&tz->device->dev, "Passive Trip: valid=%d, temp=%lu dK, tc1=%lu, tc2=%lu, tsp=%lu",
+			 tz->trips.passive.trip.valid, tz->trips.passive.trip.temperature,
+			 tz->trips.passive.tc1, tz->trips.passive.tc2, tz->trips.passive.tsp);
+	dev_info(&tz->device->dev, "Passive Devices Count: %u", tz->trips.passive.devices.count);
+	for (i = 0; i < tz->trips.passive.devices.count; i++) {
+		dev_info(&tz->device->dev, "  Passive Device[%d]: handle=%p", i, tz->trips.passive.devices.handles[i]);
+	}
+
+	/* Active trips */
+	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
+		struct acpi_thermal_active *active = &tz->trips.active[i];
+		dev_info(&tz->device->dev, "Active Trip[%d]: valid=%d, temp=%lu dK, devices.count=%u",
+				 i, active->trip.valid, active->trip.temperature, active->devices.count);
+		for (int j = 0; j < active->devices.count; j++) {
+			dev_info(&tz->device->dev, "  Active Device[%d][%d]: handle=%p", i, j, active->devices.handles[j]);
+		}
+	}
+
+	/* Devices (_TZD) */
+	dev_info(&tz->device->dev, "_TZD Devices Count: %u", tz->devices.count);
+	for (i = 0; i < tz->devices.count; i++) {
+		dev_info(&tz->device->dev, "  _TZD Device[%d]: handle=%p", i, tz->devices.handles[i]);
+	}
+	dev_info(&tz->device->dev, "-----------------------------------");
 }
 
 static int acpi_thermal_adjust_trip(struct thermal_trip *trip, void *data)
@@ -538,21 +579,42 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 		for (j = 0; j < tz->trips.active[i].devices.count; j++) {
 			handle = tz->trips.active[i].devices.handles[j];
 			dev = acpi_fetch_acpi_dev(handle);
-			if (dev != device)
-				continue;
 
-			if (bind)
+			dev_info(&thermal->device,
+				 "Active trip[%d] device[%d]: handle=%p, dev=%p, device=%p\n",
+				 i, j, handle, dev, device);
+
+			if (dev != device) {
+				dev_info(&thermal->device,
+					 "  Skipping: device does not match\n");
+				continue;
+			}
+
+			if (bind) {
+				dev_info(&thermal->device,
+					 "  Binding cooling device to trip %d\n", trip);
 				result = thermal_zone_bind_cooling_device(
 						thermal, trip, cdev,
 						THERMAL_NO_LIMIT,
 						THERMAL_NO_LIMIT,
 						THERMAL_WEIGHT_DEFAULT);
-			else
+			} else {
+				dev_info(&thermal->device,
+					 "  Unbinding cooling device from trip %d\n", trip);
 				result = thermal_zone_unbind_cooling_device(
 						thermal, trip, cdev);
+			}
 
-			if (result)
+			if (result) {
+				dev_info(&thermal->device,
+					 "  Failed to %s cooling device: result=%d\n",
+					 bind ? "bind" : "unbind", result);
 				goto failed;
+			} else {
+				dev_info(&thermal->device,
+					 "  Successfully %s cooling device\n",
+					 bind ? "bound" : "unbound");
+			}
 		}
 	}
 
