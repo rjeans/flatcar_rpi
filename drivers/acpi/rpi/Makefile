@@ -13,6 +13,9 @@ else
 KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
+# Default target
+default: modules_install
+
 modules:
 	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m CONFIG_ACPI_THERMAL=m CONFIG_THERMAL=m modules
 
@@ -22,6 +25,6 @@ modules_install:
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
-.PHONY: modules modules_install clean
+.PHONY: default modules modules_install clean
 endif
 
