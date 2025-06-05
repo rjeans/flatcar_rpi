@@ -690,16 +690,9 @@ static int acpi_thermal_zone_get_trip_hysteresis(struct thermal_zone_device *the
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
 	struct acpi_thermal_trip *acpi_trip;
 
-	if (!tz || trip < 0 || trip >= thermal_zone_device_get_trip_count(thermal))
-		return -EINVAL;
 
-	acpi_trip = tz->trip_table[trip].priv;
-	if (!acpi_trip || !acpi_trip->valid)
-		return -EINVAL;
-	acpi_trip->hysteresis = 5000;
-    dev_info(&tz->device->dev, "Getting trip %d hysteresis: %lu\n",
-	     trip, acpi_trip->hysteresis);
-	*hyst = acpi_trip->hysteresis;
+    dev_info(&tz->device->dev, "Getting trip hysteresis: \n");
+	*hyst = 5000;
 	return 0;
 }
 
