@@ -2,7 +2,7 @@
 obj-$(CONFIG_RPI_PWM_FAN_ACPI) += rpi-pwm-fan.o
 obj-$(CONFIG_RPI_MAILBOX_ACPI) += rpi-mailbox.o
 obj-$(CONFIG_RPI_PWM_POE_ACPI) += rpi-pwm-poe.o
-obj-$(CONFIG_ACPI_THERMAL) += thermal.o
+
 
 
 # Support for out-of-tree compilation
@@ -18,7 +18,7 @@ PWD := $(shell pwd)
 default: modules_install
 
 modules:
-	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m CONFIG_ACPI_THERMAL=m modules
+	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m  modules
 
 modules_install: modules
 	$(MAKE) -C $(KDIR) M=$(PWD) modules_install

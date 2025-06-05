@@ -298,9 +298,6 @@ static int pwm_fan_get_cooling_data(struct device *dev,
 		}
 	}
 
-	dev_info(dev, "Cooling levels: \n");
-	for (i = 0; i < num; i++)
-		dev_info(dev, "level %d --> %d ", i,ctx->pwm_fan_cooling_levels[i]);
 
 	ctx->pwm_fan_max_state = num - 1;
 
@@ -311,7 +308,6 @@ static void pwm_fan_cleanup(void *__ctx)
 {
 	struct pwm_fan_ctx *ctx = __ctx;
 
-	dev_info(ctx->dev, "Cleaning up\n");
 
 
 	pwm_fan_power_off(ctx);
