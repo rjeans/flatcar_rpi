@@ -198,7 +198,9 @@ static const struct hwmon_ops pwm_fan_hwmon_ops = {
 static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
+	struct pwm_fan_ctx *ctx = NULL;
+	if (cdev->devdata)
+		ctx = cdev->devdata->data;
 
 	if (!ctx)
 		return -EINVAL;
@@ -211,7 +213,9 @@ static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 				 unsigned long *state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
+	struct pwm_fan_ctx *ctx = NULL;
+	if (cdev->devdata)
+		ctx = cdev->devdata->data;
 
 	if (!ctx)
 		return -EINVAL;
@@ -224,8 +228,10 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 static int
 pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
-	struct pwm_fan_ctx *ctx = cdev->devdata;
+	struct pwm_fan_ctx *ctx = NULL;
 	int ret;
+	if (cdev->devdata)
+		ctx = cdev->devdata->data;
 
 	if (!ctx || (state > ctx->pwm_fan_max_state))
 		return -EINVAL;
@@ -366,7 +372,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	ctx->info.ops = &pwm_fan_hwmon_ops;
 	ctx->info.info = ctx_channels;
 
-	hwmon = devm_hwmon_device_register_with_info(dev, "pwmfan", ctx, &ctx->info, NULL);
+	hwmon = devm_hwmon_device_register_with_info(dev, "pwmfan", adev, &ctx->info, NULL);
 	if (IS_ERR(hwmon)) {
 		dev_err(dev, "Failed to register hwmon device\n");
 		return PTR_ERR(hwmon);
