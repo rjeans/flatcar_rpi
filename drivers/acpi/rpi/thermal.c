@@ -564,6 +564,17 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 	struct acpi_device *device = cdev->devdata;
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
 	struct acpi_device *dev;
+
+	pr_info("Callback for device: handle=%p, bind=%d, dev=%p, status={present=%d, enabled=%d, functioning=%d}, name=%s, hid=%s\n",
+				device ? device->handle : NULL, bind, device,
+				device ? device->status.present : 0,
+				device ? device->status.enabled : 0,
+				device ? device->status.functional : 0,
+				device ? acpi_device_name(device) : "NULL",
+				device ? acpi_device_hid(device) : "NULL");
+
+
+
 	acpi_handle handle;
 	int i;
 	int j;
