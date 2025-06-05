@@ -401,6 +401,21 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			ACPI_THERMAL_TRIPS_EXCEPTION(flag, tz, "device");
 		}
 	}
+
+	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
+		struct acpi_thermal_active *active = &tz->trips.active[i];
+		struct acpi_thermal_trip *trip = &active->trip;
+
+		pr_info("Active trip %d: valid=%d, temperature=%lu, hysteresis=%lu, devices.count=%d\n",
+			i, trip->valid, trip->temperature, trip->hysteresis, active->devices.count);
+
+		if (active->devices.count > 0) {
+			int j;
+			for (j = 0; j < active->devices.count; j++) {
+				pr_info("  Device %d handle: %p\n", j, active->devices.handles[j]);
+			}
+		}
+	}
 }
 
 static int acpi_thermal_adjust_trip(struct thermal_trip *trip, void *data)
