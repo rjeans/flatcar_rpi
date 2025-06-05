@@ -9,14 +9,16 @@
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/thermal.h>
+#include <linux/platform_device.h> // Include for platform_device and related functions
 
+#undef pr_fmt
 #define pr_fmt(fmt) "RPI_THERMAL: " fmt
 
 static int rpi_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	// Placeholder for temperature retrieval logic
 	*temp = 50000; // Example: 50°C
-	dev_info(&tz->device->dev, "Retrieved temperature: %d m°C\n", *temp);
+	dev_info(tz->device, "Retrieved temperature: %d m°C\n", *temp);
 	return 0;
 }
 
@@ -31,7 +33,7 @@ static int rpi_thermal_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Probing Raspberry Pi ACPI Thermal Zone\n");
 
 	// Log ACPI device information
-	if (pdev->dev.acpi_node) {
+	if (ACPI_HANDLE(&pdev->dev)) {
 		dev_info(&pdev->dev, "ACPI node found: %s\n", dev_name(&pdev->dev));
 	} else {
 		dev_warn(&pdev->dev, "No ACPI node associated with this device\n");
@@ -51,7 +53,6 @@ static int rpi_thermal_probe(struct platform_device *pdev)
 
 	// Log thermal zone configuration
 	dev_info(&pdev->dev, "Thermal zone device name: %s\n", tz->type);
-	dev_info(&pdev->dev, "Cooling devices linked: %d\n", tz->cooling_devices);
 
 	dev_info(&pdev->dev, "Raspberry Pi ACPI Thermal Zone initialized\n");
 	return 0;
