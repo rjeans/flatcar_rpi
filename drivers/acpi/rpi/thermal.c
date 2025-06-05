@@ -288,9 +288,19 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 				tz->trips.active[i].trip.valid = true;
 				dev_info(&tz->device->dev, "Loaded devices for active trip point %s\n", name);
 				for (int d = 0; d < devices.count; d++) {
-					dev_info(&tz->device->dev, "  Device handle[%d]: %p\n", d, devices.handles[d]);
-				}
-			}
+					acpi_handle handle = devices.handles[d];
+					struct acpi_device *dev = acpi_fetch_acpi_dev(handle);
+					dev_info(&tz->device->dev, "  Device handle[%d]: %p\n", d, handle);
+					if (dev) {
+						dev_info(&tz->device->dev, "    Device name: %s\n", acpi_device_name(dev));
+						dev_info(&tz->device->dev, "    Device class: %s\n", acpi_device_class(dev));
+						dev_info(&tz->device->dev, "    Device bus_id: %s\n", dev->pnp.bus_id);
+						dev_info(&tz->device->dev, "    Device status: 0x%x\n", dev->status);
+						dev_info(&tz->device->dev, "    Device type: 0x%x\n", dev->device_type);
+					} else {
+						dev_info(&tz->device->dev, "    Device not found for handle\n");
+					}
+				}}
 
 			if (memcmp(&tz->trips.active[i].devices, &devices,
 				   sizeof(struct acpi_handle_list))) {
