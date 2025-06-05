@@ -18,7 +18,7 @@ static int rpi_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	// Placeholder for temperature retrieval logic
 	*temp = 50000; // Example: 50°C
-	dev_info(tz->device, "Retrieved temperature: %d m°C\n", *temp);
+	dev_info(tz->device->parent, "Retrieved temperature: %d m°C\n", *temp);
 	return 0;
 }
 
@@ -40,7 +40,7 @@ static int rpi_thermal_probe(struct platform_device *pdev)
 	}
 
 	// Register the thermal zone device
-	tz = thermal_zone_device_register("rpi_thermal", 0, 0, NULL,
+	tz = thermal_zone_device_register("rpi_thermal", 0, 0, &pdev->dev,
 					  &rpi_thermal_ops, NULL, 0, 0);
 	if (IS_ERR(tz)) {
 		dev_err(&pdev->dev, "Failed to register thermal zone device\n");
