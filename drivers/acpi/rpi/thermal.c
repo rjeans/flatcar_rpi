@@ -141,19 +141,21 @@ struct acpi_thermal {
 static void log_acpi_device_details(struct acpi_device *device, struct device *log_device)
 {
 	if (device) {
-		dev_info(log_device, "  Device name: %s\n", acpi_device_name(device));
-		dev_info(log_device, "  Device class: %s\n", acpi_device_class(device));
-		dev_info(log_device, "  Device bus_id: %s\n", device->pnp.bus_id);
-		dev_info(log_device, "  Device status: 0x%x\n", (unsigned int)device->status.status);
-		dev_info(log_device, "  Device type: 0x%x\n", device->device_type);
+		dev_info(log_device, "  Device: name=%s, class=%s, bus_id=%s, type=0x%x\n",
+			 acpi_device_name(device),
+			 acpi_device_class(device),
+			 device->pnp.bus_id,
+			 device->device_type);
+		dev_info(log_device, "  Status: present=%u, enabled=%u, show_in_ui=%u, functional=%u, battery_present=%u\n",
+			 device->status.present,
+			 device->status.enabled,
+			 device->status.show_in_ui,
+			 device->status.functional,
+			 device->status.battery_present);
 	} else {
 		dev_info(log_device, "  Device pointer is NULL\n");
 	}
 }
-
-
-
-   static int acpi_thermal_get_temperature(struct acpi_thermal *tz)
 {
 	acpi_status status = AE_OK;
 	unsigned long long tmp;
