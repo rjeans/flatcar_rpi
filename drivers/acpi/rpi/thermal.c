@@ -684,6 +684,25 @@ acpi_thermal_unbind_cooling_device(struct thermal_zone_device *thermal,
 	return acpi_thermal_cooling_device_cb(thermal, cdev, false);
 }
 
+static int acpi_thermal_zone_get_trip_hysteresis(struct thermal_zone_device *thermal,
+						  int trip, int *hyst)
+{
+	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
+	struct acpi_thermal_trip *acpi_trip;
+
+	if (!tz || trip < 0 || trip >= thermal_zone_device_get_trip_count(thermal))
+		return -EINVAL;
+
+	acpi_trip = tz->trip_table[trip].priv;
+	if (!acpi_trip || !acpi_trip->valid)
+		return -EINVAL;
+	acpi_trip->hysteresis = 5000;
+    dev_info(&tz->device->dev, "Getting trip %d hysteresis: %lu\n",
+	     trip, acpi_trip->hysteresis);
+	*hyst = acpi_trip->hysteresis;
+	return 0;
+}
+
 static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
 	.bind = acpi_thermal_bind_cooling_device,
 	.unbind	= acpi_thermal_unbind_cooling_device,
@@ -691,6 +710,7 @@ static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
 	.get_trend = thermal_get_trend,
 	.hot = acpi_thermal_zone_device_hot,
 	.critical = acpi_thermal_zone_device_critical,
+	.get_trip_hysteresis = acpi_thermal_zone_get_trip_hysteresis,
 };
 
 static int acpi_thermal_zone_sysfs_add(struct acpi_thermal *tz)
