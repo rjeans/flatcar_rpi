@@ -528,31 +528,11 @@ static void acpi_thermal_zone_device_critical(struct thermal_zone_device *therma
 	thermal_zone_device_critical(thermal);
 }
 
-/**
- * acpi_thermal_cooling_device_cb - Callback to bind or unbind a cooling device
- *                                  to/from a thermal zone trip point.
- * @thermal: Pointer to the thermal zone device.
- * @cdev: Pointer to the cooling device.
- * @bind: Boolean indicating whether to bind (true) or unbind (false) the device.
- *
- * This function iterates through the thermal zone's trip points and associated
- * devices to find a match for the given cooling device. If a match is found,
- * it binds or unbinds the cooling device to/from the corresponding trip point
- * based on the value of the `bind` parameter. It also logs detailed information
- * about the binding/unbinding process and the devices involved.
- *
- * Returns 0 on success or a negative error code on failure.
- */
 static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 					  struct thermal_cooling_device *cdev,
 					  bool bind)
 {
 	struct acpi_device *device = cdev->devdata;
-
-	if (!device) {
-		dev_info(&thermal->device, "Cooling device data is NULL\n");
-		return -EINVAL;
-	}
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
 	struct acpi_device *dev;
 	acpi_handle handle;
@@ -591,20 +571,6 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 		}
 	}
 
-	/* Print device details outside the loop */
-	if (device) {
-		dev_info(&thermal->device,
-			 "[device] name: %s, class: %s, bus_id: %s, status: 0x%x, type: 0x%x\n",
-			 acpi_device_name(device),
-			 acpi_device_class(device),
-			 device->pnp.bus_id,
-			 device->status,
-	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
-		bool is_trip_valid = tz->trips.active[i].trip.valid;
-		if (!is_trip_valid)
-			break;
-	}
-
 	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
 		if (!tz->trips.active[i].trip.valid)
 			break;
@@ -614,23 +580,41 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 			handle = tz->trips.active[i].devices.handles[j];
 			dev = acpi_fetch_acpi_dev(handle);
 
-			/* Print dev details on one line for each device */
+			dev_info(&thermal->device,
+				 "Active trip[%d] device[%d]: handle=%p, dev=%p, device=%p\n",
+				 i, j, handle, dev, device);
+
+			/* Print both dev and device info for debugging */
 			if (dev) {
 				dev_info(&thermal->device,
-					 "Active trip[%d] device[%d]: handle=%p, dev=%p, name: %s, class: %s, bus_id: %s, status: 0x%x, type: 0x%x\n",
-					 i, j, handle, dev,
-					 acpi_device_name(dev),
-					 acpi_device_class(dev),
-					 dev->pnp.bus_id,
-					 dev->status,
-					 dev->device_type);
+					 "  [dev] name: %s\n", acpi_device_name(dev));
+				dev_info(&thermal->device,
+					 "  [dev] class: %s\n", acpi_device_class(dev));
+				dev_info(&thermal->device,
+					 "  [dev] bus_id: %s\n", dev->pnp.bus_id);
+				dev_info(&thermal->device,
+					 "  [dev] status: 0x%x\n", dev->status);
+				dev_info(&thermal->device,
+					 "  [dev] type: 0x%x\n", dev->device_type);
 			} else {
 				dev_info(&thermal->device,
-					 "Active trip[%d] device[%d]: handle=%p, dev=NULL\n",
-					 i, j, handle);
+					 "  [dev] Device not found for handle\n");
 			}
-		}
-	
+			if (device) {
+				dev_info(&thermal->device,
+					 "  [device] name: %s\n", acpi_device_name(device));
+				dev_info(&thermal->device,
+					 "  [device] class: %s\n", acpi_device_class(device));
+				dev_info(&thermal->device,
+					 "  [device] bus_id: %s\n", device->pnp.bus_id);
+				dev_info(&thermal->device,
+					 "  [device] status: 0x%x\n", device->status);
+				dev_info(&thermal->device,
+					 "  [device] type: 0x%x\n", device->device_type);
+			} else {
+				dev_info(&thermal->device,
+					 "  [device] Device pointer is NULL\n");
+			}
 			if (dev != device) {
 				dev_info(&thermal->device,
 					 "  Skipping: device does not match\n");
