@@ -200,8 +200,8 @@ static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 {
 	struct pwm_fan_ctx *ctx = NULL;
 	struct acpi_device *adev = ACPI_COMPANION(&cdev->device);
-	if (adev->data)
-		ctx = adev->data;
+	if (adev->driver_data)
+		ctx = adev->driver_data;
 
 	if (!ctx)
 		return -EINVAL;
@@ -216,8 +216,8 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 {
 	struct pwm_fan_ctx *ctx = NULL;
 	struct acpi_device *adev = ACPI_COMPANION(&cdev->device);
-	if (adev->data)
-		ctx = adev->data;
+	if (adev->driver_data)
+		ctx = adev->driver_data;
 
 	if (!ctx)
 		return -EINVAL;
@@ -234,8 +234,8 @@ pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 	int ret;
 	struct pwm_fan_ctx *ctx = NULL;
 	struct acpi_device *adev = ACPI_COMPANION(&cdev->device);
-	if (adev->data)
-		ctx = adev->data;
+	if (adev->driver_data)
+		ctx = adev->driver_data;
 
 	if (!ctx || (state > ctx->pwm_fan_max_state))
 		return -EINVAL;
