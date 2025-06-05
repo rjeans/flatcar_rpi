@@ -140,6 +140,7 @@ struct acpi_thermal {
 
 static void log_acpi_device_details(struct acpi_device *device, struct device *log_device)
 {
+	dev_info(log_device, "Entering %s\n", __func__);
 	if (device) {
 		dev_info(log_device, "  Device: name=%s, class=%s, bus_id=%s, type=0x%x\n",
 			 acpi_device_name(device),
@@ -155,15 +156,18 @@ static void log_acpi_device_details(struct acpi_device *device, struct device *l
 	} else {
 		dev_info(log_device, "  Device pointer is NULL\n");
 	}
+	dev_info(log_device, "Exiting %s\n", __func__);
 }
 
 static int acpi_thermal_get_temperature(struct acpi_thermal *tz)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	acpi_status status = AE_OK;
 	unsigned long long tmp;
 
 	if (!tz) {
 		pr_info("ACPI thermal: Invalid thermal zone structure\n");
+		dev_info(&tz->device->dev, "Exiting %s with error\n", __func__);
 		return -EINVAL;
 	}
 
@@ -178,17 +182,19 @@ static int acpi_thermal_get_temperature(struct acpi_thermal *tz)
 	tz->temperature = tmp;
 
 	dev_info(&tz->device->dev, "Current temperature: %lu dK\n", tz->temperature);
-
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 	return 0;
 }
 
 static int acpi_thermal_get_polling_frequency(struct acpi_thermal *tz)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	acpi_status status = AE_OK;
 	unsigned long long tmp;
 
 	if (!tz) {
 		pr_info("ACPI thermal: Invalid thermal zone structure\n");
+		dev_info(&tz->device->dev, "Exiting %s with error\n", __func__);
 		return -EINVAL;
 	}
 
@@ -200,21 +206,23 @@ static int acpi_thermal_get_polling_frequency(struct acpi_thermal *tz)
 
 	tz->polling_frequency = tmp;
 	dev_info(&tz->device->dev, "Polling frequency: %lu dS\n", tz->polling_frequency);
-
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 	return 0;
 }
 
 static int acpi_thermal_temp(struct acpi_thermal *tz, int temp_deci_k)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	if (temp_deci_k == THERMAL_TEMP_INVALID)
 		return THERMAL_TEMP_INVALID;
 
-	return deci_kelvin_to_millicelsius_with_offset(temp_deci_k,
-						       tz->kelvin_offset);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
+	return deci_kelvin_to_millicelsius_with_offset(temp_deci_k, tz->kelvin_offset);
 }
 
 static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	acpi_status status;
 	unsigned long long tmp;
 	struct acpi_handle_list devices;
@@ -379,12 +387,14 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 		dev_info(&tz->device->dev, "  _TZD Device[%d]: handle=%p", i, tz->devices.handles[i]);
 	}
 	dev_info(&tz->device->dev, "-----------------------------------");
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static int acpi_thermal_adjust_trip(struct thermal_trip *trip, void *data)
 {
 	struct acpi_thermal_trip *acpi_trip = trip->priv;
 	struct acpi_thermal *tz = data;
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 
 	if (!acpi_trip)
 		return 0;
@@ -394,29 +404,34 @@ static int acpi_thermal_adjust_trip(struct thermal_trip *trip, void *data)
 	else
 		trip->temperature = THERMAL_TEMP_INVALID;
 
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 	return 0;
 }
 
-static void acpi_thermal_adjust_thermal_zone(struct thermal_zone_device *thermal,
-					     unsigned long data)
+static void acpi_thermal_adjust_thermal_zone(struct thermal_zone_device *thermal, unsigned long data)
 {
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	int flag = data == ACPI_THERMAL_NOTIFY_THRESHOLDS ?
 				ACPI_TRIPS_THRESHOLDS : ACPI_TRIPS_DEVICES;
 
 	__acpi_thermal_trips_update(tz, flag);
 
 	for_each_thermal_trip(tz->thermal_zone, acpi_thermal_adjust_trip, tz);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static void acpi_queue_thermal_check(struct acpi_thermal *tz)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	if (!work_pending(&tz->thermal_check_work))
 		queue_work(acpi_thermal_pm_queue, &tz->thermal_check_work);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static void acpi_thermal_trips_update(struct acpi_thermal *tz, u32 event)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	struct acpi_device *adev = tz->device;
 
 	/*
@@ -431,10 +446,12 @@ static void acpi_thermal_trips_update(struct acpi_thermal *tz, u32 event)
 	acpi_queue_thermal_check(tz);
 	acpi_bus_generate_netlink_event(adev->pnp.device_class,
 					dev_name(&adev->dev), event, 0);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static int acpi_thermal_get_trip_points(struct acpi_thermal *tz)
 {
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	bool valid;
 	int i;
 
@@ -451,6 +468,7 @@ static int acpi_thermal_get_trip_points(struct acpi_thermal *tz)
 		pr_warn(FW_BUG "No valid trip found\n");
 		return -ENODEV;
 	}
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 	return 0;
 }
 
@@ -459,6 +477,7 @@ static int acpi_thermal_get_trip_points(struct acpi_thermal *tz)
 static int thermal_get_temp(struct thermal_zone_device *thermal, int *temp)
 {
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	int result;
 
 	if (!tz)
@@ -470,6 +489,7 @@ static int thermal_get_temp(struct thermal_zone_device *thermal, int *temp)
 
 	*temp = deci_kelvin_to_millicelsius_with_offset(tz->temperature,
 							tz->kelvin_offset);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 	return 0;
 }
 
@@ -522,21 +542,23 @@ static int thermal_get_trend(struct thermal_zone_device *thermal,
 static void acpi_thermal_zone_device_hot(struct thermal_zone_device *thermal)
 {
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
-
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	acpi_bus_generate_netlink_event(tz->device->pnp.device_class,
 					dev_name(&tz->device->dev),
 					ACPI_THERMAL_NOTIFY_HOT, 1);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static void acpi_thermal_zone_device_critical(struct thermal_zone_device *thermal)
 {
 	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
-
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	acpi_bus_generate_netlink_event(tz->device->pnp.device_class,
 					dev_name(&tz->device->dev),
 					ACPI_THERMAL_NOTIFY_CRITICAL, 1);
 
 	thermal_zone_device_critical(thermal);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
@@ -915,6 +937,7 @@ static void acpi_thermal_check_fn(struct work_struct *work)
 	struct acpi_thermal *tz = container_of(work, struct acpi_thermal,
 					       thermal_check_work);
 
+	dev_info(&tz->device->dev, "Entering %s\n", __func__);
 	/*
 	 * In general, it is not sufficient to check the pending bit, because
 	 * subsequent instances of this function may be queued after one of them
@@ -933,6 +956,7 @@ static void acpi_thermal_check_fn(struct work_struct *work)
 	refcount_inc(&tz->thermal_check_count);
 
 	mutex_unlock(&tz->thermal_check_lock);
+	dev_info(&tz->device->dev, "Exiting %s\n", __func__);
 }
 
 static int acpi_thermal_add(struct acpi_device *device)
