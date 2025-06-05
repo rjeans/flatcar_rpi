@@ -117,7 +117,7 @@ struct acpi_thermal_trips {
 	struct acpi_thermal_passive passive;
 	struct acpi_thermal_active active[ACPI_THERMAL_MAX_ACTIVE];
 };
-};
+
 
 struct acpi_thermal {
 	struct acpi_device *device;
