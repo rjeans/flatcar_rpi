@@ -584,6 +584,21 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 				 "Active trip[%d] device[%d]: handle=%p, dev=%p, device=%p\n",
 				 i, j, handle, dev, device);
 
+			if (dev) {
+				dev_info(&thermal->device,
+					 "  Device name: %s\n", acpi_device_name(dev));
+				dev_info(&thermal->device,
+					 "  Device class: %s\n", acpi_device_class(dev));
+				dev_info(&thermal->device,
+					 "  Device bus_id: %s\n", dev->pnp.bus_id);
+				dev_info(&thermal->device,
+					 "  Device status: 0x%x\n", dev->status);
+				dev_info(&thermal->device,
+					 "  Device type: 0x%x\n", dev->device_type);
+			} else {
+				dev_info(&thermal->device,
+					 "  Device not found for handle\n");
+			}
 			if (dev != device) {
 				dev_info(&thermal->device,
 					 "  Skipping: device does not match\n");
