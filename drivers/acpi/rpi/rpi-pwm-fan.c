@@ -204,10 +204,9 @@ static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
 	struct pwm_fan_binding *binding = cdev->devdata;
 	if (!binding || !binding->ctx)
 		return -EINVAL;
-	struct pwm_fan_ctx *ctx = binding->ctx;
 
 
-	*state = ctx->pwm_fan_max_state;
+	*state = binding->ctx->pwm_fan_max_state;
 
 	return 0;
 }
@@ -219,7 +218,7 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 	if (!binding || !binding->ctx)
 		return -EINVAL;
 
-	if (!ctx)
+	if (!binding->ctx)
 		return -EINVAL;
 
 	*state = ctx->pwm_fan_state;
@@ -236,13 +235,13 @@ pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 		return -EINVAL;
 
 
-	if (!ctx || (state > ctx->pwm_fan_max_state))
+	if (!binding->ctx || (state > binding->ctx->pwm_fan_max_state))
 		return -EINVAL;
 
-	if (state == ctx->pwm_fan_state)
+	if (state == binding->ctx->pwm_fan_state)
 		return 0;
 
-	ret = set_pwm(ctx, ctx->pwm_fan_cooling_levels[state]);
+	ret = set_pwm(binding->ctx, binding->ctx->pwm_fan_cooling_levels[state]);
 	if (ret) {
 		dev_err(&cdev->device, "Cannot set pwm!\n");
 		return ret;
