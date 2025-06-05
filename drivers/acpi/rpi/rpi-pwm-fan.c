@@ -221,7 +221,7 @@ static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
 	if (!binding->ctx)
 		return -EINVAL;
 
-	*state = ctx->pwm_fan_state;
+	*state = binding->ctx->pwm_fan_state;
 
 	return 0;
 }
@@ -247,7 +247,7 @@ pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 		return ret;
 	}
 
-	ctx->pwm_fan_state = state;
+	binding->ctx->pwm_fan_state = state;
 
 	return ret;
 }
