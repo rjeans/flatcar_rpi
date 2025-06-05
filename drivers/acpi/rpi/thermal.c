@@ -156,6 +156,8 @@ static void log_acpi_device_details(struct acpi_device *device, struct device *l
 		dev_info(log_device, "  Device pointer is NULL\n");
 	}
 }
+
+static int acpi_thermal_get_temperature(struct acpi_thermal *tz)
 {
 	acpi_status status = AE_OK;
 	unsigned long long tmp;
