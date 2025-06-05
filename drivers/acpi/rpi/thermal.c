@@ -687,8 +687,7 @@ acpi_thermal_unbind_cooling_device(struct thermal_zone_device *thermal,
 static int acpi_thermal_zone_get_trip_hysteresis(struct thermal_zone_device *thermal,
 						  int trip, int *hyst)
 {
-	struct acpi_thermal *tz = thermal_zone_device_priv(thermal);
-	struct acpi_thermal_trip *acpi_trip;
+
 
 
     dev_info(&tz->device->dev, "Getting trip hysteresis: \n");
@@ -703,7 +702,7 @@ static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
 	.get_trend = thermal_get_trend,
 	.hot = acpi_thermal_zone_device_hot,
 	.critical = acpi_thermal_zone_device_critical,
-	.get_trip_hyst = acpi_thermal_zone_get_trip_hysteresis
+	.set_trip_hyst = acpi_thermal_zone_get_trip_hysteresis
 };
 
 static int acpi_thermal_zone_sysfs_add(struct acpi_thermal *tz)
