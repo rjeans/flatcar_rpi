@@ -1093,7 +1093,7 @@ MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
 
 static struct acpi_driver acpi_thermal_driver = {
 	.name = "rpi-acpi-thermal",
-//	.class = ACPI_THERMAL_CLASS,
+	.class = ACPI_THERMAL_CLASS,
 	.ids = thermal_device_ids,
 	.ops = {
 		.add = acpi_thermal_add,
