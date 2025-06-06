@@ -9,6 +9,7 @@
 #include <linux/acpi.h>
 #include <linux/thermal.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
 
 #define DRIVER_NAME "rpi_acpi_thermal"
 #define RPI_HID     "RPIT0001"
@@ -52,19 +53,25 @@ static int rpi_acpi_parse_trip(struct rpi_acpi_thermal *data, const char *method
 	return 0;
 }
 
-static int rpi_acpi_probe(struct acpi_device *adev)
+static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct thermal_trip trips[MAX_TRIPS];
+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
 	int trip_count = 0;
 	int temp;
 
-	data = devm_kzalloc(&adev->dev, sizeof(*data), GFP_KERNEL);
+	if (!adev) {
+		dev_err(&pdev->dev, "No ACPI companion device found\n");
+		return -ENODEV;
+	}
+
+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
 	data->adev = adev;
-	adev->driver_data = data;
+	platform_set_drvdata(pdev, data);
 
 	if (!rpi_acpi_parse_trip(data, "_CRT", &temp)) {
 		data->trip_temps[trip_count] = temp;
@@ -121,13 +128,13 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	dev_info(&adev->dev, "RPI ACPI thermal zone registered with %d trip points\n", trip_count);
+	dev_info(&pdev->dev, "RPI ACPI thermal zone registered with %d trip points\n", trip_count);
 	return 0;
 }
 
-static int rpi_acpi_remove(struct acpi_device *adev)
+static int rpi_acpi_remove(struct platform_device *pdev)
 {
-	struct rpi_acpi_thermal *data = adev->driver_data;
+	struct rpi_acpi_thermal *data = platform_get_drvdata(pdev);
 
 	if (data && data->tzd)
 		thermal_zone_device_unregister(data->tzd);
@@ -141,15 +148,16 @@ static const struct acpi_device_id rpi_acpi_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, rpi_acpi_ids);
 
-static struct acpi_driver rpi_acpi_driver = {
-	.name = DRIVER_NAME,
-	.class = "thermal",
-	.ids = rpi_acpi_ids,
+static struct platform_driver rpi_acpi_driver = {
+	.driver = {
+		.name = DRIVER_NAME,
+		.acpi_match_table = rpi_acpi_ids,
+	},
 	.probe = rpi_acpi_probe,
 	.remove = rpi_acpi_remove,
 };
 
-module_acpi_driver(rpi_acpi_driver);
+module_platform_driver(rpi_acpi_driver);
 
 MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
 MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001");
