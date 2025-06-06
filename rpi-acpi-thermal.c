@@ -335,6 +335,8 @@ static void __acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 		    tz->trips.active[i].trip.valid)) {
 			status = acpi_evaluate_integer(tz->device->handle,
 						       name, NULL, &tmp);
+			dev_info(&tz->device->dev,
+					"Evaluating %s: %d  (%d)\n", name, (int)tmp,status);
 			if (ACPI_FAILURE(status)) {
 				tz->trips.active[i].trip.valid = false;
 				if (i == 0)
