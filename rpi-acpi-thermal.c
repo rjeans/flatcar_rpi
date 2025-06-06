@@ -1081,7 +1081,7 @@ static int acpi_thermal_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(acpi_thermal_pm, acpi_thermal_suspend, acpi_thermal_resume);
 
 static const struct acpi_device_id  thermal_device_ids[] = {
-	{ACPI_THERMAL_HID, 0},
+	{"RPITH0001", 0},
 	{"", 0},
 };
 MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
