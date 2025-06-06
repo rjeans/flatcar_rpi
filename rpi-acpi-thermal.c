@@ -1086,14 +1086,14 @@ static int acpi_thermal_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(acpi_thermal_pm, acpi_thermal_suspend, acpi_thermal_resume);
 
 static const struct acpi_device_id  thermal_device_ids[] = {
-	{ACPI_THERMAL_HID, 0},
+	{"RPIT0001", 0},
 	{"", 0},
 };
 MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
 
 static struct acpi_driver acpi_thermal_driver = {
 	.name = "rpi-acpi-thermal",
-	.class = ACPI_THERMAL_CLASS,
+//	.class = ACPI_THERMAL_CLASS,
 	.ids = thermal_device_ids,
 	.ops = {
 		.add = acpi_thermal_add,
