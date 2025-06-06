@@ -13,7 +13,7 @@
  *          concepts of 'multiple limiters', upper/lower limits, etc.
  */
 
-#define pr_fmt(fmt) "ACPI: thermal: " fmt
+#define pr_fmt(fmt) "ACPI: rpi-acpi-thermal: " fmt
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -1087,7 +1087,7 @@ static const struct acpi_device_id  thermal_device_ids[] = {
 MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
 
 static struct acpi_driver acpi_thermal_driver = {
-	.name = "thermal",
+	.name = "rpi-acpi-thermal",
 	.class = ACPI_THERMAL_CLASS,
 	.ids = thermal_device_ids,
 	.ops = {
@@ -1128,51 +1128,12 @@ static int thermal_psv(const struct dmi_system_id *d) {
 	return 0;
 }
 
-static const struct dmi_system_id thermal_dmi_table[] __initconst = {
-	/*
-	 * Award BIOS on this AOpen makes thermal control almost worthless.
-	 * http://bugzilla.kernel.org/show_bug.cgi?id=8842
-	 */
-	{
-	 .callback = thermal_act,
-	 .ident = "AOpen i915GMm-HFS",
-	 .matches = {
-		DMI_MATCH(DMI_BOARD_VENDOR, "AOpen"),
-		DMI_MATCH(DMI_BOARD_NAME, "i915GMm-HFS"),
-		},
-	},
-	{
-	 .callback = thermal_psv,
-	 .ident = "AOpen i915GMm-HFS",
-	 .matches = {
-		DMI_MATCH(DMI_BOARD_VENDOR, "AOpen"),
-		DMI_MATCH(DMI_BOARD_NAME, "i915GMm-HFS"),
-		},
-	},
-	{
-	 .callback = thermal_tzp,
-	 .ident = "AOpen i915GMm-HFS",
-	 .matches = {
-		DMI_MATCH(DMI_BOARD_VENDOR, "AOpen"),
-		DMI_MATCH(DMI_BOARD_NAME, "i915GMm-HFS"),
-		},
-	},
-	{
-	 .callback = thermal_nocrt,
-	 .ident = "Gigabyte GA-7ZX",
-	 .matches = {
-		DMI_MATCH(DMI_BOARD_VENDOR, "Gigabyte Technology Co., Ltd."),
-		DMI_MATCH(DMI_BOARD_NAME, "7ZX"),
-		},
-	},
-	{}
-};
+
 
 static int __init acpi_thermal_init(void)
 {
 	int result;
 
-	dmi_check_system(thermal_dmi_table);
 
 	if (off) {
 		pr_notice("thermal control disabled\n");
