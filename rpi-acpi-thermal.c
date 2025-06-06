@@ -46,6 +46,7 @@ static int rpi_acpi_parse_trip(struct rpi_acpi_thermal *data, const char *method
 	unsigned long long val;
 
 	status = acpi_evaluate_integer(data->adev->handle, (char *)method, NULL, &val);
+	dev_info(&data->adev->dev, "ACPI method %s returned value: %llu\n", method, val);
 	if (ACPI_FAILURE(status))
 		return -ENODEV;
 
