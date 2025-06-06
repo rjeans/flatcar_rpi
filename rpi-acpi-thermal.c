@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
+/*
+ * rpi-acpi-thermal.c - ACPI thermal zone driver for Raspberry Pi ACPI platforms
+ *
+ * Copyright (C) 2023 Richard Jeans <rich@jeansy.org>
+ */
+
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/thermal.h>
 #include <linux/slab.h>
@@ -27,7 +31,6 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	if (ACPI_FAILURE(status))
 		return -EIO;
 
-	// Convert tenths of Kelvin → millidegree Celsius
 	*temp = ((int)val - 2732) * 100;
 	return 0;
 }
@@ -63,7 +66,6 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 	data->adev = adev;
 	adev->driver_data = data;
 
-	// Parse _CRT
 	if (!rpi_acpi_parse_trip(data, "_CRT", &temp)) {
 		data->trip_temps[trip_count] = temp;
 		trips[trip_count++] = (struct thermal_trip){
@@ -73,7 +75,6 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 		};
 	}
 
-	// Parse _HOT
 	if (!rpi_acpi_parse_trip(data, "_HOT", &temp)) {
 		data->trip_temps[trip_count] = temp;
 		trips[trip_count++] = (struct thermal_trip){
@@ -83,7 +84,6 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 		};
 	}
 
-	// Parse _PSV
 	if (!rpi_acpi_parse_trip(data, "_PSV", &temp)) {
 		data->trip_temps[trip_count] = temp;
 		trips[trip_count++] = (struct thermal_trip){
@@ -93,7 +93,6 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 		};
 	}
 
-	// Parse _AC0.._AC4
 	for (int i = 0; i < 5; i++) {
 		char method[5];
 		snprintf(method, sizeof(method), "_AC%d", i);
@@ -152,6 +151,6 @@ static struct acpi_driver rpi_acpi_driver = {
 
 module_acpi_driver(rpi_acpi_driver);
 
-MODULE_AUTHOR("Richard Jeans");
+MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
 MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001");
 MODULE_LICENSE("GPL");
