@@ -142,12 +142,17 @@ static const struct acpi_device_id rpi_acpi_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, rpi_acpi_ids);
 
+// ✅ Flatcar-style ACPI driver callbacks
+static struct acpi_driver_ops rpi_acpi_ops = {
+	.add = rpi_acpi_probe,
+	.remove = rpi_acpi_remove,
+};
+
 static struct acpi_driver rpi_acpi_driver = {
 	.name = DRIVER_NAME,
 	.class = "thermal",
 	.ids = rpi_acpi_ids,
-	.probe = rpi_acpi_probe,
-	.remove = rpi_acpi_remove,
+	.ops = &rpi_acpi_ops,
 };
 
 module_acpi_driver(rpi_acpi_driver);
