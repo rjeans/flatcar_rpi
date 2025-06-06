@@ -111,12 +111,12 @@ static int rpi_acpi_probe(struct acpi_device *adev)
 		"rpi_acpi_thermal",
 		trips,
 		trip_count,
-		0,                      // read-only mask
+		0,
 		data,
 		&rpi_acpi_thermal_ops,
 		NULL,
 		0,
-		1000                   // polling interval in ms
+		1000
 	);
 
 	if (IS_ERR(data->tzd))
@@ -142,17 +142,12 @@ static const struct acpi_device_id rpi_acpi_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, rpi_acpi_ids);
 
-// ✅ Flatcar-style ACPI driver callbacks
-static struct acpi_driver_ops rpi_acpi_ops = {
-	.add = rpi_acpi_probe,
-	.remove = rpi_acpi_remove,
-};
-
 static struct acpi_driver rpi_acpi_driver = {
 	.name = DRIVER_NAME,
 	.class = "thermal",
 	.ids = rpi_acpi_ids,
-	.ops = &rpi_acpi_ops,
+	.probe = rpi_acpi_probe,
+	.remove = rpi_acpi_remove,
 };
 
 module_acpi_driver(rpi_acpi_driver);
