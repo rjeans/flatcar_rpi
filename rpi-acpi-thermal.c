@@ -6,20 +6,20 @@
 #include <linux/thermal.h>
 #include <linux/slab.h>
 
-#define DRIVER_NAME "rpec_thermal"
-#define RPEC_HID    "RPIT0001"
-#define MAX_TRIPS   8  // CRT, HOT, PSV, AC0..AC4
+#define DRIVER_NAME "rpi_acpi_thermal"
+#define RPI_HID     "RPIT0001"
+#define MAX_TRIPS   8  // _CRT, _HOT, _PSV, _AC0.._AC4
 
-struct rpec_thermal {
+struct rpi_acpi_thermal {
 	struct thermal_zone_device *tzd;
 	struct acpi_device *adev;
 	int trip_temps[MAX_TRIPS]; // millidegree Celsius
 };
 
-static int rpec_get_temp(void *data, int *temp)
+static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct rpec_thermal *rpec = data;
-	acpi_handle handle = rpec->adev->handle;
+	struct rpi_acpi_thermal *data = tz->devdata;
+	acpi_handle handle = data->adev->handle;
 	unsigned long long val;
 	acpi_status status;
 
@@ -27,111 +27,131 @@ static int rpec_get_temp(void *data, int *temp)
 	if (ACPI_FAILURE(status))
 		return -EIO;
 
-	// Convert tenths of Kelvin to millidegree Celsius
+	// Convert tenths of Kelvin → millidegree Celsius
 	*temp = ((int)val - 2732) * 100;
 	return 0;
 }
 
-static struct thermal_zone_device_ops rpec_thermal_ops = {
-	.get_temp = rpec_get_temp,
+static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
+	.get_temp = rpi_acpi_get_temp,
 };
 
-static int rpec_parse_trip(struct rpec_thermal *rpec, const char *method, int index)
+static int rpi_acpi_parse_trip(struct rpi_acpi_thermal *data, const char *method, int *out_temp)
 {
 	acpi_status status;
 	unsigned long long val;
 
-	status = acpi_evaluate_integer(rpec->adev->handle, method, NULL, &val);
+	status = acpi_evaluate_integer(data->adev->handle, (char *)method, NULL, &val);
 	if (ACPI_FAILURE(status))
 		return -ENODEV;
 
-	rpec->trip_temps[index] = ((int)val - 2732) * 100;
+	*out_temp = ((int)val - 2732) * 100;
 	return 0;
 }
 
-static int rpec_probe(struct acpi_device *adev)
+static int rpi_acpi_probe(struct acpi_device *adev)
 {
-	struct rpec_thermal *rpec;
+	struct rpi_acpi_thermal *data;
 	struct thermal_trip trips[MAX_TRIPS];
-	int num_trips = 0, i;
+	int trip_count = 0;
+	int temp;
 
-	rpec = devm_kzalloc(&adev->dev, sizeof(*rpec), GFP_KERNEL);
-	if (!rpec)
+	data = devm_kzalloc(&adev->dev, sizeof(*data), GFP_KERNEL);
+	if (!data)
 		return -ENOMEM;
 
-	rpec->adev = adev;
-	acpi_driver_data(adev) = rpec;
+	data->adev = adev;
+	adev->driver_data = data;
 
-	// Define trip points
-	if (!rpec_parse_trip(rpec, "_CRT", num_trips))
-		trips[num_trips++] = (struct thermal_trip){
+	// Parse _CRT
+	if (!rpi_acpi_parse_trip(data, "_CRT", &temp)) {
+		data->trip_temps[trip_count] = temp;
+		trips[trip_count++] = (struct thermal_trip){
 			.type = THERMAL_TRIP_CRITICAL,
-			.temperature = rpec->trip_temps[num_trips],
+			.temperature = temp,
 			.hysteresis = 0,
 		};
-	if (!rpec_parse_trip(rpec, "_HOT", num_trips))
-		trips[num_trips++] = (struct thermal_trip){
-			.type = THERMAL_TRIP_HOT,
-			.temperature = rpec->trip_temps[num_trips],
-			.hysteresis = 0,
-		};
-	if (!rpec_parse_trip(rpec, "_PSV", num_trips))
-		trips[num_trips++] = (struct thermal_trip){
-			.type = THERMAL_TRIP_PASSIVE,
-			.temperature = rpec->trip_temps[num_trips],
-			.hysteresis = 0,
-		};
+	}
 
-	// Add active trips for _AC0.._AC4
-	for (i = 0; i < 5; i++) {
-		char name[5];
-		snprintf(name, sizeof(name), "_AC%d", i);
-		if (!rpec_parse_trip(rpec, name, num_trips)) {
-			trips[num_trips++] = (struct thermal_trip){
+	// Parse _HOT
+	if (!rpi_acpi_parse_trip(data, "_HOT", &temp)) {
+		data->trip_temps[trip_count] = temp;
+		trips[trip_count++] = (struct thermal_trip){
+			.type = THERMAL_TRIP_HOT,
+			.temperature = temp,
+			.hysteresis = 0,
+		};
+	}
+
+	// Parse _PSV
+	if (!rpi_acpi_parse_trip(data, "_PSV", &temp)) {
+		data->trip_temps[trip_count] = temp;
+		trips[trip_count++] = (struct thermal_trip){
+			.type = THERMAL_TRIP_PASSIVE,
+			.temperature = temp,
+			.hysteresis = 0,
+		};
+	}
+
+	// Parse _AC0.._AC4
+	for (int i = 0; i < 5; i++) {
+		char method[5];
+		snprintf(method, sizeof(method), "_AC%d", i);
+		if (!rpi_acpi_parse_trip(data, method, &temp)) {
+			data->trip_temps[trip_count] = temp;
+			trips[trip_count++] = (struct thermal_trip){
 				.type = THERMAL_TRIP_ACTIVE,
-				.temperature = rpec->trip_temps[num_trips],
+				.temperature = temp,
 				.hysteresis = 0,
 			};
 		}
 	}
 
-	rpec->tzd = thermal_zone_device_register_with_trips("rpec_thermal", trips,
-							    num_trips, rpec,
-							    &rpec_thermal_ops,
-							    NULL, 0, 1000);
-	if (IS_ERR(rpec->tzd))
-		return PTR_ERR(rpec->tzd);
+	data->tzd = thermal_zone_device_register_with_trips(
+		"rpi_acpi_thermal",
+		trips,
+		trip_count,
+		0,                      // read-only mask
+		data,
+		&rpi_acpi_thermal_ops,
+		NULL,
+		0,
+		1000                   // polling interval in ms
+	);
 
-	dev_info(&adev->dev, "RPEC thermal zone registered\n");
+	if (IS_ERR(data->tzd))
+		return PTR_ERR(data->tzd);
+
+	dev_info(&adev->dev, "RPI ACPI thermal zone registered with %d trip points\n", trip_count);
 	return 0;
 }
 
-static int rpec_remove(struct acpi_device *adev)
+static int rpi_acpi_remove(struct acpi_device *adev)
 {
-	struct rpec_thermal *rpec = acpi_driver_data(adev);
+	struct rpi_acpi_thermal *data = adev->driver_data;
 
-	thermal_zone_device_unregister(rpec->tzd);
+	if (data && data->tzd)
+		thermal_zone_device_unregister(data->tzd);
+
 	return 0;
 }
 
-static const struct acpi_device_id rpec_ids[] = {
-	{ RPEC_HID, 0 },
+static const struct acpi_device_id rpi_acpi_ids[] = {
+	{ RPI_HID, 0 },
 	{ }
 };
-MODULE_DEVICE_TABLE(acpi, rpec_ids);
+MODULE_DEVICE_TABLE(acpi, rpi_acpi_ids);
 
-static struct acpi_driver rpec_driver = {
+static struct acpi_driver rpi_acpi_driver = {
 	.name = DRIVER_NAME,
 	.class = "thermal",
-	.ids = rpec_ids,
-	.ops = &(struct acpi_driver_ops){
-		.add = rpec_probe,
-		.remove = rpec_remove,
-	},
+	.ids = rpi_acpi_ids,
+	.probe = rpi_acpi_probe,
+	.remove = rpi_acpi_remove,
 };
 
-module_acpi_driver(rpec_driver);
+module_acpi_driver(rpi_acpi_driver);
 
-MODULE_AUTHOR("Your Name");
-MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPEC");
+MODULE_AUTHOR("Richard Jeans");
+MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001");
 MODULE_LICENSE("GPL");
