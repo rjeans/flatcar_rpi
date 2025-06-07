@@ -19,6 +19,8 @@ struct rpi_acpi_thermal {
 	struct thermal_zone_device *tzd;
 	struct acpi_device *adev;
 	int trip_temps[MAX_TRIPS]; // millidegree Celsius
+	struct thermal_trip trips[MAX_TRIPS];
+	int trip_count;
 };
 
 static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
@@ -40,29 +42,34 @@ static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 };
 
-static int rpi_acpi_parse_trip(struct rpi_acpi_thermal *data, const char *method, int *out_temp)
+static int rpi_acpi_add_trip(struct rpi_acpi_thermal *data, const char *method, enum thermal_trip_type type)
 {
 	acpi_status status;
 	unsigned long long val;
+	int temp;
 
 	status = acpi_evaluate_integer(data->adev->handle, (acpi_string)method, NULL, &val);
-	dev_info(&data->adev->dev, "ACPI name %s returned value: %llu\n", method, val);
-	if (ACPI_FAILURE(status)){
-		dev_err(&data->adev->dev, "Failed to evaluate %s: %d\n", method, status);
+	if (ACPI_FAILURE(status)) {
+		dev_dbg(&data->adev->dev, "Trip %s not defined\n", method);
 		return -ENODEV;
 	}
 
-	*out_temp = ((int)val - 2732) * 100;
+	temp = ((int)val - 2732) * 100;
+	data->trip_temps[data->trip_count] = temp;
+	data->trips[data->trip_count++] = (struct thermal_trip){
+		.type = type,
+		.temperature = temp,
+		.hysteresis = 0,
+	};
+
+	dev_info(&data->adev->dev, "Trip %s = %d m°C\n", method, temp);
 	return 0;
 }
 
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
-	struct thermal_trip trips[MAX_TRIPS];
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-	int trip_count = 0;
-	int temp;
 
 	if (!adev) {
 		dev_err(&pdev->dev, "No ACPI companion device found\n");
@@ -74,52 +81,23 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	data->adev = adev;
+	data->trip_count = 0;
 	platform_set_drvdata(pdev, data);
 
-	if (!rpi_acpi_parse_trip(data, "_CRT", &temp)) {
-		data->trip_temps[trip_count] = temp;
-		trips[trip_count++] = (struct thermal_trip){
-			.type = THERMAL_TRIP_CRITICAL,
-			.temperature = temp,
-			.hysteresis = 0,
-		};
-	}
-
-	if (!rpi_acpi_parse_trip(data, "_HOT", &temp)) {
-		data->trip_temps[trip_count] = temp;
-		trips[trip_count++] = (struct thermal_trip){
-			.type = THERMAL_TRIP_HOT,
-			.temperature = temp,
-			.hysteresis = 0,
-		};
-	}
-
-	if (!rpi_acpi_parse_trip(data, "_PSV", &temp)) {
-		data->trip_temps[trip_count] = temp;
-		trips[trip_count++] = (struct thermal_trip){
-			.type = THERMAL_TRIP_PASSIVE,
-			.temperature = temp,
-			.hysteresis = 0,
-		};
-	}
+	rpi_acpi_add_trip(data, "_CRT", THERMAL_TRIP_CRITICAL);
+	rpi_acpi_add_trip(data, "_HOT", THERMAL_TRIP_HOT);
+	rpi_acpi_add_trip(data, "_PSV", THERMAL_TRIP_PASSIVE);
 
 	for (int i = 0; i < 5; i++) {
 		char method[5];
 		snprintf(method, sizeof(method), "_AC%d", i);
-		if (!rpi_acpi_parse_trip(data, method, &temp)) {
-			data->trip_temps[trip_count] = temp;
-			trips[trip_count++] = (struct thermal_trip){
-				.type = THERMAL_TRIP_ACTIVE,
-				.temperature = temp,
-				.hysteresis = 0,
-			};
-		}
+		rpi_acpi_add_trip(data, method, THERMAL_TRIP_ACTIVE);
 	}
 
 	data->tzd = thermal_zone_device_register_with_trips(
 		"rpi_acpi_thermal",
-		trips,
-		trip_count,
+		data->trips,
+		data->trip_count,
 		0,
 		data,
 		&rpi_acpi_thermal_ops,
@@ -131,7 +109,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	dev_info(&pdev->dev, "RPI ACPI thermal zone registered with %d trip points\n", trip_count);
+	dev_info(&pdev->dev, "Registered thermal zone with %d trip(s)\n", data->trip_count);
 	return 0;
 }
 
