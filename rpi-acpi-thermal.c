@@ -29,6 +29,20 @@ struct rpi_acpi_thermal {
 	struct thermal_cooling_device *cdev;
 };
 
+static inline int check_array_length(struct device *dev, const char *prop, int expected)
+{
+	int count = device_property_count_u32(dev, prop);
+	if (count < 0) {
+		dev_err(dev, "Missing property: %s\n", prop);
+		return count;
+	}
+	if (count != expected) {
+		dev_err(dev, "Length mismatch for %s: expected %d, got %d\n", prop, expected, count);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 {
 	struct rpi_acpi_thermal *data = tz->devdata;
@@ -48,25 +62,13 @@ static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 };
 
-static inline int check_matching_length(struct device *dev, const char *prop, int expected)
-{
-	int len = device_property_count_u32(dev, prop);
-	if (len < 0)
-		return len;
-	if (len != expected) {
-		dev_err(dev, "Length mismatch for %s: expected %d, got %d\n", prop, expected, len);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
 	struct acpi_device *cdev_adev;
 	acpi_handle fan_handle;
-	int i, ret;
+	int ret, i;
 
 	if (!adev)
 		return -ENODEV;
@@ -78,42 +80,45 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	data->adev = adev;
 	platform_set_drvdata(pdev, data);
 
+	/* Infer trip count */
 	ret = device_property_count_u32(&pdev->dev, "active-trip-temps");
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Missing or invalid property: active-trip-temps\n");
+		dev_err(&pdev->dev, "Missing property: active-trip-temps\n");
+		return ret;
+	}
+	if (ret > MAX_TRIPS) {
+		dev_err(&pdev->dev, "Trip count (%d) exceeds MAX_TRIPS (%d)\n", ret, MAX_TRIPS);
 		return -EINVAL;
 	}
 	data->trip_count = ret;
 
-	if (data->trip_count > MAX_TRIPS) {
-		dev_err(&pdev->dev, "trip-count exceeds MAX_TRIPS (%d)\n", MAX_TRIPS);
-		return -EINVAL;
+	/* Read trip temperatures */
+	ret = device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to read active-trip-temps array\n");
+		return ret;
 	}
 
-	if (check_matching_length(&pdev->dev, "active-trip-hysteresis", data->trip_count))
-		return -EINVAL;
-	if (check_matching_length(&pdev->dev, "cooling-min-states", data->trip_count))
-		return -EINVAL;
-	if (check_matching_length(&pdev->dev, "cooling-max-states", data->trip_count))
-		return -EINVAL;
-
-	ret = device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count);
-	if (ret)
-		return dev_err_probe(&pdev->dev, ret, "Failed to read active-trip-temps\n");
-
+	/* Optional hysteresis */
 	ret = device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count);
-	if (ret) {
-		dev_warn(&pdev->dev, "Missing active-trip-hysteresis, defaulting to 0\n");
+	if (ret < 0) {
+		dev_warn(&pdev->dev, "active-trip-hysteresis missing or invalid, defaulting to zero\n");
 		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
 	}
 
-	ret = device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count);
+	/* Validate and read cooling state arrays */
+	ret = check_array_length(&pdev->dev, "cooling-min-states", data->trip_count);
 	if (ret)
-		return dev_err_probe(&pdev->dev, ret, "Failed to read cooling-min-states\n");
+		return ret;
+	ret = check_array_length(&pdev->dev, "cooling-max-states", data->trip_count);
+	if (ret)
+		return ret;
 
-	ret = device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count);
-	if (ret)
-		return dev_err_probe(&pdev->dev, ret, "Failed to read cooling-max-states\n");
+	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0 ||
+	    device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0) {
+		dev_err(&pdev->dev, "Failed to read cooling state arrays\n");
+		return -EINVAL;
+	}
 
 	for (i = 0; i < data->trip_count; i++) {
 		data->trips[i].type = THERMAL_TRIP_ACTIVE;
@@ -122,11 +127,14 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	}
 
 	data->tzd = thermal_zone_device_register_with_trips(DRIVER_NAME,
-				data->trips, data->trip_count, 0, data,
-				&rpi_acpi_thermal_ops, NULL, 0, 1000);
-	if (IS_ERR(data->tzd))
+		data->trips, data->trip_count, 0, data,
+		&rpi_acpi_thermal_ops, NULL, 0, 1000);
+	if (IS_ERR(data->tzd)) {
+		dev_err(&pdev->dev, "Failed to register thermal zone\n");
 		return PTR_ERR(data->tzd);
+	}
 
+	/* Locate cooling device via _DSD reference */
 	if (acpi_get_handle(data->adev->handle, "_DSD.CoolingDevice", &fan_handle)) {
 		dev_err(&pdev->dev, "CoolingDevice handle from _DSD not found\n");
 		goto unregister_tzd;
@@ -134,7 +142,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	cdev_adev = acpi_fetch_acpi_dev(fan_handle);
 	if (!cdev_adev) {
-		dev_err(&pdev->dev, "Failed to resolve ACPI cooling device from fan_handle\n");
+		dev_err(&pdev->dev, "Failed to resolve ACPI cooling device from handle\n");
 		goto unregister_tzd;
 	}
 
@@ -146,7 +154,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	for (i = 0; i < data->trip_count; i++) {
 		thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
-		                                  data->max_states[i], data->min_states[i], 0);
+			data->max_states[i], data->min_states[i], 0);
 	}
 
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
