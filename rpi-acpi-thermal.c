@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <acpi/acpi_bus.h>
 #include <linux/err.h>
 
 #define DRIVER_NAME "rpi_acpi_thermal"
