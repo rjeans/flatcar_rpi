@@ -73,7 +73,7 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 
 	status = acpi_evaluate_object(parent, "_DSD", NULL, &buf);
 	if (ACPI_FAILURE(status)) {
-		dev_err(dev, "_DSD evaluation failed\n");
+		dev_err(dev, "_DSD evaluation failed: %s\n", acpi_format_exception(status));
 		return NULL;
 	}
 
@@ -84,20 +84,57 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		return NULL;
 	}
 
-	for (int i = 0; i + 1 < dsd->package.count; i += 2) {
-		union acpi_object *key = &dsd->package.elements[i];
-		union acpi_object *val = &dsd->package.elements[i + 1];
+	if (dsd->package.count < 2) {
+		dev_err(dev, "_DSD package too short (%d elements)\n", dsd->package.count);
+		kfree(buf.pointer);
+		return NULL;
+	}
 
-		if (key->type == ACPI_TYPE_STRING &&
-		    !strcmp(key->string.pointer, "cooling-device") &&
-		    val->type == ACPI_TYPE_LOCAL_REFERENCE) {
-			result = val->reference.handle;
-			break;
+	/* ACPI _DSD format: {UUID, properties} */
+	union acpi_object *uuid = &dsd->package.elements[0];
+	union acpi_object *props = &dsd->package.elements[1];
+
+	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE) {
+		dev_err(dev, "_DSD UUID or properties malformed (uuid type=%d, props type=%d)\n",
+		        uuid->type, props->type);
+		kfree(buf.pointer);
+		return NULL;
+	}
+
+	for (int i = 0; i < props->package.count; i++) {
+		union acpi_object *entry = &props->package.elements[i];
+
+		if (entry->type != ACPI_TYPE_PACKAGE || entry->package.count != 2)
+			continue;
+
+		union acpi_object *key = &entry->package.elements[0];
+		union acpi_object *val = &entry->package.elements[1];
+
+		if (key->type != ACPI_TYPE_STRING)
+			continue;
+
+		dev_dbg(dev, "_DSD property: %s (type %d)\n", key->string.pointer, val->type);
+
+		if (!strcmp(key->string.pointer, "cooling-device")) {
+			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
+				result = val->reference.handle;
+				dev_info(dev, "Found cooling-device as direct reference\n");
+				break;
+			} else if (val->type == ACPI_TYPE_PACKAGE &&
+			           val->package.count > 0 &&
+			           val->package.elements[0].type == ACPI_TYPE_LOCAL_REFERENCE) {
+				result = val->package.elements[0].reference.handle;
+				dev_info(dev, "Found cooling-device inside package (count=%d)\n",
+				         val->package.count);
+				break;
+			} else {
+				dev_err(dev, "cooling-device property is not a reference or valid package (type=%d)\n", val->type);
+			}
 		}
 	}
 
 	if (!result)
-		dev_err(dev, "cooling-device not found in _DSD package\n");
+		dev_err(dev, "cooling-device not found in _DSD properties\n");
 
 	kfree(buf.pointer);
 	return result;
