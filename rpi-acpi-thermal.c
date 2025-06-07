@@ -63,23 +63,20 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
-	static const guid_t guid = GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
-	                                     0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
-	union acpi_object *dsd = NULL;
+	struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *dsd;
 	acpi_handle result = NULL;
-	int rev;
 
-	for (rev = 2; rev >= 0 && !dsd; rev--)
-		dsd = acpi_evaluate_dsm(parent, &guid, rev, 0, NULL);
-
-	if (!dsd) {
-		dev_err(dev, "_DSD evaluation failed or returned NULL for all revisions\n");
+	acpi_status status = acpi_get_object(parent, "_DSD", &buf);
+	if (ACPI_FAILURE(status)) {
+		dev_err(dev, "_DSD: acpi_get_object failed\n");
 		return NULL;
 	}
 
-	if (dsd->type != ACPI_TYPE_PACKAGE) {
-		dev_err(dev, "_DSD is not a package (type=%d)\n", dsd->type);
-		ACPI_FREE(dsd);
+	dsd = buf.pointer;
+	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
+		dev_err(dev, "_DSD: not a valid package (type=%d)\n", dsd ? dsd->type : -1);
+		kfree(buf.pointer);
 		return NULL;
 	}
 
@@ -96,9 +93,9 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 	}
 
 	if (!result)
-		dev_err(dev, "CoolingDevice reference not found in _DSD\n");
+		dev_err(dev, "_DSD: cooling-device not found in _DSD package\n");
 
-	ACPI_FREE(dsd);
+	kfree(buf.pointer);
 	return result;
 }
 
