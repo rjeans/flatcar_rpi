@@ -112,14 +112,9 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		goto unregister_tzd;
 	}
 
-	#if defined(CONFIG_ACPI)
-	cdev_adev = acpi_bus_get_acpi_device(fan_handle);
-#else
-	cdev_adev = NULL;
-#endif
+	cdev_adev = acpi_fetch_acpi_dev(fan_handle);
 	if (!cdev_adev) {
-		dev_err(&pdev->dev, "Failed to resolve ACPI cooling device from fan_handle
-");
+		dev_err(&pdev->dev, "Failed to resolve ACPI cooling device from fan_handle\n");
 		goto unregister_tzd;
 	}
 
@@ -131,7 +126,8 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	for (i = 0; i < data->trip_count; i++) {
 		thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
-					   data->max_states[i], data->min_states[i], 0);
+		                                 data->max_states[i],
+		                                 data->min_states[i], 0);
 	}
 
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
