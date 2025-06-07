@@ -11,7 +11,6 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
-#include <acpi/acpi_bus.h>
 #include <linux/err.h>
 
 #define DRIVER_NAME "rpi_acpi_thermal"
@@ -113,8 +112,10 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		goto unregister_tzd;
 	}
 
-	if (acpi_bus_get_device(fan_handle, &cdev_adev)) {
-		dev_err(&pdev->dev, "Cooling device not found under ACPI\n");
+	cdev_adev = acpi_fetch_acpi_dev(fan_handle);
+	if (!cdev_adev) {
+		dev_err(&pdev->dev, "Cooling device not found under ACPI
+");
 		goto unregister_tzd;
 	}
 
