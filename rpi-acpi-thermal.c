@@ -61,21 +61,24 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	return 0;
 }
 
+#include <acpi/acpi_bus.h>  // Ensure this is included at the top
+
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
+	acpi_status status;
 	struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *dsd;
 	acpi_handle result = NULL;
 
-	acpi_status status = acpi_get_object(parent, "_DSD", &buf);
+	status = acpi_evaluate_object(parent, "_DSD", NULL, &buf);
 	if (ACPI_FAILURE(status)) {
-		dev_err(dev, "_DSD: acpi_get_object failed\n");
+		dev_err(dev, "_DSD evaluation failed\n");
 		return NULL;
 	}
 
 	dsd = buf.pointer;
 	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
-		dev_err(dev, "_DSD: not a valid package (type=%d)\n", dsd ? dsd->type : -1);
+		dev_err(dev, "_DSD is not a package (type=%d)\n", dsd ? dsd->type : -1);
 		kfree(buf.pointer);
 		return NULL;
 	}
@@ -93,12 +96,11 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 	}
 
 	if (!result)
-		dev_err(dev, "_DSD: cooling-device not found in _DSD package\n");
+		dev_err(dev, "cooling-device not found in _DSD package\n");
 
 	kfree(buf.pointer);
 	return result;
 }
-
 
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
