@@ -12,6 +12,8 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/err.h>
+#include <acpi/acpi_bus.h>
+#include <acpi/acuuid.h>
 
 #define DRIVER_NAME "rpi_acpi_thermal"
 #define RPI_HID     "RPIT0001"
@@ -61,6 +63,38 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 };
+
+/* Extract handle from _DSD for "cooling-device" key */
+static acpi_handle find_cooling_device_handle(acpi_handle parent_handle)
+{
+	union acpi_object *dsd;
+	acpi_handle ref_handle = NULL;
+	const guid_t guid = UUID_DSD;
+	int i;
+
+	dsd = acpi_evaluate_dsm(parent_handle, &guid, 1, 0);
+	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
+		pr_warn("ACPI: _DSD evaluation failed or not a package\n");
+		return NULL;
+	}
+
+	for (i = 0; i < dsd->package.count; i++) {
+		union acpi_object *prop = &dsd->package.elements[i];
+
+		if (prop->type == ACPI_TYPE_PACKAGE &&
+		    prop->package.count == 2 &&
+		    prop->package.elements[0].type == ACPI_TYPE_STRING &&
+		    strcmp(prop->package.elements[0].string.pointer, "cooling-device") == 0 &&
+		    prop->package.elements[1].type == ACPI_TYPE_LOCAL_REFERENCE) {
+
+			ref_handle = prop->package.elements[1].reference.handle;
+			break;
+		}
+	}
+
+	ACPI_FREE(dsd);
+	return ref_handle;
+}
 
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
@@ -134,9 +168,9 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return PTR_ERR(data->tzd);
 	}
 
-	/* Locate cooling device via _DSD reference */
-	if (acpi_get_handle(data->adev->handle, "_DSD.cooling-device", &fan_handle)) {
-		dev_err(&pdev->dev, "CoolingDevice handle from _DSD not found\n");
+	fan_handle = find_cooling_device_handle(data->adev->handle);
+	if (!fan_handle) {
+		dev_err(&pdev->dev, "CoolingDevice reference not found in _DSD\n");
 		goto unregister_tzd;
 	}
 
