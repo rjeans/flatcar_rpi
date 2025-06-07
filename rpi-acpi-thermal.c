@@ -243,6 +243,15 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	data->cdev = cdev_adev->dev.driver_data;
 
 	for (i = 0; i < data->trip_count; i++) {
+		dev_info(&pdev->dev, "Binding trip %d: temp=%d hyst=%d min=%d max=%d\n",
+         i, data->trip_temps[i], data->trip_hyst[i],
+         data->min_states[i], data->max_states[i]);
+
+		dev_info(&pdev->dev, "Cooling device name: %s\n",
+         data->cdev->type);
+		dev_info(&pdev->dev, "Cooling device ops: get_max_state=%p set_cur_state=%p\n",
+         data->cdev->ops->get_max_state,
+         data->cdev->ops->set_cur_state);	
 		ret=thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
 			THERMAL_NO_LIMIT,THERMAL_NO_LIMIT,THERMAL_WEIGHT_DEFAULT);
 		if (ret) {
