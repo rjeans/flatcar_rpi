@@ -12,6 +12,7 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/err.h>
+#include <acpi/acpi_bus.h>  // Ensure this is included at the top
 
 #define DRIVER_NAME "rpi_acpi_thermal"
 #define RPI_HID     "RPIT0001"
@@ -61,7 +62,7 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	return 0;
 }
 
-#include <acpi/acpi_bus.h>  // Ensure this is included at the top
+
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
