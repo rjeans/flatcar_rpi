@@ -133,12 +133,38 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		}
 	}
 
-	if (!result)
+	if (!result) {
 		dev_err(dev, "cooling-device not found in _DSD properties\n");
+		goto out;
+	}
 
+	/* Additional diagnostics for result handle */
+	char path[ACPI_PATHNAME_MAX];
+	struct acpi_buffer path_buf = { .length = sizeof(path), .pointer = path };
+	status = acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf);
+	if (ACPI_SUCCESS(status)) {
+		dev_info(dev, "Cooling-device ACPI path: %s\n", path);
+	} else {
+		dev_warn(dev, "Failed to get ACPI path for cooling-device: %s\n",
+		         acpi_format_exception(status));
+	}
+
+	struct acpi_device *adev;
+	if (acpi_bus_get_device(result, &adev)) {
+		dev_warn(dev, "Cooling-device ACPI bus lookup failed\n");
+	} else {
+		dev_info(dev, "Cooling-device found: %s\n", dev_name(&adev->dev));
+		dev_info(dev, "Cooling-device driver: %s\n",
+		         adev->dev.driver ? adev->dev.driver->name : "none");
+		if (!adev->dev.driver_data)
+			dev_warn(dev, "Cooling-device driver_data is NULL\n");
+	}
+
+out:
 	kfree(buf.pointer);
 	return result;
 }
+
 
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
