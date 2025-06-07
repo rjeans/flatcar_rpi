@@ -51,9 +51,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-	s32 *temps, *hyst, *min_states, *max_states;
-	int i, count;
-	struct fwnode_handle *fwnode;
+	int i;
 
 	if (!adev)
 		return -ENODEV;
@@ -63,24 +61,24 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	data->adev = adev;
-	fwnode = dev_fwnode(&pdev->dev);
+	platform_set_drvdata(pdev, data);
 
 	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, MAX_TRIPS) < 0)
-		return -EINVAL;
-
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, MAX_TRIPS) < 0)
-		memset(data->trip_hyst, 0, sizeof(data->trip_hyst));
-
-	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, MAX_TRIPS) < 0)
-		return -EINVAL;
-
-	if (device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, MAX_TRIPS) < 0)
 		return -EINVAL;
 
 	if (device_property_read_u32(&pdev->dev, "trip-count", &data->trip_count) < 0)
 		return -EINVAL;
 
 	if (data->trip_count > MAX_TRIPS)
+		return -EINVAL;
+
+	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0)
+		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
+
+	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0)
+		return -EINVAL;
+
+	if (device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0)
 		return -EINVAL;
 
 	for (i = 0; i < data->trip_count; i++) {
@@ -95,18 +93,18 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	data->cdev = thermal_cooling_device_get_by_fwnode_name(fwnode, "cooling-device");
-	if (!data->cdev) {
+	/* Register a basic cooling device (this assumes it's not pre-defined via ACPI) */
+	data->cdev = devm_thermal_cooling_device_register(&pdev->dev, "fan", NULL, NULL);
+	if (IS_ERR(data->cdev)) {
 		thermal_zone_device_unregister(data->tzd);
-		return -EPROBE_DEFER;
+		return PTR_ERR(data->cdev);
 	}
 
 	for (i = 0; i < data->trip_count; i++) {
 		thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
-					   data->min_states[i], data->max_states[i]);
+					   data->max_states[i], data->min_states[i], 0);
 	}
 
-	platform_set_drvdata(pdev, data);
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
 	return 0;
 }
