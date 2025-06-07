@@ -112,9 +112,13 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		goto unregister_tzd;
 	}
 
-	cdev_adev = acpi_fetch_acpi_dev(fan_handle);
+	#if defined(CONFIG_ACPI)
+	cdev_adev = acpi_bus_get_acpi_device(fan_handle);
+#else
+	cdev_adev = NULL;
+#endif
 	if (!cdev_adev) {
-		dev_err(&pdev->dev, "Cooling device not found under ACPI
+		dev_err(&pdev->dev, "Failed to resolve ACPI cooling device from fan_handle
 ");
 		goto unregister_tzd;
 	}
