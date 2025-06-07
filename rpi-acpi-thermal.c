@@ -221,6 +221,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (!fan_handle)
 		goto unregister_tzd;
 
+	dev_info(&pdev->dev, "Found cooling device handle: %p\n", fan_handle);
 	cdev_adev = acpi_fetch_acpi_dev(fan_handle);
 	if (!cdev_adev || !cdev_adev->dev.driver_data) {
 		dev_err(&pdev->dev, "Cooling device ACPI fetch or driver_data failed\n");
