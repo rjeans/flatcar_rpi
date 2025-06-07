@@ -63,13 +63,17 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
-	union acpi_object *dsd;
+	static const guid_t guid = GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
+	                                     0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
+	union acpi_object *dsd = NULL;
 	acpi_handle result = NULL;
-	int i;
+	int rev;
 
-	dsd = acpi_evaluate_dsm(parent, &dsd_guid, 1, 0, NULL);
+	for (rev = 2; rev >= 0 && !dsd; rev--)
+		dsd = acpi_evaluate_dsm(parent, &guid, rev, 0, NULL);
+
 	if (!dsd) {
-		dev_err(dev, "_DSD evaluation returned NULL\n");
+		dev_err(dev, "_DSD evaluation failed or returned NULL for all revisions\n");
 		return NULL;
 	}
 
@@ -79,7 +83,7 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		return NULL;
 	}
 
-	for (i = 0; i + 1 < dsd->package.count; i += 2) {
+	for (int i = 0; i + 1 < dsd->package.count; i += 2) {
 		union acpi_object *key = &dsd->package.elements[i];
 		union acpi_object *val = &dsd->package.elements[i + 1];
 
@@ -97,6 +101,7 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 	ACPI_FREE(dsd);
 	return result;
 }
+
 
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
