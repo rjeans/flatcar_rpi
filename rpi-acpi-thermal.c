@@ -64,37 +64,38 @@ static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 };
 
-/* Extract handle from _DSD for "cooling-device" key */
 static acpi_handle find_cooling_device_handle(acpi_handle parent_handle)
 {
-	union acpi_object *dsd;
-	acpi_handle ref_handle = NULL;
-	const guid_t guid = UUID_DSD;
-	int i;
+    static const guid_t dsd_uuid = GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
+                                             0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
+    union acpi_object *dsd;
+    acpi_handle ref_handle = NULL;
+    int i;
 
-	dsd = acpi_evaluate_dsm(parent_handle, &guid, 1, 0);
-	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
-		pr_warn("ACPI: _DSD evaluation failed or not a package\n");
-		return NULL;
-	}
+    dsd = acpi_evaluate_dsm(parent_handle, &dsd_uuid, 1, 0, NULL);
+    if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
+        pr_warn("ACPI: _DSD evaluation failed or not a package\n");
+        return NULL;
+    }
 
-	for (i = 0; i < dsd->package.count; i++) {
-		union acpi_object *prop = &dsd->package.elements[i];
+    for (i = 0; i < dsd->package.count; i++) {
+        union acpi_object *prop = &dsd->package.elements[i];
 
-		if (prop->type == ACPI_TYPE_PACKAGE &&
-		    prop->package.count == 2 &&
-		    prop->package.elements[0].type == ACPI_TYPE_STRING &&
-		    strcmp(prop->package.elements[0].string.pointer, "cooling-device") == 0 &&
-		    prop->package.elements[1].type == ACPI_TYPE_LOCAL_REFERENCE) {
+        if (prop->type == ACPI_TYPE_PACKAGE &&
+            prop->package.count == 2 &&
+            prop->package.elements[0].type == ACPI_TYPE_STRING &&
+            strcmp(prop->package.elements[0].string.pointer, "cooling-device") == 0 &&
+            prop->package.elements[1].type == ACPI_TYPE_LOCAL_REFERENCE) {
 
-			ref_handle = prop->package.elements[1].reference.handle;
-			break;
-		}
-	}
+            ref_handle = prop->package.elements[1].reference.handle;
+            break;
+        }
+    }
 
-	ACPI_FREE(dsd);
-	return ref_handle;
+    ACPI_FREE(dsd);
+    return ref_handle;
 }
+
 
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
