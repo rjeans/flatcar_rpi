@@ -135,7 +135,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	}
 
 	/* Locate cooling device via _DSD reference */
-	if (acpi_get_handle(data->adev->handle, "_DSD.CoolingDevice", &fan_handle)) {
+	if (acpi_get_handle(data->adev->handle, "_DSD.cooling-device", &fan_handle)) {
 		dev_err(&pdev->dev, "CoolingDevice handle from _DSD not found\n");
 		goto unregister_tzd;
 	}
