@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/property.h>
+#include <linux/err.h>
 
 #define DRIVER_NAME "rpi_acpi_thermal"
 #define RPI_HID     "RPIT0001"
@@ -51,6 +52,8 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	struct acpi_device *cdev_adev;
+	acpi_handle fan_handle;
 	int i;
 
 	if (!adev)
@@ -63,23 +66,35 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	data->adev = adev;
 	platform_set_drvdata(pdev, data);
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, MAX_TRIPS) < 0)
+	if (device_property_read_u32(&pdev->dev, "trip-count", &data->trip_count) < 0) {
+		dev_err(&pdev->dev, "Missing property: trip-count\n");
 		return -EINVAL;
+	}
 
-	if (device_property_read_u32(&pdev->dev, "trip-count", &data->trip_count) < 0)
+	if (data->trip_count > MAX_TRIPS) {
+		dev_err(&pdev->dev, "trip-count exceeds MAX_TRIPS (%d)\n", MAX_TRIPS);
 		return -EINVAL;
+	}
 
-	if (data->trip_count > MAX_TRIPS)
+	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count) < 0) {
+		dev_err(&pdev->dev, "Missing property: active-trip-temps\n");
 		return -EINVAL;
+	}
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0)
+	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0) {
+		dev_warn(&pdev->dev, "Missing property: active-trip-hysteresis, defaulting to 0\n");
 		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
+	}
 
-	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0)
+	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0) {
+		dev_err(&pdev->dev, "Missing property: cooling-min-states\n");
 		return -EINVAL;
+	}
 
-	if (device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0)
+	if (device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0) {
+		dev_err(&pdev->dev, "Missing property: cooling-max-states\n");
 		return -EINVAL;
+	}
 
 	for (i = 0; i < data->trip_count; i++) {
 		data->trips[i].type = THERMAL_TRIP_ACTIVE;
@@ -93,11 +108,24 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	/* Register a basic cooling device (this assumes it's not pre-defined via ACPI) */
-	data->cdev = devm_thermal_cooling_device_register(&pdev->dev, "fan", NULL, NULL);
-	if (IS_ERR(data->cdev)) {
+	/* Look up the fan cooling device using the _DSD-provided ACPI path */
+	if (acpi_get_handle(data->adev->handle, "_DSD.CoolingDevice", &fan_handle)) {
+		dev_err(&pdev->dev, "Could not resolve CoolingDevice handle from _DSD\n");
 		thermal_zone_device_unregister(data->tzd);
-		return PTR_ERR(data->cdev);
+		return -ENODEV;
+	}
+
+	if (acpi_bus_get_device(fan_handle, &cdev_adev)) {
+		dev_err(&pdev->dev, "Cooling device not found\n");
+		thermal_zone_device_unregister(data->tzd);
+		return -ENODEV;
+	}
+
+	data->cdev = cdev_adev->dev.driver_data;
+	if (!data->cdev) {
+		dev_err(&pdev->dev, "Cooling device driver data is NULL\n");
+		thermal_zone_device_unregister(data->tzd);
+		return -EINVAL;
 	}
 
 	for (i = 0; i < data->trip_count; i++) {
@@ -135,5 +163,5 @@ static struct platform_driver rpi_acpi_driver = {
 module_platform_driver(rpi_acpi_driver);
 
 MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
-MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001 using _DSD properties");
+MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001 using _DSD properties and linked ACPI cooling device");
 MODULE_LICENSE("GPL");
