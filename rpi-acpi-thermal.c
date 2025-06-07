@@ -48,13 +48,25 @@ static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 };
 
+static inline int check_matching_length(struct device *dev, const char *prop, int expected)
+{
+	int len = device_property_count_u32(dev, prop);
+	if (len < 0)
+		return len;
+	if (len != expected) {
+		dev_err(dev, "Length mismatch for %s: expected %d, got %d\n", prop, expected, len);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
 	struct acpi_device *cdev_adev;
 	acpi_handle fan_handle;
-	int i;
+	int i, ret;
 
 	if (!adev)
 		return -ENODEV;
@@ -66,33 +78,42 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	data->adev = adev;
 	platform_set_drvdata(pdev, data);
 
-	if (device_property_read_u32(&pdev->dev, "trip-count", &data->trip_count) < 0) {
-		dev_err(&pdev->dev, "Missing property: trip-count\n");
+	ret = device_property_count_u32(&pdev->dev, "active-trip-temps");
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Missing or invalid property: active-trip-temps\n");
 		return -EINVAL;
 	}
+	data->trip_count = ret;
 
 	if (data->trip_count > MAX_TRIPS) {
 		dev_err(&pdev->dev, "trip-count exceeds MAX_TRIPS (%d)\n", MAX_TRIPS);
 		return -EINVAL;
 	}
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count) < 0) {
-		dev_err(&pdev->dev, "Missing property: active-trip-temps\n");
+	if (check_matching_length(&pdev->dev, "active-trip-hysteresis", data->trip_count))
 		return -EINVAL;
-	}
+	if (check_matching_length(&pdev->dev, "cooling-min-states", data->trip_count))
+		return -EINVAL;
+	if (check_matching_length(&pdev->dev, "cooling-max-states", data->trip_count))
+		return -EINVAL;
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0)
+	ret = device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "Failed to read active-trip-temps\n");
+
+	ret = device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count);
+	if (ret) {
+		dev_warn(&pdev->dev, "Missing active-trip-hysteresis, defaulting to 0\n");
 		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
-
-	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0) {
-		dev_err(&pdev->dev, "Missing property: cooling-min-states\n");
-		return -EINVAL;
 	}
 
-	if (device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0) {
-		dev_err(&pdev->dev, "Missing property: cooling-max-states\n");
-		return -EINVAL;
-	}
+	ret = device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "Failed to read cooling-min-states\n");
+
+	ret = device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "Failed to read cooling-max-states\n");
 
 	for (i = 0; i < data->trip_count; i++) {
 		data->trips[i].type = THERMAL_TRIP_ACTIVE;
@@ -106,7 +127,6 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	/* Locate cooling device via _DSD-defined ACPI path */
 	if (acpi_get_handle(data->adev->handle, "_DSD.CoolingDevice", &fan_handle)) {
 		dev_err(&pdev->dev, "CoolingDevice handle from _DSD not found\n");
 		goto unregister_tzd;
@@ -126,8 +146,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	for (i = 0; i < data->trip_count; i++) {
 		thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
-		                                 data->max_states[i],
-		                                 data->min_states[i], 0);
+		                                  data->max_states[i], data->min_states[i], 0);
 	}
 
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
