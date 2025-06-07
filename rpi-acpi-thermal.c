@@ -131,7 +131,6 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 
 	if (result) {
 		struct acpi_buffer path_buf = { ACPI_ALLOCATE_BUFFER, NULL };
-
 		status = acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf);
 		if (ACPI_SUCCESS(status)) {
 			dev_info(dev, "Cooling-device ACPI path: %s\n", (char *)path_buf.pointer);
