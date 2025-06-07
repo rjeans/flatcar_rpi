@@ -243,8 +243,12 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	data->cdev = cdev_adev->dev.driver_data;
 
 	for (i = 0; i < data->trip_count; i++) {
-		thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
+		ret=thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
 			data->max_states[i], data->min_states[i], 0);
+		if (ret) {{
+			dev_err(&pdev->dev, "Failed to bind cooling device to trip %d: %d\n", i, ret);
+			goto unregister_tzd;
+		}
 	}
 
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
