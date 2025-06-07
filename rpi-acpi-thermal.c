@@ -244,7 +244,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	for (i = 0; i < data->trip_count; i++) {
 		ret=thermal_zone_bind_cooling_device(data->tzd, i, data->cdev,
-			data->max_states[i], data->min_states[i], 0);
+			THERMAL_NO_LIMIT,THERMAL_NO_LIMIT,THERMAL_WEIGHT_DEFAULT);
 		if (ret) {
 			dev_err(&pdev->dev, "Failed to bind cooling device to trip %d: %d\n", i, ret);
 			goto unregister_tzd;
