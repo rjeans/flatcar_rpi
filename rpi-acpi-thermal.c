@@ -62,7 +62,6 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	return 0;
 }
 
-
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
 	acpi_status status;
@@ -117,33 +116,32 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->reference.handle;
 				dev_info(dev, "Found cooling-device as direct reference\n");
-				break;
 			} else if (val->type == ACPI_TYPE_PACKAGE &&
 			           val->package.count > 0 &&
 			           val->package.elements[0].type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->package.elements[0].reference.handle;
 				dev_info(dev, "Found cooling-device inside package (count=%d)\n",
 				         val->package.count);
-				break;
 			} else {
 				dev_err(dev, "cooling-device property is not a reference or valid package (type=%d)\n", val->type);
 			}
+			break;
 		}
 	}
 
-	if (!result) {
-		dev_err(dev, "cooling-device not found in _DSD properties\n");
-	} else {
-#if defined(CONFIG_ACPI)
-		/* Log the ACPI path of the handle, even if we can't resolve full device */
-		struct acpi_buffer path_buf = { .length = ACPI_ALLOCATE_BUFFER, .pointer = NULL };
-		if (ACPI_SUCCESS(acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf))) {
+	if (result) {
+		struct acpi_buffer path_buf = { ACPI_ALLOCATE_BUFFER, NULL };
+
+		status = acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf);
+		if (ACPI_SUCCESS(status)) {
 			dev_info(dev, "Cooling-device ACPI path: %s\n", (char *)path_buf.pointer);
 			kfree(path_buf.pointer);
 		} else {
-			dev_info(dev, "Cooling-device: ACPI path resolution failed\n");
+			dev_info(dev, "Cooling-device: ACPI path resolution failed (%s)\n",
+			         acpi_format_exception(status));
 		}
-#endif
+	} else {
+		dev_err(dev, "cooling-device not found in _DSD properties\n");
 	}
 
 	kfree(buf.pointer);
