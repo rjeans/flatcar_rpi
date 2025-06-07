@@ -63,7 +63,6 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 }
 
 
-
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
 	acpi_status status;
@@ -90,7 +89,6 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		return NULL;
 	}
 
-	/* ACPI _DSD format: {UUID, properties} */
 	union acpi_object *uuid = &dsd->package.elements[0];
 	union acpi_object *props = &dsd->package.elements[1];
 
@@ -135,8 +133,23 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 
 	if (!result) {
 		dev_err(dev, "cooling-device not found in _DSD properties\n");
-		goto out;
+	} else {
+#if defined(CONFIG_ACPI)
+		/* Log the ACPI path of the handle, even if we can't resolve full device */
+		struct acpi_buffer path_buf = { .length = ACPI_ALLOCATE_BUFFER, .pointer = NULL };
+		if (ACPI_SUCCESS(acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf))) {
+			dev_info(dev, "Cooling-device ACPI path: %s\n", (char *)path_buf.pointer);
+			kfree(path_buf.pointer);
+		} else {
+			dev_info(dev, "Cooling-device: ACPI path resolution failed\n");
+		}
+#endif
 	}
+
+	kfree(buf.pointer);
+	return result;
+}
+
 
 	/* Additional diagnostics for result handle */
 	char path[ACPI_PATHNAME_MAX];
