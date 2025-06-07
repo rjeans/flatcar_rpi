@@ -81,10 +81,8 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0) {
-		dev_warn(&pdev->dev, "Missing property: active-trip-hysteresis, defaulting to 0\n");
+	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count) < 0)
 		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
-	}
 
 	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0) {
 		dev_err(&pdev->dev, "Missing property: cooling-min-states\n");
@@ -108,24 +106,21 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(data->tzd))
 		return PTR_ERR(data->tzd);
 
-	/* Look up the fan cooling device using the _DSD-provided ACPI path */
+	/* Locate cooling device via _DSD-defined ACPI path */
 	if (acpi_get_handle(data->adev->handle, "_DSD.CoolingDevice", &fan_handle)) {
-		dev_err(&pdev->dev, "Could not resolve CoolingDevice handle from _DSD\n");
-		thermal_zone_device_unregister(data->tzd);
-		return -ENODEV;
+		dev_err(&pdev->dev, "CoolingDevice handle from _DSD not found\n");
+		goto unregister_tzd;
 	}
 
 	if (acpi_bus_get_device(fan_handle, &cdev_adev)) {
-		dev_err(&pdev->dev, "Cooling device not found\n");
-		thermal_zone_device_unregister(data->tzd);
-		return -ENODEV;
+		dev_err(&pdev->dev, "Cooling device not found under ACPI\n");
+		goto unregister_tzd;
 	}
 
 	data->cdev = cdev_adev->dev.driver_data;
 	if (!data->cdev) {
 		dev_err(&pdev->dev, "Cooling device driver data is NULL\n");
-		thermal_zone_device_unregister(data->tzd);
-		return -EINVAL;
+		goto unregister_tzd;
 	}
 
 	for (i = 0; i < data->trip_count; i++) {
@@ -135,6 +130,10 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d active trip(s)\n", data->trip_count);
 	return 0;
+
+unregister_tzd:
+	thermal_zone_device_unregister(data->tzd);
+	return -ENODEV;
 }
 
 static int rpi_acpi_remove(struct platform_device *pdev)
