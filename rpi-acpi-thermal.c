@@ -113,7 +113,7 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		if (key->type != ACPI_TYPE_STRING)
 			continue;
 
-		dev_dbg(dev, "_DSD property: %s (type %d)\n", key->string.pointer, val->type);
+		dev_info(dev, "_DSD property: %s (type %d)\n", key->string.pointer, val->type);
 
 		if (!strcmp(key->string.pointer, "cooling-device")) {
 			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
