@@ -265,3 +265,5 @@ module_platform_driver(rpi_acpi_driver);
 MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
 MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001 using _DSD properties and linked ACPI cooling device");
 MODULE_LICENSE("GPL");
+
+
