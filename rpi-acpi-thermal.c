@@ -68,7 +68,7 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz, struct thermal_cooling_
 
 	/* Fallback: match by string name instead of dev pointer */
 	if (!strstr(cdev->type, "pwm-fan")) {
-		dev_dbg(&tz->device, "Ignoring unmatched cooling device: %s\n", cdev->type);
+		dev_info(&tz->device, "Ignoring unmatched cooling device: %s\n", cdev->type);
 		return 0;
 	}
 
