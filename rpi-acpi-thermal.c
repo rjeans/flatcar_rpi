@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * rpi-acpi-thermal.c - ACPI thermal zone driver for Raspberry Pi ACPI platforms
- * Copyright (C) 2023 Richard Jeans <rich@jeansy.org>
- */
-
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/thermal.h>
@@ -23,14 +18,13 @@ static const guid_t dsd_guid = GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
 struct rpi_acpi_thermal {
 	struct thermal_zone_device *tzd;
 	struct acpi_device *adev;
+	struct acpi_device *cdev_adev;
 	int trip_count;
 	s32 trip_temps[MAX_TRIPS];
 	s32 trip_hyst[MAX_TRIPS];
 	s32 min_states[MAX_TRIPS];
 	s32 max_states[MAX_TRIPS];
 	struct thermal_trip trips[MAX_TRIPS];
-	acpi_handle fan_handle;
-	struct acpi_device *cdev_adev;
 };
 
 static inline int check_array_length(struct device *dev, const char *prop, int expected)
@@ -67,38 +61,35 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz, struct thermal_cooling_
 	struct rpi_acpi_thermal *data = tz->devdata;
 	int i;
 
-	if (!data->cdev_adev) {
-		dev_err(&tz->device, "No ACPI companion for cooling device\n");
-		return -ENODEV;
+	if (!data || !data->cdev_adev) {
+		dev_err(&tz->device, "No cooling device ACPI companion available\n");
+		return -EINVAL;
 	}
 
-	data->cdev_adev = acpi_fetch_acpi_dev(data->fan_handle);
-	if (!data->cdev_adev || !data->cdev_adev->dev.driver_data) {
-		dev_err(&tz->device, "ACPI fetch or driver_data for cooling device failed\n");
-		return -ENODEV;
+	if (cdev->dev.parent != &data->cdev_adev->dev) {
+		dev_dbg(&tz->device, "Ignoring cooling device not matching ACPI companion\n");
+		return 0;
 	}
 
-	data->cdev = data->cdev_adev->dev.driver_data;
+	dev_info(&tz->device, "Binding matching cooling device: %s\n", cdev->type);
+	dev_info(&tz->device, "Cooling device ops: get_max_state=%p set_cur_state=%p\n",
+	         cdev->ops->get_max_state, cdev->ops->set_cur_state);
 
 	for (i = 0; i < data->trip_count; i++) {
-		dev_info(&tz->device, "Binding trip %d: temp=%d hyst=%d min=%d max=%d\n",
-		         i, data->trip_temps[i], data->trip_hyst[i],
-		         data->min_states[i], data->max_states[i]);
-
-		dev_info(&tz->device, "Cooling device name: %s\n", data->cdev->type);
-
-		dev_info(&tz->device, "Cooling device ops: get_max_state=%p set_cur_state=%p\n",
-		         data->cdev->ops->get_max_state, data->cdev->ops->set_cur_state);
-
-		int ret = thermal_zone_bind_cooling_device(tz, i, data->cdev,
-			THERMAL_NO_LIMIT, THERMAL_NO_LIMIT, THERMAL_WEIGHT_DEFAULT);
-		if (ret) {
+		dev_info(&tz->device, "Binding trip %d to cooling device\n", i);
+		int ret = thermal_zone_bind_cooling_device(tz, i, cdev,
+			data->min_states[i], data->max_states[i], THERMAL_WEIGHT_DEFAULT);
+		if (ret)
 			dev_err(&tz->device, "Failed to bind cooling device to trip %d: %d\n", i, ret);
-			return ret;
-		}
 	}
+
 	return 0;
 }
+
+static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
+	.get_temp = rpi_acpi_get_temp,
+	.bind = rpi_acpi_bind,
+};
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
 {
@@ -116,25 +107,35 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 	dsd = buf.pointer;
 	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
 		dev_err(dev, "_DSD is not a package (type=%d)\n", dsd ? dsd->type : -1);
-		goto out;
+		kfree(buf.pointer);
+		return NULL;
 	}
 
-	if (dsd->package.count < 2)
-		goto out;
+	if (dsd->package.count < 2) {
+		dev_err(dev, "_DSD package too short (%d elements)\n", dsd->package.count);
+		kfree(buf.pointer);
+		return NULL;
+	}
 
 	union acpi_object *uuid = &dsd->package.elements[0];
 	union acpi_object *props = &dsd->package.elements[1];
 
-	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE)
-		goto out;
+	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE) {
+		dev_err(dev, "_DSD UUID or properties malformed (uuid type=%d, props type=%d)\n",
+		        uuid->type, props->type);
+		kfree(buf.pointer);
+		return NULL;
+	}
 
 	for (int i = 0; i < props->package.count; i++) {
 		union acpi_object *entry = &props->package.elements[i];
+
 		if (entry->type != ACPI_TYPE_PACKAGE || entry->package.count != 2)
 			continue;
 
 		union acpi_object *key = &entry->package.elements[0];
 		union acpi_object *val = &entry->package.elements[1];
+
 		if (key->type != ACPI_TYPE_STRING)
 			continue;
 
@@ -143,10 +144,13 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		if (!strcmp(key->string.pointer, "cooling-device")) {
 			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->reference.handle;
+				dev_info(dev, "Found cooling-device as direct reference\n");
 			} else if (val->type == ACPI_TYPE_PACKAGE &&
-			           val->package.count &&
+			           val->package.count > 0 &&
 			           val->package.elements[0].type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->package.elements[0].reference.handle;
+				dev_info(dev, "Found cooling-device inside package (count=%d)\n",
+				         val->package.count);
 			}
 			break;
 		}
@@ -158,25 +162,23 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		if (ACPI_SUCCESS(status)) {
 			dev_info(dev, "Cooling-device ACPI path: %s\n", (char *)path_buf.pointer);
 			kfree(path_buf.pointer);
+		} else {
+			dev_info(dev, "Cooling-device: ACPI path resolution failed (%s)\n",
+			         acpi_format_exception(status));
 		}
+	} else {
+		dev_err(dev, "cooling-device not found in _DSD properties\n");
 	}
 
-out:
 	kfree(buf.pointer);
-	if (!result)
-		dev_err(dev, "cooling-device not found in _DSD\n");
 	return result;
 }
-
-static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
-	.get_temp = rpi_acpi_get_temp,
-	.bind = rpi_acpi_bind,
-};
 
 static int rpi_acpi_probe(struct platform_device *pdev)
 {
 	struct rpi_acpi_thermal *data;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	acpi_handle fan_handle;
 	int ret, i;
 
 	if (!adev)
@@ -194,25 +196,18 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return ret;
 	if (ret > MAX_TRIPS)
 		return -EINVAL;
-
 	data->trip_count = ret;
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count))
+	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count) ||
+	    device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) ||
+	    device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count)) {
+		dev_err(&pdev->dev, "Failed to read cooling properties\n");
 		return -EINVAL;
+	}
 
-	if (device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count))
+	ret = device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count);
+	if (ret < 0)
 		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
-
-	ret = check_array_length(&pdev->dev, "cooling-min-states", data->trip_count);
-	if (ret)
-		return ret;
-	ret = check_array_length(&pdev->dev, "cooling-max-states", data->trip_count);
-	if (ret)
-		return ret;
-
-	if (device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) < 0 ||
-	    device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count) < 0)
-		return -EINVAL;
 
 	for (i = 0; i < data->trip_count; i++) {
 		data->trips[i].type = THERMAL_TRIP_ACTIVE;
@@ -220,15 +215,25 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		data->trips[i].hysteresis = data->trip_hyst[i];
 	}
 
-	data->fan_handle = find_cooling_device_handle(&pdev->dev, data->adev->handle);
+	fan_handle = find_cooling_device_handle(&pdev->dev, data->adev->handle);
+	if (!fan_handle)
+		return -ENODEV;
+
+	data->cdev_adev = acpi_fetch_acpi_dev(fan_handle);
+	if (!data->cdev_adev) {
+		dev_err(&pdev->dev, "Cooling device companion fetch failed\n");
+		return -ENODEV;
+	}
 
 	data->tzd = thermal_zone_device_register_with_trips(DRIVER_NAME,
 		data->trips, data->trip_count, 0, data,
 		&rpi_acpi_thermal_ops, NULL, 0, 1000);
-	if (IS_ERR(data->tzd))
-		return PTR_ERR(data->tzd);
 
-	dev_info(&pdev->dev, "Registered ACPI thermal zone with %d trip points\n", data->trip_count);
+	if (IS_ERR(data->tzd)) {
+		dev_err(&pdev->dev, "Failed to register thermal zone\n");
+		return PTR_ERR(data->tzd);
+	}
+
 	return 0;
 }
 
