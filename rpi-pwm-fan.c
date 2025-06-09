@@ -447,7 +447,7 @@ static int pwm_fan_remove(struct platform_device *pdev)
 			         "Unbinding cooling device from thermal zone: %s\n",
 			         dev_name(&ctx->tz->device));
 
-			for (i = 0; i < ctx->tz.trip_count; i++) {
+			for (i = 0; i < ctx->tz->trip_count; i++) {
 				int ret = thermal_zone_unbind_cooling_device(ctx->tz, i, ctx->cdev);
 				if (ret)
 					dev_warn(ctx->dev,
