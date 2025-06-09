@@ -7,6 +7,7 @@
 #include <linux/property.h>
 #include <linux/err.h>
 #include <acpi/acpi_bus.h>
+#include "rpi-pwm-fan.h"
 
 #define DRIVER_NAME "rpi_acpi_thermal"
 #define RPI_HID     "RPIT0001"
@@ -72,68 +73,85 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	return 0;
 }
 
-static int rpi_acpi_bind(struct thermal_zone_device *tz, struct thermal_cooling_device *cdev)
+static int rpi_acpi_bind(struct thermal_zone_device *tz,
+                         struct thermal_cooling_device *cdev)
 {
 	struct rpi_acpi_thermal *data = tz->devdata;
+	struct pwm_fan_ctx *ctx;
 	int i;
 
-	if (!data || !data->cdev_adev) {
-		dev_err(&tz->device, "No cooling device ACPI companion available\n");
+	if (!data) {
+		dev_err(&tz->device, "No thermal zone context available\n");
 		return -EINVAL;
 	}
 
-	/* Fallback: match by string name instead of dev pointer */
+	/* Fallback: match by cooling device type */
 	if (!strstr(cdev->type, "pwm-fan")) {
 		dev_info(&tz->device, "Ignoring unmatched cooling device: %s\n", cdev->type);
 		return 0;
 	}
 
-	dev_info(&tz->device, "Binding matching cooling device: %s\n", cdev->type);
-	dev_info(&tz->device, "Cooling device ops: get_max_state=%p set_cur_state=%p\n",
-	         cdev->ops->get_max_state, cdev->ops->set_cur_state);
-
-	for (i = 0; i < data->trip_count; i++) {
-		dev_info(&tz->device, "Binding trip %d to cooling device\n", i);
-		int ret = thermal_zone_bind_cooling_device(tz, i, cdev,
-			data->min_states[i], data->max_states[i], THERMAL_WEIGHT_DEFAULT);
-		if (ret)
-			dev_err(&tz->device, "Failed to bind cooling device to trip %d: %d\n", i, ret);
+	ctx = cdev->devdata;
+	if (!ctx) {
+		dev_err(&tz->device, "Cooling device context not found\n");
+		return -EINVAL;
 	}
 
+	ctx->tz = tz;
+	ctx->trip_count = data->trip_count;
 
+	dev_info(&tz->device, "Binding cooling device: %s\n", cdev->type);
+
+	for (i = 0; i < data->trip_count; i++) {
+		int ret = thermal_zone_bind_cooling_device(tz, i, cdev,
+				data->min_states[i], data->max_states[i], THERMAL_WEIGHT_DEFAULT);
+		if (ret)
+			dev_err(&tz->device, "Failed to bind trip %d: %d\n", i, ret);
+		else
+			dev_info(&tz->device, "Bound trip %d to cooling device\n", i);
+	}
 
 	return 0;
 }
 
-static int rpi_acpi_unbind(struct thermal_zone_device *tz, struct thermal_cooling_device *cdev)
+static int rpi_acpi_unbind(struct thermal_zone_device *tz,
+                           struct thermal_cooling_device *cdev)
 {
 	struct rpi_acpi_thermal *data = tz->devdata;
+	struct pwm_fan_ctx *ctx;
 	int i;
 
-	if (!data || !data->cdev_adev) {
-		dev_err(&tz->device, "No cooling device ACPI companion available for unbind\n");
+	if (!data) {
+		dev_err(&tz->device, "No thermal zone context available for unbind\n");
 		return -EINVAL;
 	}
 
-	/* Fallback: match by string name instead of dev pointer */
 	if (!strstr(cdev->type, "pwm-fan")) {
 		dev_info(&tz->device, "Ignoring unmatched cooling device on unbind: %s\n", cdev->type);
 		return 0;
 	}
 
+	ctx = cdev->devdata;
+	if (!ctx) {
+		dev_err(&tz->device, "Cooling device context not found on unbind\n");
+		return -EINVAL;
+	}
+
 	dev_info(&tz->device, "Unbinding cooling device: %s\n", cdev->type);
 
 	for (i = 0; i < data->trip_count; i++) {
-		dev_info(&tz->device, "Unbinding trip %d from cooling device\n", i);
 		int ret = thermal_zone_unbind_cooling_device(tz, i, cdev);
 		if (ret)
-			dev_err(&tz->device, "Failed to unbind cooling device from trip %d: %d\n", i, ret);
+			dev_err(&tz->device, "Failed to unbind trip %d: %d\n", i, ret);
+		else
+			dev_info(&tz->device, "Unbound trip %d from cooling device\n", i);
 	}
+
+	ctx->tz = NULL;
+	ctx->trip_count = 0;
 
 	return 0;
 }
-
-
 
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,

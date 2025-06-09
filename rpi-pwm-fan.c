@@ -17,33 +17,13 @@
 #include <linux/property.h>
 #include <linux/acpi.h>
 #include <linux/thermal.h>
+#include "rpi-pwm-fan.h"
 
 
 
 #define MAX_PWM 255
 
 
-
-
-
-struct pwm_fan_ctx {
-	struct device *dev;
-
-	struct mutex lock;
-	struct pwm_device *pwm;
-	struct pwm_state pwm_state;
-	bool enabled;
-
-
-	unsigned int pwm_value;
-	unsigned int pwm_fan_state;
-	unsigned int pwm_fan_max_state;
-	unsigned int *pwm_fan_cooling_levels;
-	struct thermal_cooling_device *cdev;
-
-	struct hwmon_chip_info info;
-
-};
 
 
 
@@ -378,8 +358,10 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	}
 
 	ret = pwm_fan_get_cooling_data(dev, ctx);  // Still useful for thermal binding
-	if (ret)
+	if (ret) {
+		dev_err(dev, "Failed to get cooling data: %d\n", ret);
 		return ret;
+	}
 
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
@@ -455,14 +437,28 @@ static int pwm_fan_remove(struct platform_device *pdev)
 	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
 	int i;
 
+	if (!ctx)
+		return -EINVAL;
+
 	if (ctx->cdev) {
-		/* Unbind from all thermal zones */
-		struct thermal_zone_device *tz;
-		for_each_thermal_zone(tz) {
-			for (i = 0; i < tz->num_trips; i++) {
-				thermal_zone_unbind_cooling_device(tz, i, ctx->cdev);
-				dev_info(&tz->device, "Unbound cooling device from trip %d\n", i);
+		/* Unbind from stored thermal zone if available */
+		if (ctx->tz) {
+			dev_info(&ctx->dev->dev,
+			         "Unbinding cooling device from thermal zone: %s\n",
+			         dev_name(&ctx->tz->device));
+
+			for (i = 0; i < ctx->trip_count; i++) {
+				int ret = thermal_zone_unbind_cooling_device(ctx->tz, i, ctx->cdev);
+				if (ret)
+					dev_warn(&ctx->dev->dev,
+					         "Failed to unbind from trip %d: %d\n", i, ret);
+				else
+					dev_info(&ctx->dev->dev,
+					         "Unbound cooling device from trip %d\n", i);
 			}
+		} else {
+			dev_warn(&ctx->dev->dev,
+			         "No thermal zone recorded — skipping unbind\n");
 		}
 
 		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
@@ -474,7 +470,6 @@ static int pwm_fan_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
 
 static struct platform_driver pwm_fan_driver = {
 	.probe		= pwm_fan_probe,
