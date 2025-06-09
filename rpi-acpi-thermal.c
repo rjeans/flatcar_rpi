@@ -235,9 +235,9 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return PTR_ERR(data->tzd);
 	}
 
-	for (int i = 0; i < tz->num_trips; i++) {
+	for (int i = 0; i < data->trip_count; i++) {
 	struct thermal_trip t;
-	__thermal_zone_get_trip(tz, i, &t);
+	__thermal_zone_get_trip(data->tips, i, &t);
 	dev_info(&pdev->dev, "Trip %d: temp=%d hysteresis=%d\n",
 	         i, t.temperature, t.hysteresis);
 }
