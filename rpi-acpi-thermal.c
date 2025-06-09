@@ -57,7 +57,13 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 
 	dev_info(&tz->device, "Current temperature: %d.%02d C\n",
 	         *temp / 1000, abs(*temp) % 1000);
+	
+			dev_info(&tz->device, "thermal_zone_device: id=%d, type=%s, num_trips=%d, mode=%d, temperature=%d, last_temperature=%d, emul_temperature=%d, polling_delay_jiffies=%lu, passive_delay_jiffies=%lu, suspended=%d\n",
+					 tz->id, tz->type, tz->num_trips, tz->mode, tz->temperature, tz->last_temperature,
+					 tz->emul_temperature, tz->polling_delay_jiffies, tz->passive_delay_jiffies, tz->suspended);
 
+					dev_info(&tz->device, "prev_low_trip=%d, prev_high_trip=%d\n",
+							 tz->prev_low_trip, tz->prev_high_trip);
 	return 0;
 }
 
@@ -87,13 +93,16 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz,
 
 	ctx->tz = tz;
 
+
 	dev_info(&tz->device, "Binding cooling device: %s\n", cdev->type);
 
 	for (i = 0; i < data->trip_count; i++) {
 		int ret = thermal_zone_bind_cooling_device(tz, i, cdev,
 				data->min_states[i], data->max_states[i], THERMAL_WEIGHT_DEFAULT);
 		if (ret)
-			dev_err(&tz->device, "Failed to bind trip %d\n", i);
+			dev_err(&tz->device, "Failed to bind trip %d: %d\n", i, ret);
+		else
+			dev_info(&tz->device, "Bound trip %d to cooling device\n", i);
 	}
 
 	return 0;
@@ -127,10 +136,13 @@ static int rpi_acpi_unbind(struct thermal_zone_device *tz,
 	for (i = 0; i < data->trip_count; i++) {
 		int ret = thermal_zone_unbind_cooling_device(tz, i, cdev);
 		if (ret)
-			dev_err(&tz->device, "Failed to unbind trip %d\n", i);
+			dev_err(&tz->device, "Failed to unbind trip %d: %d\n", i, ret);
+		else
+			dev_info(&tz->device, "Unbound trip %d from cooling device\n", i);
 	}
 
 	ctx->tz = NULL;
+
 
 	return 0;
 }
@@ -306,12 +318,21 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 		return PTR_ERR(data->tzd);
 	}
 
+
+
+	for (int i = 0; i < data->trip_count; i++) {
+	struct thermal_trip t;
+	__thermal_zone_get_trip(data->tzd, i, &t);
+	dev_info(&pdev->dev, "Trip %d: temp=%d hysteresis=%d\n",
+	         i, t.temperature, t.hysteresis);
+}
 	dev_info(&pdev->dev, "Registered thermal zone %s with %d trips\n",
 	         DRIVER_NAME, data->trip_count);
 
-	ret = thermal_zone_device_enable(data->tzd);
+
+	ret= thermal_zone_device_enable(data->tzd);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed to enable thermal zone\n");
+		dev_err(&pdev->dev, "Failed to enable thermal zone: %d\n", ret);
 		thermal_zone_device_unregister(data->tzd);
 		return ret;
 	}
