@@ -443,21 +443,21 @@ static int pwm_fan_remove(struct platform_device *pdev)
 	if (ctx->cdev) {
 		/* Unbind from stored thermal zone if available */
 		if (ctx->tz) {
-			dev_info(&ctx->dev,
+			dev_info(ctx->dev,
 			         "Unbinding cooling device from thermal zone: %s\n",
 			         dev_name(&ctx->tz->device));
 
 			for (i = 0; i < ctx->trip_count; i++) {
 				int ret = thermal_zone_unbind_cooling_device(ctx->tz, i, ctx->cdev);
 				if (ret)
-					dev_warn(&ctx->dev,
+					dev_warn(ctx->dev,
 					         "Failed to unbind from trip %d: %d\n", i, ret);
 				else
-					dev_info(&ctx->dev,
+					dev_info(ctx->dev,
 					         "Unbound cooling device from trip %d\n", i);
 			}
 		} else {
-			dev_warn(&ctx->dev,
+			dev_warn(ctx->dev,
 			         "No thermal zone recorded — skipping unbind\n");
 		}
 
