@@ -297,12 +297,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 {
 	struct pwm_fan_ctx *ctx;
 	struct device *dev = &pdev->dev;
-	const struct hwmon_channel_info *ctx_channels[] = {
-		HWMON_CHANNEL_INFO(pwm, HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
-		NULL
-	};
 	struct thermal_cooling_device *cdev;
-	struct device *hwmon;
 	int ret;
 	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
 
@@ -310,8 +305,6 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		dev_err(dev, "No ACPI companion found\n");
 		return -ENODEV;
 	}
-
-
 
 	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
@@ -325,8 +318,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(ctx->pwm), "Could not get PWM\n");
 
 	platform_set_drvdata(pdev, ctx);
-    adev->driver_data = ctx;
-
+	adev->driver_data = ctx;
 
 	pwm_init_state(ctx->pwm, &ctx->pwm_state);
 	ctx->pwm_state.usage_power = true;
@@ -336,10 +328,9 @@ static int pwm_fan_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-
 	ret = set_pwm(ctx, MAX_PWM);
 	if (ret) {
-		dev_err(dev, "Failed to configure PWM: %d\n", ret);
+		dev_err(dev, "Failed to configure PWM\n");
 		return ret;
 	}
 
@@ -359,47 +350,36 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	ret = pwm_fan_get_cooling_data(dev, ctx);  // Still useful for thermal binding
 	if (ret) {
-		dev_err(dev, "Failed to get cooling data: %d\n", ret);
+		dev_err(dev, "Failed to get cooling data\n");
 		return ret;
 	}
 
 	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
 
 	if (IS_ENABLED(CONFIG_THERMAL)) {
-         cdev = thermal_cooling_device_register( "pwm-fan", adev,
-					    &pwm_fan_cooling_ops);
-
+		cdev = thermal_cooling_device_register("pwm-fan", adev, &pwm_fan_cooling_ops);
 		if (IS_ERR(cdev)) {
 			ret = PTR_ERR(cdev);
-			dev_err(dev, "Failed to register pwm-fan as cooling device: %d\n", ret);
+			dev_err(dev, "Failed to register pwm-fan as cooling device\n");
 			return ret;
 		}
 		ctx->cdev = cdev;
 		dev_info(dev, "Registered as cooling device\n");
-
-
 	}
 
 	ret = sysfs_create_link(&dev->kobj, &ctx->cdev->device.kobj, "thermal_cooling");
-if (ret) {
-	dev_err(dev, "Failed to create sysfs link 'thermal_cooling'\n");
-	
-	return ret;
-	
-}
+	if (ret) {
+		dev_err(dev, "Failed to create sysfs link 'thermal_cooling'\n");
+		return ret;
+	}
 
-ret = sysfs_create_link(&ctx->cdev->device.kobj, &dev->kobj, "device");
-if (ret) {
-	dev_err(dev, "Failed to create sysfs link 'device'\n");
-	return ret;
-}
-
-
-
+	ret = sysfs_create_link(&ctx->cdev->device.kobj, &dev->kobj, "device");
+	if (ret) {
+		dev_err(dev, "Failed to create sysfs link 'device'\n");
+		return ret;
+	}
 
 	return 0;
-
-
 }
 
 
@@ -441,24 +421,13 @@ static int pwm_fan_remove(struct platform_device *pdev)
 		return -EINVAL;
 
 	if (ctx->cdev) {
-		/* Unbind from stored thermal zone if available */
 		if (ctx->tz) {
-			dev_info(ctx->dev,
-			         "Unbinding cooling device from thermal zone: %s\n",
-			         dev_name(&ctx->tz->device));
-
+			dev_info(ctx->dev, "Unbinding cooling device from thermal zone\n");
 			for (i = 0; i < ctx->tz->num_trips; i++) {
 				int ret = thermal_zone_unbind_cooling_device(ctx->tz, i, ctx->cdev);
 				if (ret)
-					dev_warn(ctx->dev,
-					         "Failed to unbind from trip %d: %d\n", i, ret);
-				else
-					dev_info(ctx->dev,
-					         "Unbound cooling device from trip %d\n", i);
+					dev_warn(ctx->dev, "Failed to unbind from trip %d\n", i);
 			}
-		} else {
-			dev_warn(ctx->dev,
-			         "No thermal zone recorded — skipping unbind\n");
 		}
 
 		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
