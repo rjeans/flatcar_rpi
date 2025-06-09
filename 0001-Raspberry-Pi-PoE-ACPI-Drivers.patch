@@ -1,0 +1,1763 @@
+From 04815267b13f8ce3666839899260d6c2636547d4 Mon Sep 17 00:00:00 2001
+From: root <root@flatcardevelopercontainer.bin>
+Date: Mon, 9 Jun 2025 15:56:48 +0000
+Subject: [PATCH] Raspberry Pi PoE ACPI Drivers
+
+---
+ drivers/acpi/Kconfig                |   1 +
+ drivers/acpi/Makefile               |   2 +
+ drivers/acpi/rpi/Kconfig            |  38 +++
+ drivers/acpi/rpi/Makefile           |  32 ++
+ drivers/acpi/rpi/rpi-acpi-thermal.c | 326 ++++++++++++++++++
+ drivers/acpi/rpi/rpi-mailbox.c      | 369 +++++++++++++++++++++
+ drivers/acpi/rpi/rpi-mailbox.h      |  24 ++
+ drivers/acpi/rpi/rpi-pwm-fan.c      | 490 ++++++++++++++++++++++++++++
+ drivers/acpi/rpi/rpi-pwm-fan.h      |  30 ++
+ drivers/acpi/rpi/rpi-pwm-poe.c      | 354 ++++++++++++++++++++
+ 10 files changed, 1666 insertions(+)
+ create mode 100644 drivers/acpi/rpi/Kconfig
+ create mode 100644 drivers/acpi/rpi/Makefile
+ create mode 100644 drivers/acpi/rpi/rpi-acpi-thermal.c
+ create mode 100644 drivers/acpi/rpi/rpi-mailbox.c
+ create mode 100644 drivers/acpi/rpi/rpi-mailbox.h
+ create mode 100644 drivers/acpi/rpi/rpi-pwm-fan.c
+ create mode 100644 drivers/acpi/rpi/rpi-pwm-fan.h
+ create mode 100644 drivers/acpi/rpi/rpi-pwm-poe.c
+
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index cee82b4..a9dea2f 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -483,6 +483,7 @@ source "drivers/acpi/nfit/Kconfig"
+ source "drivers/acpi/numa/Kconfig"
+ source "drivers/acpi/apei/Kconfig"
+ source "drivers/acpi/dptf/Kconfig"
++source "drivers/acpi/rpi/Kconfig"
+ 
+ config ACPI_WATCHDOG
+ 	bool
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index eaa09bf..b6b6851 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -132,3 +132,5 @@ obj-$(CONFIG_ARM64)		+= arm64/
+ obj-$(CONFIG_ACPI_VIOT)		+= viot.o
+ 
+ obj-$(CONFIG_RISCV)		+= riscv/
++
++obj-$(CONFIG_RPI_ACPI)
+diff --git a/drivers/acpi/rpi/Kconfig b/drivers/acpi/rpi/Kconfig
+new file mode 100644
+index 0000000..4647695
+--- /dev/null
++++ b/drivers/acpi/rpi/Kconfig
+@@ -0,0 +1,38 @@
++menuconfig RPI_ACPI
++    bool "Raspberry Pi ACPI support"
++    depends on ACPI
++    help
++      Enables Raspberry Pi-specific ACPI drivers for mailbox, PWM, and PoE fan.
++
++if RPI_ACPI
++
++config RPI_PWM_FAN_ACPI
++    tristate "Raspberry Pi PWM Fan ACPI driver"
++    depends on ACPI
++    help
++      Enables support for the Raspberry Pi PoE HAT fan via ACPI thermal control.
++
++config RPI_MAILBOX_ACPI
++    tristate "Raspberry Pi ACPI mailbox client"
++    depends on ACPI
++    depends on MAILBOX
++    help
++      Enables the mailbox interface as an ACPI client device.
++
++config RPI_PWM_POE_ACPI
++    tristate "Raspberry Pi PoE PWM ACPI device"
++    depends on ACPI
++    depends on RPI_MAILBOX_ACPI
++    help
++      Enables support for controlling the PoE fan via PWM from ACPI.
++
++config RPI_ACPI_THERMAL
++    tristate "Raspberry Pi Thermal Device for PWM fan"
++    depends on ACPI 
++    depends on THERMAL
++    help
++      Enables support for the Raspberry Pi Thermal Device Controller
++
++
++endif
++
+diff --git a/drivers/acpi/rpi/Makefile b/drivers/acpi/rpi/Makefile
+new file mode 100644
+index 0000000..ccdec64
+--- /dev/null
++++ b/drivers/acpi/rpi/Makefile
+@@ -0,0 +1,32 @@
++# Kernel module objects
++obj-$(CONFIG_RPI_PWM_FAN_ACPI) += rpi-pwm-fan.o
++obj-$(CONFIG_RPI_MAILBOX_ACPI) += rpi-mailbox.o
++obj-$(CONFIG_RPI_PWM_POE_ACPI) += rpi-pwm-poe.o
++obj-$(CONFIG_RPI_ACPI_THERMAL) += rpi-acpi-thermal.o
++
++
++
++# Support for out-of-tree compilation
++ifneq ($(KERNELRELEASE),)
++# In-tree build
++# ...existing code...
++else
++# Out-of-tree build
++KDIR ?= /lib/modules/$(shell uname -r)/build
++PWD := $(shell pwd)
++
++# Default target
++default: modules_install
++
++modules:
++	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_RPI_PWM_FAN_ACPI=m CONFIG_RPI_MAILBOX_ACPI=m CONFIG_RPI_PWM_POE_ACPI=m  CONFIG_RPI_ACPI_THERMAL=m modules
++
++modules_install: modules
++	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
++
++clean:
++	$(MAKE) -C $(KDIR) M=$(PWD) clean
++
++.PHONY: default modules modules_install clean
++endif
++
+diff --git a/drivers/acpi/rpi/rpi-acpi-thermal.c b/drivers/acpi/rpi/rpi-acpi-thermal.c
+new file mode 100644
+index 0000000..9cee990
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-acpi-thermal.c
+@@ -0,0 +1,326 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/module.h>
++#include <linux/acpi.h>
++#include <linux/thermal.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/property.h>
++#include <linux/err.h>
++#include <acpi/acpi_bus.h>
++#include "rpi-pwm-fan.h"
++
++#define DRIVER_NAME "rpi_acpi_thermal"
++#define RPI_HID     "RPIT0001"
++#define MAX_TRIPS   8
++
++static const guid_t dsd_guid = GUID_INIT(0xdaffd814, 0x6eba, 0x4d8c,
++                                         0x8a, 0x91, 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01);
++
++struct rpi_acpi_thermal {
++	struct thermal_zone_device *tzd;
++	struct acpi_device *adev;
++	struct acpi_device *cdev_adev;
++	int trip_count;
++	s32 trip_temps[MAX_TRIPS];
++	s32 trip_hyst[MAX_TRIPS];
++	s32 min_states[MAX_TRIPS];
++	s32 max_states[MAX_TRIPS];
++	struct thermal_trip trips[MAX_TRIPS];
++};
++
++static inline int check_array_length(struct device *dev, const char *prop, int expected)
++{
++	int count = device_property_count_u32(dev, prop);
++	if (count < 0) {
++		dev_err(dev, "Missing property: %s\n", prop);
++		return count;
++	}
++	if (count != expected) {
++		dev_err(dev, "Length mismatch for %s: expected %d, got %d\n", prop, expected, count);
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
++{
++	struct rpi_acpi_thermal *data = tz->devdata;
++	acpi_handle handle = data->adev->handle;
++	unsigned long long val;
++	acpi_status status;
++
++	status = acpi_evaluate_integer(handle, "_TMP", NULL, &val);
++	if (ACPI_FAILURE(status))
++		return -EIO;
++
++	*temp = ((int)val - 2732) * 100;
++
++	return 0;
++}
++
++static int rpi_acpi_bind(struct thermal_zone_device *tz,
++                         struct thermal_cooling_device *cdev)
++{
++	struct rpi_acpi_thermal *data = tz->devdata;
++	struct pwm_fan_ctx *ctx;
++	int i;
++
++	if (!data) {
++		dev_err(&tz->device, "No thermal zone context available\n");
++		return -EINVAL;
++	}
++
++	/* Fallback: match by cooling device type */
++	if (!strstr(cdev->type, "pwm-fan")) {
++		return 0;
++	}
++
++	ctx = cdev->devdata;
++	if (!ctx) {
++		dev_err(&tz->device, "Cooling device context not found\n");
++		return -EINVAL;
++	}
++
++	ctx->tz = tz;
++
++
++	dev_info(&tz->device, "Binding cooling device: %s\n", cdev->type);
++
++	for (i = 0; i < data->trip_count; i++) {
++		int ret = thermal_zone_bind_cooling_device(tz, i, cdev,
++				data->min_states[i], data->max_states[i], THERMAL_WEIGHT_DEFAULT);
++		if (ret)
++			dev_err(&tz->device, "Failed to bind trip %d: %d\n", i, ret);
++		else
++			dev_info(&tz->device, "Bound trip %d to cooling device\n", i);
++	}
++
++	return 0;
++}
++
++static int rpi_acpi_unbind(struct thermal_zone_device *tz,
++                           struct thermal_cooling_device *cdev)
++{
++	struct rpi_acpi_thermal *data = tz->devdata;
++	struct pwm_fan_ctx *ctx;
++	int i;
++
++	if (!data) {
++		dev_err(&tz->device, "No thermal zone context available for unbind\n");
++		return -EINVAL;
++	}
++
++	if (!strstr(cdev->type, "pwm-fan")) {
++		dev_info(&tz->device, "Ignoring unmatched cooling device on unbind: %s\n", cdev->type);
++		return 0;
++	}
++
++	ctx = cdev->devdata;
++	if (!ctx) {
++		dev_err(&tz->device, "Cooling device context not found on unbind\n");
++		return -EINVAL;
++	}
++
++	dev_info(&tz->device, "Unbinding cooling device: %s\n", cdev->type);
++
++	for (i = 0; i < data->trip_count; i++) {
++		int ret = thermal_zone_unbind_cooling_device(tz, i, cdev);
++		if (ret)
++			dev_err(&tz->device, "Failed to unbind trip %d: %d\n", i, ret);
++		else
++			dev_info(&tz->device, "Unbound trip %d from cooling device\n", i);
++	}
++
++	ctx->tz = NULL;
++
++
++	return 0;
++}
++
++static int rpi_acpi_get_trend(struct thermal_zone_device *tz,
++                              const struct thermal_trip *trip,
++                              enum thermal_trend *trend)
++{
++	int temp=tz->temperature;
++	
++
++	if (temp < trip->temperature - trip->hysteresis)
++		*trend = THERMAL_TREND_DROPPING;
++	else if (temp >= trip->temperature)
++		*trend = THERMAL_TREND_RAISING;
++	else
++		*trend = THERMAL_TREND_STABLE;
++
++
++	return 0;
++}
++
++static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
++	.get_temp = rpi_acpi_get_temp,
++	.bind = rpi_acpi_bind,
++	.unbind = rpi_acpi_unbind,
++	.get_trend = rpi_acpi_get_trend,
++};
++
++static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
++{
++	acpi_status status;
++	struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
++	union acpi_object *dsd;
++	acpi_handle result = NULL;
++
++	status = acpi_evaluate_object(parent, "_DSD", NULL, &buf);
++	if (ACPI_FAILURE(status))
++		return NULL;
++
++	dsd = buf.pointer;
++	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE || dsd->package.count < 2)
++		goto out;
++
++	union acpi_object *uuid = &dsd->package.elements[0];
++	union acpi_object *props = &dsd->package.elements[1];
++
++	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE)
++		goto out;
++
++	for (int i = 0; i < props->package.count; i++) {
++		union acpi_object *entry = &props->package.elements[i];
++
++		if (entry->type != ACPI_TYPE_PACKAGE || entry->package.count != 2)
++			continue;
++
++		union acpi_object *key = &entry->package.elements[0];
++		union acpi_object *val = &entry->package.elements[1];
++
++		if (key->type != ACPI_TYPE_STRING)
++			continue;
++
++		if (!strcmp(key->string.pointer, "cooling-device")) {
++			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
++				result = val->reference.handle;
++			} else if (val->type == ACPI_TYPE_PACKAGE &&
++			           val->package.count > 0 &&
++			           val->package.elements[0].type == ACPI_TYPE_LOCAL_REFERENCE) {
++				result = val->package.elements[0].reference.handle;
++			}
++			break;
++		}
++	}
++
++out:
++	kfree(buf.pointer);
++	return result;
++}
++
++static int rpi_acpi_probe(struct platform_device *pdev)
++{
++	struct rpi_acpi_thermal *data;
++	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
++	acpi_handle fan_handle;
++	int ret, i;
++
++	if (!adev)
++		return -ENODEV;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->adev = adev;
++	platform_set_drvdata(pdev, data);
++
++	ret = device_property_count_u32(&pdev->dev, "active-trip-temps");
++	if (ret < 0)
++		return ret;
++	if (ret > MAX_TRIPS)
++		return -EINVAL;
++	data->trip_count = ret;
++
++	if (device_property_read_u32_array(&pdev->dev, "active-trip-temps", data->trip_temps, data->trip_count) ||
++	    device_property_read_u32_array(&pdev->dev, "cooling-min-states", data->min_states, data->trip_count) ||
++	    device_property_read_u32_array(&pdev->dev, "cooling-max-states", data->max_states, data->trip_count)) {
++		dev_err(&pdev->dev, "Failed to read cooling properties\n");
++		return -EINVAL;
++	}
++
++	ret = device_property_read_u32_array(&pdev->dev, "active-trip-hysteresis", data->trip_hyst, data->trip_count);
++	if (ret < 0)
++		memset(data->trip_hyst, 0, sizeof(s32) * data->trip_count);
++
++	for (i = 0; i < data->trip_count; i++) {
++		data->trips[i].type = THERMAL_TRIP_ACTIVE;
++		data->trips[i].temperature = data->trip_temps[i];
++		data->trips[i].hysteresis = data->trip_hyst[i];
++	}
++
++	fan_handle = find_cooling_device_handle(&pdev->dev, data->adev->handle);
++	if (!fan_handle)
++		return -ENODEV;
++
++	data->cdev_adev = acpi_fetch_acpi_dev(fan_handle);
++	if (!data->cdev_adev) {
++		dev_err(&pdev->dev, "Cooling device companion fetch failed\n");
++		return -ENODEV;
++	}
++
++	data->tzd = thermal_zone_device_register_with_trips(DRIVER_NAME,
++		data->trips, data->trip_count, 0, data,
++		&rpi_acpi_thermal_ops, NULL, 0, 1000);
++
++	if (IS_ERR(data->tzd)) {
++		dev_err(&pdev->dev, "Failed to register thermal zone\n");
++		return PTR_ERR(data->tzd);
++	}
++
++
++
++	for (int i = 0; i < data->trip_count; i++) {
++	struct thermal_trip t;
++	__thermal_zone_get_trip(data->tzd, i, &t);
++	dev_info(&pdev->dev, "Trip %d: temp=%d hysteresis=%d\n",
++	         i, t.temperature, t.hysteresis);
++}
++	dev_info(&pdev->dev, "Registered thermal zone %s with %d trips\n",
++	         DRIVER_NAME, data->trip_count);
++
++
++	ret= thermal_zone_device_enable(data->tzd);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to enable thermal zone: %d\n", ret);
++		thermal_zone_device_unregister(data->tzd);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rpi_acpi_remove(struct platform_device *pdev)
++{
++	struct rpi_acpi_thermal *data = platform_get_drvdata(pdev);
++	if (data && data->tzd)
++		thermal_zone_device_unregister(data->tzd);
++	return 0;
++}
++
++static const struct acpi_device_id rpi_acpi_ids[] = {
++	{ RPI_HID, 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, rpi_acpi_ids);
++
++static struct platform_driver rpi_acpi_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.acpi_match_table = rpi_acpi_ids,
++	},
++	.probe = rpi_acpi_probe,
++	.remove = rpi_acpi_remove,
++};
++
++module_platform_driver(rpi_acpi_driver);
++
++MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
++MODULE_DESCRIPTION("ACPI Thermal Zone driver for RPIT0001 using _DSD properties and linked ACPI cooling device");
++MODULE_LICENSE("GPL");
++
++
+diff --git a/drivers/acpi/rpi/rpi-mailbox.c b/drivers/acpi/rpi/rpi-mailbox.c
+new file mode 100644
+index 0000000..213a3f8
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-mailbox.c
+@@ -0,0 +1,369 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * rpi-mailbox.c - ACPI adaptation of the BCM2835 mailbox driver
++ *
++ * Copyright (C) 2010,2015 Broadcom
++ * Copyright (C) 2013-2014 Lubomir Rintel
++ * Copyright (C) 2013 Craig McGeachie
++ * Copyright (C) 2023 Richard Jeans <rich@jeansy.org>
++ *
++ * This driver is based on the original code from drivers/mailbox/bcm2835-mailbox.c.
++ * Parts of the driver are derived from:
++ *  - arch/arm/mach-bcm2708/vcio.c by Gray Girling, obtained from branch
++ *    "rpi-3.6.y" of git://github.com/raspberrypi/linux.git
++ *  - drivers/mailbox/bcm2835-ipc.c by Lubomir Rintel at
++ *    https://github.com/hackerspace/rpi-linux/blob/lr-raspberry-pi/drivers/
++ *    mailbox/bcm2835-ipc.c
++ *  - Documentation available at:
++ *    https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/mailbox_controller.h>
++#include <linux/mailbox_client.h>
++#include <linux/acpi.h>
++#include <linux/completion.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/dma-mapping.h>
++#include "rpi-mailbox.h"
++
++
++
++/* Mailboxes */
++#define ARM_0_MAIL0	0x00
++#define ARM_0_MAIL1	0x20
++
++/*
++ * Mailbox registers. We basically only support mailbox 0 & 1. We
++ * deliver to the VC in mailbox 1, it delivers to us in mailbox 0. See
++ * BCM2835-ARM-Peripherals.pdf section 1.3 for an explanation about
++ * the placement of memory barriers.
++ */
++#define MAIL0_RD	(ARM_0_MAIL0 + 0x00)
++#define MAIL0_POL	(ARM_0_MAIL0 + 0x10)
++#define MAIL0_STA	(ARM_0_MAIL0 + 0x18)
++#define MAIL0_CNF	(ARM_0_MAIL0 + 0x1C)
++#define MAIL1_WRT	(ARM_0_MAIL1 + 0x00)
++#define MAIL1_STA	(ARM_0_MAIL1 + 0x18)
++
++
++#define PROPERTY_CHANNEL_IRQ (1 << 8)
++
++#define ARM_MS_FULL  0x80000000
++#define ARM_MS_EMPTY 0x40000000
++
++/* Configuration register: Enable interrupts. */
++#define ARM_MC_IHAVEDATAIRQEN	BIT(0)
++
++#define BCM2835_MAX_CHANNELS     16
++
++struct rpi_mbox {
++    void __iomem *regs;
++    struct mbox_controller controller;
++    struct device *dev;
++    struct mbox_chan chans[BCM2835_MAX_CHANNELS];
++    struct completion tx_completions[BCM2835_MAX_CHANNELS];
++    int irq;
++    spinlock_t lock;
++};
++
++
++struct rpi_mbox *rpi_mbox_global;
++
++#define RPI_MBOX_CHAN_FIRMWARE 8
++
++struct mbox_chan *rpi_mbox_request_firmware_channel(struct mbox_client *cl)
++{
++	struct rpi_mbox *mbox = rpi_mbox_global;
++	struct mbox_chan *chan;
++	int ret;
++
++	if (!cl || !mbox) {
++		pr_err("rpi_mbox_request_firmware_channel: Invalid client or uninitialized mailbox\n");
++		return ERR_PTR(-ENODEV);
++	}
++
++	if (RPI_MBOX_CHAN_FIRMWARE >= mbox->controller.num_chans) {
++		pr_err("rpi_mbox_request_firmware_channel: Firmware channel index out of range\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	chan = &mbox->chans[RPI_MBOX_CHAN_FIRMWARE];
++
++	if (chan->cl) {
++		pr_err("rpi_mbox_request_firmware_channel: Firmware channel already bound\n");
++		return ERR_PTR(-EBUSY);
++	}
++
++	ret = mbox_bind_client(chan, cl);
++	if (ret) {
++		pr_err("rpi_mbox_request_firmware_channel: Failed to bind client: %d\n", ret);
++		return ERR_PTR(ret);
++	}
++
++	init_completion(&mbox->tx_completions[RPI_MBOX_CHAN_FIRMWARE]);
++	chan->mbox = &mbox->controller;
++
++	return chan;
++}
++EXPORT_SYMBOL_GPL(rpi_mbox_request_firmware_channel);
++
++
++
++struct mbox_chan *rpi_mbox_request_channel(struct mbox_client *cl)
++{
++	struct mbox_chan *chan;
++	int i, ret;
++
++	if (!cl || !rpi_mbox_global) {
++		pr_err("rpi_mbox_request_channel: Invalid client or uninitialized mailbox\n");
++		return ERR_PTR(-ENODEV);
++	}
++
++	for (i = 0; i < rpi_mbox_global->controller.num_chans; i++) {
++		if (i == RPI_MBOX_CHAN_FIRMWARE)
++			continue;
++
++		chan = &rpi_mbox_global->chans[i];
++		if (!chan->cl) {
++			ret = mbox_bind_client(chan, cl);
++			if (ret) {
++				pr_err("rpi_mbox_request_channel: Failed to bind client: %d\n", ret);
++				return ERR_PTR(ret);
++			}
++
++			init_completion(&rpi_mbox_global->tx_completions[i]);
++			chan->mbox = &rpi_mbox_global->controller;
++			return chan;
++		}
++	}
++
++	pr_err("rpi_mbox_request_channel: No free channel available\n");
++	return ERR_PTR(-EBUSY);
++}
++EXPORT_SYMBOL_GPL(rpi_mbox_request_channel);
++
++int rpi_mbox_free_channel(struct mbox_chan *chan)
++{
++	if (!chan) {
++		pr_err("rpi_mbox_free_channel: Invalid channel\n");
++		return -EINVAL;
++	}
++
++	if (!chan->cl) {
++		pr_err("rpi_mbox_free_channel: Channel not bound or already unbound\n");
++		return -ENODEV;
++	}
++
++	chan->cl = NULL;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(rpi_mbox_free_channel);
++
++static int rpi_mbox_send_data(struct mbox_chan *chan, void *data)
++{
++	struct rpi_mbox *mbox = container_of(chan->mbox, struct rpi_mbox, controller);
++	u32 msg = *(u32 *)data;
++
++	if (!chan || !data) {
++		pr_err("rpi_mbox_send_data: Invalid channel or data\n");
++		return -EINVAL;
++	}
++
++	spin_lock(&mbox->lock);
++	writel(msg, mbox->regs + MAIL1_WRT);
++	spin_unlock(&mbox->lock);
++
++	return 0;
++}
++
++static bool rpi_mbox_last_tx_done(struct mbox_chan *chan)
++{
++	struct rpi_mbox *mbox = container_of(chan->mbox, struct rpi_mbox, controller);
++	bool ret;
++
++	spin_lock(&mbox->lock);
++	ret = !(readl(mbox->regs + MAIL1_STA) & ARM_MS_FULL);
++	spin_unlock(&mbox->lock);
++
++	return ret;
++}
++
++static int rpi_mbox_startup(struct mbox_chan *chan)
++{
++	struct rpi_mbox *mbox = container_of(chan->mbox, struct rpi_mbox, controller);
++
++	/* Enable the interrupt on data reception */
++	writel(ARM_MC_IHAVEDATAIRQEN, mbox->regs + MAIL0_CNF);
++
++	return 0;
++}
++
++static void rpi_mbox_shutdown(struct mbox_chan *chan)
++{
++	struct rpi_mbox *mbox;
++
++	mbox = container_of(chan->mbox, struct rpi_mbox, controller);
++}
++
++static irqreturn_t rpi_mbox_irq(int irq, void *dev_id)
++{
++	struct rpi_mbox *mbox = dev_id;
++	struct device *dev = mbox->controller.dev;
++	irqreturn_t handled = IRQ_NONE;
++
++	if (!mbox) {
++		pr_err("rpi_mbox_irq: Invalid mailbox context\n");
++		return IRQ_NONE;
++	}
++
++	// Process all pending messages
++	while (!(readl(mbox->regs + MAIL0_STA) & ARM_MS_EMPTY)) {
++		u32 msg = readl(mbox->regs + MAIL0_RD);
++		u32 chan_index = msg & 0xf;
++
++		// Validate channel index
++		if (chan_index >= BCM2835_MAX_CHANNELS) {
++			dev_warn(dev, "rpi_mbox_irq: Invalid channel index %u in IRQ msg 0x%08X\n", chan_index, msg);
++			continue;
++		}
++
++		// Get the channel and ensure it is bound
++		struct mbox_chan *chan = &mbox->chans[chan_index];
++		if (!chan->cl || !chan->cl->rx_callback) {
++			dev_warn(dev, "rpi_mbox_irq: Unbound mailbox channel %u (msg=0x%08X), skipping\n", chan_index, msg);
++			continue;
++		}
++
++		// Dispatch the message to the client
++		mbox_chan_received_data(chan, &msg);
++		handled = IRQ_HANDLED;
++	}
++
++	return handled;
++}
++
++static const struct mbox_chan_ops rpi_mbox_chan_ops = {
++	.send_data     = rpi_mbox_send_data,
++	.startup       = rpi_mbox_startup,
++	.shutdown      = rpi_mbox_shutdown,
++	.last_tx_done  = rpi_mbox_last_tx_done,
++};
++
++static int rpi_mbox_probe(struct platform_device *pdev)
++{
++	struct rpi_mbox *mbox;
++	struct resource *res;
++	int ret;
++
++	// Check if CONFIG_MAILBOX is enabled
++#ifndef CONFIG_MAILBOX
++	dev_err(&pdev->dev, "CONFIG_MBOX is not enabled. Cannot initialize rpi-mailbox.\n");
++	return -ENODEV;
++#endif
++
++	// Log the start of the probe function
++	dev_info(&pdev->dev, "Probing rpi-mailbox device\n");
++
++	// Allocate memory for the mailbox structure
++	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
++	if (!mbox) {
++		dev_err(&pdev->dev, "Failed to allocate memory for mailbox structure\n");
++		return -ENOMEM;
++	}
++
++	// Store the mailbox structure in the platform device's driver data
++	platform_set_drvdata(pdev, mbox);
++	mbox->dev = &pdev->dev;
++	rpi_mbox_global = mbox;
++
++	// Get the IRQ resource for the mailbox
++	mbox->irq = platform_get_irq(pdev, 0);
++	if (mbox->irq < 0) {
++		ret = dev_err_probe(&pdev->dev, mbox->irq, "Failed to get IRQ\n");
++		goto err_free_mbox;
++	}
++
++	// Request the IRQ and associate it with the mailbox IRQ handler
++	ret = devm_request_irq(&pdev->dev, mbox->irq, rpi_mbox_irq,
++			       0, dev_name(&pdev->dev), mbox);
++	if (ret) {
++		dev_err_probe(&pdev->dev, ret, "Failed to request IRQ\n");
++		goto err_free_mbox;
++	}
++
++	// Get the memory resource for the mailbox registers
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mbox->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mbox->regs)) {
++		ret = PTR_ERR(mbox->regs);
++		dev_err(&pdev->dev, "Failed to map mailbox registers: %d\n", ret);
++		goto err_free_mbox;
++	}
++
++	// Initialize the mailbox controller
++	mbox->controller.dev = &pdev->dev;
++	mbox->controller.chans = mbox->chans;
++	mbox->controller.num_chans = BCM2835_MAX_CHANNELS;
++	mbox->controller.ops = &rpi_mbox_chan_ops;
++	mbox->controller.txdone_poll = true;
++	mbox->controller.txpoll_period = 5;
++
++	// Register the mailbox controller
++	ret = devm_mbox_controller_register(&pdev->dev, &mbox->controller);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register mailbox controller: %d\n", ret);
++		goto err_free_mbox;
++	}
++
++	// Log successful initialization
++	dev_info(&pdev->dev, "rpi-mailbox device initialized successfully\n");
++	return 0;
++
++err_free_mbox:
++	// Cleanup in case of any errors
++	devm_kfree(&pdev->dev, mbox);
++	return ret;
++}
++
++static int rpi_mbox_remove(struct platform_device *pdev)
++{
++	struct rpi_mbox *mbox = platform_get_drvdata(pdev);
++
++	// Log the start of the remove function
++	dev_info(&pdev->dev, "Removing rpi-mailbox device\n");
++
++	if (mbox) {
++		// Perform any necessary cleanup here
++		devm_kfree(&pdev->dev, mbox);
++	}
++
++	dev_info(&pdev->dev, "rpi-mailbox device removed successfully\n");
++	return 0;
++}
++
++static const struct acpi_device_id rpi_mbox_acpi_ids[] = {
++	{ "BCM2849", 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, rpi_mbox_acpi_ids);
++
++static struct platform_driver rpi_mbox_driver = {
++	.driver = {
++		.name = "rpi-mbox",
++		.acpi_match_table = rpi_mbox_acpi_ids,
++	},
++	.probe = rpi_mbox_probe,
++	.remove = rpi_mbox_remove,
++};
++
++module_platform_driver(rpi_mbox_driver);
++
++MODULE_AUTHOR("Richard Jeans <rich@jeansy.org>");
++MODULE_DESCRIPTION("ACPI adaptation of the BCM2835 mailbox controller");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/acpi/rpi/rpi-mailbox.h b/drivers/acpi/rpi/rpi-mailbox.h
+new file mode 100644
+index 0000000..3ac2c6f
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-mailbox.h
+@@ -0,0 +1,24 @@
++// SPDX-License-Identifier: GPL-2.0
++#ifndef RPI_MAILBOX_H
++#define RPI_MAILBOX_H
++
++#include <linux/mailbox_controller.h>
++
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++extern struct mbox_chan *rpi_mbox_request_channel(struct mbox_client *);
++extern int rpi_mbox_free_channel(struct mbox_chan *);
++extern struct mbox_chan *rpi_mbox_request_firmware_channel(struct mbox_client *);
++
++
++
++
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif // RPI_MAILBOX_H
+\ No newline at end of file
+diff --git a/drivers/acpi/rpi/rpi-pwm-fan.c b/drivers/acpi/rpi/rpi-pwm-fan.c
+new file mode 100644
+index 0000000..6f82ac6
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-pwm-fan.c
+@@ -0,0 +1,490 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * pwm-fan.c - Hwmon driver for fans connected to PWM lines.
++ *
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *
++ * Author: Kamil Debski <k.debski@samsung.com>
++ */
++
++#include <linux/hwmon.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/sysfs.h>
++#include <linux/thermal.h>
++#include <linux/property.h>
++#include <linux/acpi.h>
++#include <linux/thermal.h>
++#include "rpi-pwm-fan.h"
++
++
++
++#define MAX_PWM 255
++
++
++
++
++
++
++
++
++static int pwm_fan_power_on(struct pwm_fan_ctx *ctx)
++{
++	if (ctx->enabled)
++		return 0;
++
++	ctx->pwm_state.enabled = true;
++	int ret = pwm_apply_might_sleep(ctx->pwm, &ctx->pwm_state);
++	if (!ret)
++		ctx->enabled = true;
++
++	return ret;
++}
++
++
++static int pwm_fan_power_off(struct pwm_fan_ctx *ctx)
++{
++	if (!ctx->enabled)
++		return 0;
++
++	ctx->pwm_state.enabled = false;
++	ctx->pwm_state.duty_cycle = 0;
++	int ret = pwm_apply_might_sleep(ctx->pwm, &ctx->pwm_state);
++	if (!ret)
++		ctx->enabled = false;
++
++	return ret;
++}
++
++static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
++{
++	struct pwm_state *state = &ctx->pwm_state;
++	unsigned long period;
++	int ret = 0;
++
++	if (pwm > 0) {
++
++
++		period = state->period;
++		state->duty_cycle = DIV_ROUND_UP(pwm * (period - 1), MAX_PWM);
++		ret = pwm_apply_might_sleep(ctx->pwm, state);
++		if (ret)
++			return ret;
++		ret = pwm_fan_power_on(ctx);
++	} else {
++		ret = pwm_fan_power_off(ctx);
++	}
++	if (!ret)
++		ctx->pwm_value = pwm;
++
++	return ret;
++}
++
++static int set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
++{
++	int ret;
++
++	mutex_lock(&ctx->lock);
++	ret = __set_pwm(ctx, pwm);
++	mutex_unlock(&ctx->lock);
++
++	return ret;
++}
++
++static void pwm_fan_update_state(struct pwm_fan_ctx *ctx, unsigned long pwm)
++{
++	int i;
++
++	for (i = 0; i < ctx->pwm_fan_max_state; ++i)
++		if (pwm < ctx->pwm_fan_cooling_levels[i + 1])
++			break;
++
++	ctx->pwm_fan_state = i;
++}
++
++
++static int pwm_fan_write(struct device *dev, enum hwmon_sensor_types type,
++			 u32 attr, int channel, long val)
++{
++	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
++	int ret;
++
++	switch (attr) {
++	case hwmon_pwm_input:
++		if (val < 0 || val > MAX_PWM)
++			return -EINVAL;
++		ret = set_pwm(ctx, val);
++		if (ret)
++			return ret;
++		pwm_fan_update_state(ctx, val);
++		break;
++	case hwmon_pwm_enable:
++		if (val != 1)
++			return -EOPNOTSUPP;
++		return 0;
++
++	default:
++		return -EOPNOTSUPP;
++	}
++
++	return 0;
++}
++
++static int pwm_fan_read(struct device *dev, enum hwmon_sensor_types type,
++			u32 attr, int channel, long *val)
++{
++	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
++
++	switch (type) {
++	case hwmon_pwm:
++		switch (attr) {
++		case hwmon_pwm_input:
++			*val = ctx->pwm_value;
++			return 0;
++		case hwmon_pwm_enable:
++			*val = 1;
++			return 0;
++		}
++		return -EOPNOTSUPP;
++
++	default:
++		return -ENOTSUPP;
++	}
++}
++
++static umode_t pwm_fan_is_visible(const void *data,
++				  enum hwmon_sensor_types type,
++				  u32 attr, int channel)
++{
++	switch (type) {
++	case hwmon_pwm:
++		return 0644;
++
++
++	default:
++		return 0;
++	}
++}
++
++static const struct hwmon_ops pwm_fan_hwmon_ops = {
++	.is_visible = pwm_fan_is_visible,
++	.read = pwm_fan_read,
++	.write = pwm_fan_write,
++};
++
++/* thermal cooling device callbacks */
++static int pwm_fan_get_max_state(struct thermal_cooling_device *cdev,
++				 unsigned long *state)
++{
++	struct pwm_fan_ctx *ctx = NULL;
++	struct acpi_device *adev = cdev->devdata;
++	if (adev->driver_data)
++		ctx = adev->driver_data;
++
++	if (!ctx)
++		return -EINVAL;
++
++	*state = ctx->pwm_fan_max_state;
++
++	return 0;
++}
++
++static int pwm_fan_get_cur_state(struct thermal_cooling_device *cdev,
++				 unsigned long *state)
++{
++	struct pwm_fan_ctx *ctx = NULL;
++	struct acpi_device *adev = cdev->devdata;
++	if (adev->driver_data)
++		ctx = adev->driver_data;
++
++	if (!ctx)
++		return -EINVAL;
++
++	*state = ctx->pwm_fan_state;
++
++	return 0;
++}
++
++static int
++pwm_fan_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
++{
++	struct pwm_fan_ctx *ctx = NULL;
++	int ret;
++	struct acpi_device *adev = cdev->devdata;
++	if (adev->driver_data)
++		ctx = adev->driver_data;
++
++	if (!ctx || (state > ctx->pwm_fan_max_state))
++		return -EINVAL;
++
++	if (state == ctx->pwm_fan_state)
++		return 0;
++
++	ret = set_pwm(ctx, ctx->pwm_fan_cooling_levels[state]);
++	if (ret) {
++		dev_err(&cdev->device, "Cannot set pwm!\n");
++		return ret;
++	}
++
++	ctx->pwm_fan_state = state;
++
++	return ret;
++}
++
++static const struct thermal_cooling_device_ops pwm_fan_cooling_ops = {
++	.get_max_state = pwm_fan_get_max_state,
++	.get_cur_state = pwm_fan_get_cur_state,
++	.set_cur_state = pwm_fan_set_cur_state,
++};
++
++
++static int pwm_fan_get_cooling_data(struct device *dev,
++				       struct pwm_fan_ctx *ctx)
++{
++	
++	int num, i, ret;
++
++	if (!fwnode_property_present(dev_fwnode(dev), "cooling-levels")) {
++		dev_info(dev, "No cooling levels property found\n");
++		return 0;
++	}
++
++	ret = fwnode_property_count_u32(dev_fwnode(dev), "cooling-levels");
++	if (ret <= 0) {
++		dev_err(dev, "Wrong data!\n");
++		return ret ? : -EINVAL;
++	}
++
++	num = ret;
++	ctx->pwm_fan_cooling_levels = devm_kcalloc(dev, num, sizeof(u32),
++						   GFP_KERNEL);
++	if (!ctx->pwm_fan_cooling_levels)
++		return -ENOMEM;
++
++	ret = fwnode_property_read_u32_array(dev_fwnode(dev), "cooling-levels",
++					 ctx->pwm_fan_cooling_levels, num);
++	if (ret) {
++		dev_err(dev, "Property 'cooling-levels' cannot be read!\n");
++		return ret;
++	}
++
++	for (i = 0; i < num; i++) {
++		if (ctx->pwm_fan_cooling_levels[i] > MAX_PWM) {
++			dev_err(dev, "PWM fan state[%d]:%d > %d\n", i,
++				ctx->pwm_fan_cooling_levels[i], MAX_PWM);
++			return -EINVAL;
++		}
++	}
++
++
++	ctx->pwm_fan_max_state = num - 1;
++
++	return 0;
++}
++
++static void pwm_fan_cleanup(void *__ctx)
++{
++	struct pwm_fan_ctx *ctx = __ctx;
++
++
++
++	pwm_fan_power_off(ctx);
++}
++
++static int pwm_fan_probe(struct platform_device *pdev)
++{
++	struct pwm_fan_ctx *ctx;
++	struct device *dev = &pdev->dev;
++	const struct hwmon_channel_info *ctx_channels[] = {
++		HWMON_CHANNEL_INFO(pwm, HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
++		NULL
++	};
++	struct thermal_cooling_device *cdev;
++	struct device *hwmon;
++	int ret;
++	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
++
++	if (!adev) {
++		dev_err(dev, "No ACPI companion found\n");
++		return -ENODEV;
++	}
++
++
++
++	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++
++	mutex_init(&ctx->lock);
++	ctx->dev = dev;
++
++	ctx->pwm = devm_pwm_get(dev, NULL);
++	if (IS_ERR(ctx->pwm))
++		return dev_err_probe(dev, PTR_ERR(ctx->pwm), "Could not get PWM\n");
++
++	platform_set_drvdata(pdev, ctx);
++    adev->driver_data = ctx;
++
++
++	pwm_init_state(ctx->pwm, &ctx->pwm_state);
++	ctx->pwm_state.usage_power = true;
++
++	if (ctx->pwm_state.period > ULONG_MAX / MAX_PWM + 1) {
++		dev_err(dev, "Configured period too big\n");
++		return -EINVAL;
++	}
++
++
++	ret = set_pwm(ctx, MAX_PWM);
++	if (ret) {
++		dev_err(dev, "Failed to configure PWM: %d\n", ret);
++		return ret;
++	}
++
++	ret = devm_add_action_or_reset(dev, pwm_fan_cleanup, ctx);
++	if (ret)
++		return ret;
++
++
++	ctx->info.ops = &pwm_fan_hwmon_ops;
++	ctx->info.info = ctx_channels;
++
++	hwmon = devm_hwmon_device_register_with_info(dev, "pwmfan", ctx, &ctx->info, NULL);
++	if (IS_ERR(hwmon)) {
++		dev_err(dev, "Failed to register hwmon device\n");
++		return PTR_ERR(hwmon);
++	}
++
++	ret = pwm_fan_get_cooling_data(dev, ctx);  // Still useful for thermal binding
++	if (ret) {
++		dev_err(dev, "Failed to get cooling data: %d\n", ret);
++		return ret;
++	}
++
++	ctx->pwm_fan_state = ctx->pwm_fan_max_state;
++
++	if (IS_ENABLED(CONFIG_THERMAL)) {
++         cdev = thermal_cooling_device_register( "pwm-fan", adev,
++					    &pwm_fan_cooling_ops);
++
++		if (IS_ERR(cdev)) {
++			ret = PTR_ERR(cdev);
++			dev_err(dev, "Failed to register pwm-fan as cooling device: %d\n", ret);
++			return ret;
++		}
++		ctx->cdev = cdev;
++		dev_info(dev, "Registered as cooling device\n");
++
++
++	}
++
++	ret = sysfs_create_link(&dev->kobj, &ctx->cdev->device.kobj, "thermal_cooling");
++if (ret) {
++	dev_err(dev, "Failed to create sysfs link 'thermal_cooling'\n");
++	
++	return ret;
++	
++}
++
++ret = sysfs_create_link(&ctx->cdev->device.kobj, &dev->kobj, "device");
++if (ret) {
++	dev_err(dev, "Failed to create sysfs link 'device'\n");
++	return ret;
++}
++
++
++
++
++	return 0;
++
++
++}
++
++
++static void pwm_fan_shutdown(struct platform_device *pdev)
++{
++	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
++
++	pwm_fan_cleanup(ctx);
++}
++
++static int pwm_fan_suspend(struct device *dev)
++{
++	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
++
++	return pwm_fan_power_off(ctx);
++}
++
++static int pwm_fan_resume(struct device *dev)
++{
++	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
++
++	return set_pwm(ctx, ctx->pwm_value);
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
++
++static const struct acpi_device_id acpi_pwm_fan_match[] = {
++	{ "PWMF0001", 0},
++	{},
++};
++MODULE_DEVICE_TABLE(acpi, acpi_pwm_fan_match);
++
++static int pwm_fan_remove(struct platform_device *pdev)
++{
++	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
++	int i;
++
++	if (!ctx)
++		return -EINVAL;
++
++	if (ctx->cdev) {
++		/* Unbind from stored thermal zone if available */
++		if (ctx->tz) {
++			dev_info(ctx->dev,
++			         "Unbinding cooling device from thermal zone: %s\n",
++			         dev_name(&ctx->tz->device));
++
++			for (i = 0; i < ctx->tz->num_trips; i++) {
++				int ret = thermal_zone_unbind_cooling_device(ctx->tz, i, ctx->cdev);
++				if (ret)
++					dev_warn(ctx->dev,
++					         "Failed to unbind from trip %d: %d\n", i, ret);
++				else
++					dev_info(ctx->dev,
++					         "Unbound cooling device from trip %d\n", i);
++			}
++		} else {
++			dev_warn(ctx->dev,
++			         "No thermal zone recorded, skipping unbind\n");
++		}
++
++		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
++		sysfs_remove_link(&ctx->dev->kobj, "thermal_cooling");
++		thermal_cooling_device_unregister(ctx->cdev);
++	}
++
++	pwm_fan_cleanup(ctx);
++
++	return 0;
++}
++
++static struct platform_driver pwm_fan_driver = {
++	.probe		= pwm_fan_probe,
++	.remove		= pwm_fan_remove,
++	.shutdown	= pwm_fan_shutdown,
++	.driver	= {
++		.name		= "pwm-fan",
++		.pm		= pm_sleep_ptr(&pwm_fan_pm),
++		.acpi_match_table	= acpi_pwm_fan_match,
++	},
++};
++
++module_platform_driver(pwm_fan_driver);
++
++MODULE_AUTHOR("Kamil Debski <k.debski@samsung.com>");
++MODULE_ALIAS("platform:pwm-fan");
++MODULE_DESCRIPTION("PWM FAN driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/acpi/rpi/rpi-pwm-fan.h b/drivers/acpi/rpi/rpi-pwm-fan.h
+new file mode 100644
+index 0000000..0bb6c7f
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-pwm-fan.h
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#ifndef RPI_PWM_FAN_H
++#define RPI_PWM_FAN_H
++
++#include <linux/device.h>
++#include <linux/mutex.h>
++#include <linux/pwm.h>
++#include <linux/thermal.h>
++#include <linux/hwmon.h>
++
++struct pwm_fan_ctx {
++	struct device *dev;
++
++	struct mutex lock;
++	struct pwm_device *pwm;
++	struct pwm_state pwm_state;
++	bool enabled;
++
++	unsigned int pwm_value;
++	unsigned int pwm_fan_state;
++	unsigned int pwm_fan_max_state;
++	unsigned int *pwm_fan_cooling_levels;
++	struct thermal_cooling_device *cdev;
++
++    struct thermal_zone_device * tz;
++
++	struct hwmon_chip_info info;
++};
++
++#endif // RPI_PWM_FAN_H
+diff --git a/drivers/acpi/rpi/rpi-pwm-poe.c b/drivers/acpi/rpi/rpi-pwm-poe.c
+new file mode 100644
+index 0000000..10a82cc
+--- /dev/null
++++ b/drivers/acpi/rpi/rpi-pwm-poe.c
+@@ -0,0 +1,354 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/acpi.h>
++#include <linux/pm_runtime.h>
++#include <linux/mailbox_client.h>
++#include <linux/delay.h>
++#include <linux/dma-mapping.h>
++#include "rpi-mailbox.h"
++
++static DEFINE_MUTEX(transaction_lock);
++
++
++
++
++#define RPI_MBOX_CHAN_FIRMWARE       8
++
++#define RPI_PWM_MAX_DUTY		255
++#define RPI_PWM_PERIOD_NS		80000 /* 12.5 kHz */
++
++#define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
++
++struct acpi_pwm_driver_data {
++	struct pwm_chip chip;
++	struct mbox_client mbox;
++	struct mbox_chan *chan;
++	struct device *dev;
++    struct completion c;
++	unsigned int scaled_duty_cycle;
++    struct pwm_state state;
++};
++
++static inline struct acpi_pwm_driver_data *to_acpi_pwm(struct pwm_chip *chip)
++{
++	return container_of(chip, struct acpi_pwm_driver_data, chip);
++}
++
++static void response_callback(struct mbox_client *cl, void *msg)
++{
++	struct acpi_pwm_driver_data *data = container_of(cl, struct acpi_pwm_driver_data, mbox);
++	complete(&data->c);
++}
++
++
++#define RPI_FIRMWARE_GET_POE_HAT_VAL    0x00030049
++#define RPI_FIRMWARE_SET_POE_HAT_VAL    0x00038049
++#define RPI_FIRMWARE_STATUS_REQUEST 0x00000000
++
++#define RPI_PWM_CUR_DUTY_REG         0x0
++#define RPI_PWM_CUR_ENABLE_REG         0x0
++
++#
++// Sub-registers used inside the payload
++
++
++static int build_poe_firmware_msg(u32 *buf,
++                                  bool is_get,
++                                  u32 property_tag,
++                                  u32 reg,
++                                  u32 value)
++{
++	if (!buf)
++		return -EINVAL;
++
++	buf[0] = cpu_to_le32(9 * sizeof(u32));      // total size: 32 bytes
++	buf[1] = cpu_to_le32(RPI_FIRMWARE_STATUS_REQUEST);           // request
++	buf[2] = cpu_to_le32(property_tag);   // compound PoE property tag
++	buf[3] = cpu_to_le32(3*sizeof(u32));                    // tag payload size
++	buf[4] = cpu_to_le32(0);       // 0 for GET, 0 for SET
++	buf[5] = cpu_to_le32(reg);               // register to read or write
++	buf[6] = cpu_to_le32(value);                // value (unused for GET)
++	buf[7] = cpu_to_le32(0);                    
++	buf[8] = cpu_to_le32(0);                    
++
++	return 0;
++}
++
++static int send_mbox_message(struct completion *c, struct device *dev, struct mbox_chan *chan,
++                             u32 property_tag, u32 reg, u32 value, bool is_get, u32 *value_out)
++{
++    dma_addr_t dma_handle;
++    u32 *dma_buf;
++    int ret;
++
++ 
++    dma_buf = dma_alloc_coherent(chan->mbox->dev, PAGE_ALIGN(9 * sizeof(u32)), &dma_handle, GFP_ATOMIC);
++    if (!dma_buf) {
++        dev_err(dev, "send_mbox_message: Failed to allocate DMA buffer\n");
++        return -ENOMEM;
++    }
++
++    ret = build_poe_firmware_msg(dma_buf, is_get, property_tag, reg, value);
++
++    
++
++    dev_dbg(dev, "Sending tag 0x%08x reg 0x%08x val %u\n", dma_buf[2], dma_buf[5], dma_buf[6]);
++
++
++    mutex_lock(&transaction_lock);
++
++    reinit_completion(c);
++
++    u32 msg = MBOX_MSG(RPI_MBOX_CHAN_FIRMWARE, dma_handle);
++
++
++    ret = mbox_send_message(chan, &msg);
++    if (ret < 0) {
++        dev_err(dev, "send_mbox_message: Failed to send message: %pe\n", ERR_PTR(ret));
++        goto out_free;
++    }
++
++    if (!wait_for_completion_timeout(c, HZ)) {
++        dev_err(dev, "Timeout waiting for response\n");
++        ret = -ETIMEDOUT;
++        goto out_free;
++    }
++
++    if (!(dma_buf[4] & 0x80000000)) {
++        dev_err(dev, "Firmware did not acknowledge property tag 0x%08x\n", property_tag);
++        ret = -EIO;
++        goto out_free;
++    }
++
++    if (is_get && value_out)
++        *value_out = le32_to_cpu(dma_buf[6]);
++
++    ret = 0;
++
++out_free:
++	mutex_unlock(&transaction_lock);
++	dma_free_coherent(chan->mbox->dev, PAGE_ALIGN(7 * sizeof(u32)), dma_buf, dma_handle);
++
++	return ret;
++}
++
++static int send_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u8 duty)
++{
++    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_SET_POE_HAT_VAL, RPI_PWM_CUR_DUTY_REG, duty, false, NULL);
++}
++
++
++static int get_pwm_duty(struct completion *c, struct device *dev, struct mbox_chan *chan, u32 *value_out)
++{
++    return send_mbox_message(c, dev, chan, RPI_FIRMWARE_GET_POE_HAT_VAL, RPI_PWM_CUR_DUTY_REG,0, true, value_out);
++}
++
++
++
++static int rpi_pwm_poe_apply(struct pwm_chip *chip, struct pwm_device *pwm,
++                             const struct pwm_state *state)
++{
++	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
++	int ret;
++	unsigned new_scaled_duty_cycle;
++
++	// Validate the PWM state
++	if (state->period != RPI_PWM_PERIOD_NS || state->polarity != PWM_POLARITY_NORMAL) {
++		return -EINVAL;
++	}
++
++	data->state = *state;
++
++	// Calculate the new scaled duty cycle
++	if (!state->enabled) {
++		new_scaled_duty_cycle = 0;
++	} else if (state->duty_cycle < RPI_PWM_PERIOD_NS) {
++		new_scaled_duty_cycle = DIV_ROUND_DOWN_ULL(state->duty_cycle * RPI_PWM_MAX_DUTY, RPI_PWM_PERIOD_NS);
++	} else {
++		new_scaled_duty_cycle = RPI_PWM_MAX_DUTY;
++	}
++
++	// Skip updating if the duty cycle hasn't changed
++	if (new_scaled_duty_cycle == data->scaled_duty_cycle) {
++		return 0;
++	}
++
++	// Send the new duty cycle to the firmware
++	ret = send_pwm_duty(&data->c, data->dev, data->chan, new_scaled_duty_cycle);
++	if (ret) {
++		return ret;
++	}
++
++	data->scaled_duty_cycle = new_scaled_duty_cycle;
++	return 0;
++}
++
++static int rpi_pwm_poe_get_state(struct pwm_chip *chip,
++                                 struct pwm_device *pwm,
++                                 struct pwm_state *state)
++{
++	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
++
++	// Populate the PWM state with the current values
++	state->period = RPI_PWM_PERIOD_NS;
++	state->polarity = PWM_POLARITY_NORMAL;
++	state->duty_cycle = data->state.duty_cycle;
++	state->enabled = data->state.enabled;
++
++	return 0;
++}
++
++static int rpi_pwm_poe_request(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	// No special handling required for requesting a PWM device
++	return 0;
++}
++
++static void rpi_pwm_poe_free(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
++
++	// Reset the PWM state to disabled
++	data->state.period = RPI_PWM_PERIOD_NS;
++	data->state.duty_cycle = 0;
++	data->state.enabled = false;
++	data->state.polarity = PWM_POLARITY_NORMAL;
++
++	rpi_pwm_poe_apply(chip, pwm, &data->state);
++}
++
++static int rpi_pwm_poe_capture(struct pwm_chip *chip, struct pwm_device *pwm,
++                               struct pwm_capture *capture, unsigned long timeout)
++{
++	struct acpi_pwm_driver_data *data = to_acpi_pwm(chip);
++
++	// Return the cached period and duty cycle
++	capture->period = data->state.period;
++	capture->duty_cycle = data->state.duty_cycle;
++
++	return 0;
++}
++
++static const struct pwm_ops rpi_pwm_poe_ops = {
++	.apply = rpi_pwm_poe_apply,
++	.get_state = rpi_pwm_poe_get_state,
++	.request = rpi_pwm_poe_request,
++	.free = rpi_pwm_poe_free,
++	.capture = rpi_pwm_poe_capture,
++	.owner = THIS_MODULE,
++};
++
++static int rpi_pwm_poe_probe(struct platform_device *pdev)
++{
++	struct acpi_pwm_driver_data *data;
++	struct mbox_client *cl;
++	int ret;
++
++	// Check if CONFIG_PWM is enabled
++#ifndef CONFIG_PWM
++	dev_err(&pdev->dev, "CONFIG_PWM is not enabled. Cannot initialize rpi-pwm-poe.\n");
++	return -ENODEV;
++#endif
++
++	// Log the start of the probe function
++	dev_info(&pdev->dev, "Probing rpi-pwm-poe device\n");
++
++	// Allocate memory for the driver data
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data) {
++		dev_err(&pdev->dev, "Failed to allocate memory for driver data\n");
++		return -ENOMEM;
++	}
++
++	data->dev = &pdev->dev;
++	cl = &data->mbox;
++	cl->dev = &pdev->dev;
++	cl->tx_block = true;
++	cl->rx_callback = response_callback;
++
++	init_completion(&data->c);
++
++	// Request the firmware mailbox channel
++	data->chan = rpi_mbox_request_firmware_channel(cl);
++	if (IS_ERR(data->chan)) {
++		ret = PTR_ERR(data->chan);
++		dev_err(&pdev->dev, "Failed to request firmware mailbox channel: %d\n", ret);
++		return ret;
++	}
++
++	// Get the current duty cycle from the firmware
++	ret = get_pwm_duty(&data->c, &pdev->dev, data->chan, &data->scaled_duty_cycle);
++	if (ret < 0) {
++		dev_warn(&pdev->dev, "Failed to get current duty cycle: %d\n", ret);
++	}
++
++	// Initialize the PWM state
++	data->state.period = RPI_PWM_PERIOD_NS;
++	data->state.duty_cycle = 0;
++	data->state.enabled = false;
++	data->state.polarity = PWM_POLARITY_NORMAL;
++
++	// Initialize the PWM chip
++	data->chip.dev = &pdev->dev;
++	data->chip.ops = &rpi_pwm_poe_ops;
++	data->chip.npwm = 1;
++
++	platform_set_drvdata(pdev, data);
++
++	// Register the PWM chip
++	ret = devm_pwmchip_add(&pdev->dev, &data->chip);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register PWM chip: %d\n", ret);
++		rpi_mbox_free_channel(data->chan);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "rpi-pwm-poe device initialized successfully\n");
++	return 0;
++}
++
++static int rpi_pwm_poe_remove(struct platform_device *pdev)
++{
++	struct acpi_pwm_driver_data *data = platform_get_drvdata(pdev);
++	int ret;
++
++	// Log the start of the remove function
++	dev_info(&pdev->dev, "Removing rpi-pwm-poe device\n");
++
++	// Reset the duty cycle to 0
++	ret = send_pwm_duty(&data->c, data->dev, data->chan, 0);
++	if (ret) {
++		dev_warn(data->dev, "Failed to send PWM duty: %d\n", ret);
++		return ret;
++	}
++
++	// Free the mailbox channel
++	if (data->chan) {
++		rpi_mbox_free_channel(data->chan);
++	}
++
++	return 0;
++}
++
++static const struct acpi_device_id rpi_pwm_poe_ids[] = {
++	{ "BCM2853", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(acpi, rpi_pwm_poe_ids);
++
++static struct platform_driver rpi_pwm_poe_driver = {
++	.driver = {
++		.name = "rpi-pwm-poe",
++		.acpi_match_table = rpi_pwm_poe_ids,
++	},
++	.probe = rpi_pwm_poe_probe,
++	.remove = rpi_pwm_poe_remove,
++};
++
++module_platform_driver(rpi_pwm_poe_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("You");
++MODULE_DESCRIPTION("ACPI PWM driver using mailbox to control firmware duty");
+-- 
+2.45.3
+
