@@ -56,18 +56,12 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 	*temp = ((int)val - 2732) * 100;
 
 	dev_info(&tz->device, "Current temperature: %d.%02d C\n",
-	         *temp / 100, abs(*temp) % 100);
+	         *temp / 1000, abs(*temp) % 1000);
 	
 			dev_info(&tz->device, "thermal_zone_device: id=%d, type=%s, num_trips=%d, mode=%d, temperature=%d, last_temperature=%d, emul_temperature=%d, polling_delay_jiffies=%lu, passive_delay_jiffies=%lu, suspended=%d\n",
 					 tz->id, tz->type, tz->num_trips, tz->mode, tz->temperature, tz->last_temperature,
 					 tz->emul_temperature, tz->polling_delay_jiffies, tz->passive_delay_jiffies, tz->suspended);
-					for (int i = 0; i < tz->num_trips; i++) {
-						struct thermal_trip t;
-						if (!__thermal_zone_get_trip(tz, i, &t)) {
-							dev_info(&tz->device, "  trip %d: type=%d temp=%d hyst=%d\n",
-									 i, t.type, t.temperature, t.hysteresis);
-						}
-					}
+
 					dev_info(&tz->device, "prev_low_trip=%d, prev_high_trip=%d\n",
 							 tz->prev_low_trip, tz->prev_high_trip);
 	return 0;
