@@ -147,10 +147,32 @@ static int rpi_acpi_unbind(struct thermal_zone_device *tz,
 	return 0;
 }
 
+static int rpi_acpi_get_trend(struct thermal_zone_device *tz,
+                              const struct thermal_trip *trip,
+                              enum thermal_trend *trend)
+{
+	int temp;
+	rpi_acpi_get_temp(tz, &temp);  // or your actual temp reading function
+
+	if (temp < trip->temperature - trip->hysteresis)
+		*trend = THERMAL_TREND_DROPPING;
+	else if (temp >= trip->temperature)
+		*trend = THERMAL_TREND_RAISING;
+	else
+		*trend = THERMAL_TREND_STABLE;
+
+	dev_info(&tz->device,
+		"Trend check: temp=%d, trip=%d, hyst=%d, trend=%d\n",
+		temp, trip->temperature, trip->hysteresis, *trend);
+
+	return 0;
+}
+
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 	.bind = rpi_acpi_bind,
 	.unbind = rpi_acpi_unbind,
+	.get_trend = rpi_acpi_get_trend,
 };
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
