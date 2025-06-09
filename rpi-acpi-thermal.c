@@ -228,7 +228,7 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	data->tzd = thermal_zone_device_register_with_trips(DRIVER_NAME,
 		data->trips, data->trip_count, 0, data,
-		&rpi_acpi_thermal_ops, NULL, 0, 1000);
+		&rpi_acpi_thermal_ops, NULL, THERMAL_DEVICE_ENABLED, 1000);
 
 	if (IS_ERR(data->tzd)) {
 		dev_err(&pdev->dev, "Failed to register thermal zone\n");
