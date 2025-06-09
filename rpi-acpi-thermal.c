@@ -151,7 +151,7 @@ static int rpi_acpi_get_trend(struct thermal_zone_device *tz,
                               const struct thermal_trip *trip,
                               enum thermal_trend *trend)
 {
-	int temp=tx->temperature;
+	int temp=tz->temperature;
 	
 
 	if (temp < trip->temperature - trip->hysteresis)
