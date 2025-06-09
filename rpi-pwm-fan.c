@@ -458,7 +458,7 @@ static int pwm_fan_remove(struct platform_device *pdev)
 			}
 		} else {
 			dev_warn(ctx->dev,
-			         "No thermal zone recorded — skipping unbind\n");
+			         "No thermal zone recorded, skipping unbind\n");
 		}
 
 		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
