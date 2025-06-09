@@ -453,8 +453,18 @@ MODULE_DEVICE_TABLE(acpi, acpi_pwm_fan_match);
 static int pwm_fan_remove(struct platform_device *pdev)
 {
 	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
+	int i;
 
 	if (ctx->cdev) {
+		/* Unbind from all thermal zones */
+		struct thermal_zone_device *tz;
+		for_each_thermal_zone(tz) {
+			for (i = 0; i < tz->num_trips; i++) {
+				thermal_zone_unbind_cooling_device(tz, i, ctx->cdev);
+				dev_info(&tz->device, "Unbound cooling device from trip %d\n", i);
+			}
+		}
+
 		sysfs_remove_link(&ctx->cdev->device.kobj, "device");
 		sysfs_remove_link(&ctx->dev->kobj, "thermal_cooling");
 		thermal_cooling_device_unregister(ctx->cdev);
@@ -464,6 +474,7 @@ static int pwm_fan_remove(struct platform_device *pdev)
 
 	return 0;
 }
+
 
 static struct platform_driver pwm_fan_driver = {
 	.probe		= pwm_fan_probe,

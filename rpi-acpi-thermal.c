@@ -100,12 +100,45 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz, struct thermal_cooling_
 			dev_err(&tz->device, "Failed to bind cooling device to trip %d: %d\n", i, ret);
 	}
 
+
+
 	return 0;
 }
+
+static int rpi_acpi_unbind(struct thermal_zone_device *tz, struct thermal_cooling_device *cdev)
+{
+	struct rpi_acpi_thermal *data = tz->devdata;
+	int i;
+
+	if (!data || !data->cdev_adev) {
+		dev_err(&tz->device, "No cooling device ACPI companion available for unbind\n");
+		return -EINVAL;
+	}
+
+	/* Fallback: match by string name instead of dev pointer */
+	if (!strstr(cdev->type, "pwm-fan")) {
+		dev_info(&tz->device, "Ignoring unmatched cooling device on unbind: %s\n", cdev->type);
+		return 0;
+	}
+
+	dev_info(&tz->device, "Unbinding cooling device: %s\n", cdev->type);
+
+	for (i = 0; i < data->trip_count; i++) {
+		dev_info(&tz->device, "Unbinding trip %d from cooling device\n", i);
+		int ret = thermal_zone_unbind_cooling_device(tz, i, cdev);
+		if (ret)
+			dev_err(&tz->device, "Failed to unbind cooling device from trip %d: %d\n", i, ret);
+	}
+
+	return 0;
+}
+
+
 
 static struct thermal_zone_device_ops rpi_acpi_thermal_ops = {
 	.get_temp = rpi_acpi_get_temp,
 	.bind = rpi_acpi_bind,
+	.unbind = rpi_acpi_unbind,
 };
 
 static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle parent)
@@ -244,12 +277,14 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 
 	data->tzd = thermal_zone_device_register_with_trips(DRIVER_NAME,
 		data->trips, data->trip_count, 0, data,
-		&rpi_acpi_thermal_ops, NULL, THERMAL_DEVICE_ENABLED, 1000);
+		&rpi_acpi_thermal_ops, NULL, 0, 1000);
 
 	if (IS_ERR(data->tzd)) {
 		dev_err(&pdev->dev, "Failed to register thermal zone\n");
 		return PTR_ERR(data->tzd);
 	}
+
+
 
 	for (int i = 0; i < data->trip_count; i++) {
 	struct thermal_trip t;
@@ -259,6 +294,14 @@ static int rpi_acpi_probe(struct platform_device *pdev)
 }
 	dev_info(&pdev->dev, "Registered thermal zone %s with %d trips\n",
 	         DRIVER_NAME, data->trip_count);
+
+
+	ret= thermal_zone_device_enable(data->tzd);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to enable thermal zone: %d\n", ret);
+		thermal_zone_device_unregister(data->tzd);
+		return ret;
+	}
 
 	return 0;
 }
