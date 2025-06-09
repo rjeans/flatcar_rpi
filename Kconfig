@@ -28,12 +28,10 @@ config RPI_PWM_POE_ACPI
 
 config RPI_ACPI_THERMAL
     tristate "Raspberry Pi Thermal Device for PWM fan"
-    depends on ACPI 
+    depends on ACPI
     depends on THERMAL
-    set RPI_WWM_FAN_ACPI
     help
       Enables support for the Raspberry Pi Thermal Device Controller
 
 
 endif
-
