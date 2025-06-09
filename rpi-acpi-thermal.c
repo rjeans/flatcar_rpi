@@ -55,15 +55,6 @@ static int rpi_acpi_get_temp(struct thermal_zone_device *tz, int *temp)
 
 	*temp = ((int)val - 2732) * 100;
 
-	dev_info(&tz->device, "Current temperature: %d.%02d C\n",
-	         *temp / 1000, abs(*temp) % 1000);
-	
-			dev_info(&tz->device, "thermal_zone_device: id=%d, type=%s, num_trips=%d, mode=%d, temperature=%d, last_temperature=%d, emul_temperature=%d, polling_delay_jiffies=%lu, passive_delay_jiffies=%lu, suspended=%d\n",
-					 tz->id, tz->type, tz->num_trips, tz->mode, tz->temperature, tz->last_temperature,
-					 tz->emul_temperature, tz->polling_delay_jiffies, tz->passive_delay_jiffies, tz->suspended);
-
-					dev_info(&tz->device, "prev_low_trip=%d, prev_high_trip=%d\n",
-							 tz->prev_low_trip, tz->prev_high_trip);
 	return 0;
 }
 
@@ -81,7 +72,6 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz,
 
 	/* Fallback: match by cooling device type */
 	if (!strstr(cdev->type, "pwm-fan")) {
-		dev_info(&tz->device, "Ignoring unmatched cooling device: %s\n", cdev->type);
 		return 0;
 	}
 
@@ -161,9 +151,6 @@ static int rpi_acpi_get_trend(struct thermal_zone_device *tz,
 	else
 		*trend = THERMAL_TREND_STABLE;
 
-	dev_info(&tz->device,
-		"Trend check: temp=%d, trip=%d, hyst=%d, trend=%d\n",
-		temp, trip->temperature, trip->hysteresis, *trend);
 
 	return 0;
 }
@@ -183,33 +170,18 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 	acpi_handle result = NULL;
 
 	status = acpi_evaluate_object(parent, "_DSD", NULL, &buf);
-	if (ACPI_FAILURE(status)) {
-		dev_err(dev, "_DSD evaluation failed: %s\n", acpi_format_exception(status));
+	if (ACPI_FAILURE(status))
 		return NULL;
-	}
 
 	dsd = buf.pointer;
-	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE) {
-		dev_err(dev, "_DSD is not a package (type=%d)\n", dsd ? dsd->type : -1);
-		kfree(buf.pointer);
-		return NULL;
-	}
-
-	if (dsd->package.count < 2) {
-		dev_err(dev, "_DSD package too short (%d elements)\n", dsd->package.count);
-		kfree(buf.pointer);
-		return NULL;
-	}
+	if (!dsd || dsd->type != ACPI_TYPE_PACKAGE || dsd->package.count < 2)
+		goto out;
 
 	union acpi_object *uuid = &dsd->package.elements[0];
 	union acpi_object *props = &dsd->package.elements[1];
 
-	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE) {
-		dev_err(dev, "_DSD UUID or properties malformed (uuid type=%d, props type=%d)\n",
-		        uuid->type, props->type);
-		kfree(buf.pointer);
-		return NULL;
-	}
+	if (uuid->type != ACPI_TYPE_BUFFER || props->type != ACPI_TYPE_PACKAGE)
+		goto out;
 
 	for (int i = 0; i < props->package.count; i++) {
 		union acpi_object *entry = &props->package.elements[i];
@@ -223,37 +195,19 @@ static acpi_handle find_cooling_device_handle(struct device *dev, acpi_handle pa
 		if (key->type != ACPI_TYPE_STRING)
 			continue;
 
-		dev_info(dev, "_DSD property: %s (type %d)\n", key->string.pointer, val->type);
-
 		if (!strcmp(key->string.pointer, "cooling-device")) {
 			if (val->type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->reference.handle;
-				dev_info(dev, "Found cooling-device as direct reference\n");
 			} else if (val->type == ACPI_TYPE_PACKAGE &&
 			           val->package.count > 0 &&
 			           val->package.elements[0].type == ACPI_TYPE_LOCAL_REFERENCE) {
 				result = val->package.elements[0].reference.handle;
-				dev_info(dev, "Found cooling-device inside package (count=%d)\n",
-				         val->package.count);
 			}
 			break;
 		}
 	}
 
-	if (result) {
-		struct acpi_buffer path_buf = { ACPI_ALLOCATE_BUFFER, NULL };
-		status = acpi_get_name(result, ACPI_FULL_PATHNAME, &path_buf);
-		if (ACPI_SUCCESS(status)) {
-			dev_info(dev, "Cooling-device ACPI path: %s\n", (char *)path_buf.pointer);
-			kfree(path_buf.pointer);
-		} else {
-			dev_info(dev, "Cooling-device: ACPI path resolution failed (%s)\n",
-			         acpi_format_exception(status));
-		}
-	} else {
-		dev_err(dev, "cooling-device not found in _DSD properties\n");
-	}
-
+out:
 	kfree(buf.pointer);
 	return result;
 }
