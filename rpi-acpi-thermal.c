@@ -98,7 +98,7 @@ static int rpi_acpi_bind(struct thermal_zone_device *tz,
 	}
 
 	ctx->tz = tz;
-	ctx->trip_count = data->trip_count;
+
 
 	dev_info(&tz->device, "Binding cooling device: %s\n", cdev->type);
 
@@ -148,7 +148,7 @@ static int rpi_acpi_unbind(struct thermal_zone_device *tz,
 	}
 
 	ctx->tz = NULL;
-	ctx->trip_count = 0;
+
 
 	return 0;
 }
