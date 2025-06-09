@@ -15,14 +15,24 @@ config RPI_PWM_FAN_ACPI
 config RPI_MAILBOX_ACPI
     tristate "Raspberry Pi ACPI mailbox client"
     depends on ACPI
+    depends on MAILBOX
     help
       Enables the mailbox interface as an ACPI client device.
 
 config RPI_PWM_POE_ACPI
     tristate "Raspberry Pi PoE PWM ACPI device"
     depends on ACPI
+    depends on RPI_MAILBOX_ACPI
     help
       Enables support for controlling the PoE fan via PWM from ACPI.
+
+config RPI_ACPI_THERMAL
+    tristate "Raspberry Pi Thermal Device for PWM fan"
+    depends on ACPI 
+    depends on THERMAL
+    set RPI_WWM_FAN_ACPI
+    help
+      Enables support for the Raspberry Pi Thermal Device Controller
 
 
 endif
