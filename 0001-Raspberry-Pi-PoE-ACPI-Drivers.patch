@@ -45,7 +45,7 @@ index eaa09bf..b6b6851 100644
  
  obj-$(CONFIG_RISCV)		+= riscv/
 +
-+obj-$(CONFIG_RPI_ACPI)
++obj-$(CONFIG_RPI_ACPI)  += rpi/
 diff --git a/drivers/acpi/rpi/Kconfig b/drivers/acpi/rpi/Kconfig
 new file mode 100644
 index 0000000..4647695
