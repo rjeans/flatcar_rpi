@@ -27,7 +27,7 @@ This is the ACPI PWM driver for the Raspberry Pi PoE HAT fan. It uses the `rpi-m
 - Period is fixed at 80,000 ns (12.5 kHz)
 - Supports `pwm_apply`, `get_state`, `capture`, etc.
 
-**ACPI ID**: `BCM2853`
+**ACPI ID**: `PWMF0001`
 
 ### 3. rpi-pwm-fan.c / rpi-pwm-fan.h
 
